@@ -1,12 +1,12 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="utf-8" />
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1, viewport-fit=cover"
     />
-    <title>Peer Connect: peer tutoring for your school</title>
+    <title>Peer Connect: peer learning for your school</title>
     <style>
 :root {
   --bg: #f3f6fb;
@@ -37,6 +37,7 @@
   }
 }
 :root[data-theme="dark"] {
+  color-scheme: dark;
   --bg: #0c1224;
   --surface: #151d36;
   --ink: #eef2ff;
@@ -982,6 +983,16 @@ dialog.auth-screen #dbody { width: 100%; height: 100%; display: grid; grid-templ
 .profile-page .profile-head h2 { font-size:clamp(30px,4vw,48px); }
 .profile-page .profile-tabs { padding:14px clamp(18px,3vw,42px); }
 .profile-page .profile-content { padding:24px clamp(18px,3vw,42px); max-height:none; overflow:visible; min-height:180px; }
+.profile-page .av { overflow:hidden; }
+.profile-page .av img { width:100%; height:100%; object-fit:cover; }
+.card .av { overflow:hidden; }
+.card .av img { width:100%; height:100%; object-fit:cover; }
+.profile-social { display:flex; align-items:center; flex-wrap:wrap; gap:18px; margin:12px 0 16px; color:var(--muted); }
+.profile-social b { color:var(--ink); }
+.profile-appearance { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+.profile-appearance input[type=file] { position:absolute; width:1px; height:1px; opacity:0; overflow:hidden; }
+.profile-appearance label { cursor:pointer; }
+.profile-page .profile-cover { background-size:cover; background-position:center; }
 .verify-badge { color:var(--green); border:1px solid var(--green); border-radius:99px; padding:2px 9px; font-size:12px; font-weight:700; }
 .verify-review-state { color:var(--muted); border:1px solid var(--line); border-radius:99px; padding:2px 9px; font-size:12px; font-weight:700; }
 .verify-status { border-left:4px solid var(--brand); }
@@ -997,13 +1008,13 @@ dialog.auth-screen #dbody { width: 100%; height: 100%; display: grid; grid-templ
         <a class="logo" href="#home"><i></i>Peer Connect</a>
         <nav>
           <a class="h" data-nav="home" href="#home">Home</a
-          ><a class="h" data-nav="tutors" href="#tutors">Tutors</a
-          ><a class="h tutor-only" data-role-nav="tutor" data-nav="dashboard" href="#dashboard" hidden>Tutor dashboard</a
-          ><a class="h admin-only" data-nav="verification" href="#verification" hidden>Verify tutors</a
+          ><a class="h" data-nav="tutors" href="#tutors">Mentors</a
+          ><a class="h tutor-only" data-role-nav="tutor" data-nav="dashboard" href="#dashboard" hidden>Mentor dashboard</a
+          ><a class="h admin-only" data-nav="verification" href="#verification" hidden>Verify mentors</a
           ><a class="h" data-nav="doubts" href="#doubts">Doubts</a
           ><a class="h" data-nav="pricing" href="#pricing">Pricing</a
           ><a class="h" data-nav="me" href="#me">My page</a
-          ><button class="btn ghost h" id="btnTutor">Become a tutor</button
+          ><button class="btn ghost h" id="btnTutor">Become a mentor</button
           ><button class="btn gbtn" id="gsign">Sign up / Sign in</button>
         </nav>
       </div>
@@ -1013,19 +1024,19 @@ dialog.auth-screen #dbody { width: 100%; height: 100%; display: grid; grid-templ
       <div class="wrap hero" data-v="home">
         <h1 id="homeTitle">Find a classmate who gets it.</h1>
         <p id="homeIntro">
-          Peer Connect is a peer tutoring network for your school. Find tutors, ask
-          your doubts, and learn from students who have been through the same
+          Peer Connect is a peer learning network for your school. Find mentors, ask
+          questions, and learn from people who have been through the same
           exams.
         </p>
         <div class="search" id="homeActions">
-          <a class="btn" href="#tutors">Find a tutor</a
+          <a class="btn" href="#tutors">Find a mentor</a
           ><a class="btn ghost" href="#doubts">Ask a doubt</a>
         </div>
         <div class="homecards" id="homeCards">
           <a href="#tutors"
-            ><b>Tutors</b
+            ><b>Mentors</b
             ><span
-              >Search verified tutors by subject and send a connection
+              >Search verified mentors by subject and send a connection
               request.</span
             ></a
           >
@@ -1052,9 +1063,9 @@ dialog.auth-screen #dbody { width: 100%; height: 100%; display: grid; grid-templ
         </div>
       </section>
       <div class="wrap hero" data-v="tutors">
-        <h1>Verified tutors</h1>
+        <h1>Verified mentors</h1>
         <p>
-          Find a senior tutor by subject and location. Open a profile to see
+          Find a mentor by subject and location. Open a profile to see
           their school, subjects, and recent answers.
         </p>
         <div class="search">
@@ -1085,16 +1096,16 @@ dialog.auth-screen #dbody { width: 100%; height: 100%; display: grid; grid-templ
 
       <section id="dashboard" data-v="dashboard">
         <div class="wrap">
-          <h2>Tutor dashboard</h2>
-          <p>Manage your availability, review requests, and help students get unstuck.</p>
+          <h2>Mentor dashboard</h2>
+          <p>Manage your availability, review requests, and help learners get unstuck.</p>
           <div id="tutorDashboardBody"></div>
         </div>
       </section>
 
       <section id="verification" data-v="verification" hidden>
         <div class="wrap">
-          <h2>Tutor verification review</h2>
-          <p>Review both submitted documents. Approving gives the tutor a green Verified badge and lists their profile in tutor search.</p>
+          <h2>Mentor verification review</h2>
+          <p>Review both submitted documents. Approval gives the mentor a green Verified badge and lists their profile in mentor search.</p>
           <div id="verificationAdminBody"></div>
         </div>
       </section>
@@ -1128,7 +1139,7 @@ dialog.auth-screen #dbody { width: 100%; height: 100%; display: grid; grid-templ
             <div id="flist"></div>
           </div>
           <aside class="doubt-side" aria-label="Peer learning tips">
-            <div class="doubt-side-card"><h3>Learn together</h3><p>Ask a clear question, share what you tried, and help another student when you can.</p><a class="btn ghost" href="#tutors">Find a tutor</a></div>
+          <div class="doubt-side-card"><h3>Learn together</h3><p>Ask a clear question, share what you tried, and guide another learner when you can.</p><a class="btn ghost" href="#tutors">Find a mentor</a></div>
             <div class="doubt-side-card"><h3>Keep it helpful</h3><ul><li>Include the subject and key steps.</li><li>Be respectful when answering.</li><li>Never post personal or private details.</li></ul></div>
           </aside>
           </div>
@@ -1146,21 +1157,21 @@ dialog.auth-screen #dbody { width: 100%; height: 100%; display: grid; grid-templ
             <li>
               <b>Make a profile</b
               ><span
-                >Students list their grade and subjects. Tutors add marks,
+                >Learners list their class and subjects. Mentors add their areas of strength,
                 topics and free time.</span
               >
             </li>
             <li>
               <b>Get verified</b
               ><span
-                >Tutors pass a short topic test or get a teacher’s
+                >Mentors submit school documents for verification,
                 recommendation before they show a verified badge.</span
               >
             </li>
             <li>
               <b>Connect</b
               ><span
-                >Send a request with the topic you need help with. The tutor
+                >Send a request with the topic you need help with. The mentor
                 accepts and picks a time.</span
               >
             </li>
@@ -1168,7 +1179,7 @@ dialog.auth-screen #dbody { width: 100%; height: 100%; display: grid; grid-templ
               <b>Meet and rate</b
               ><span
                 >After a 45-minute session, both sides leave short feedback that
-                builds the tutor’s profile.</span
+                builds the mentor’s profile.</span
               >
             </li>
           </ol>
@@ -1179,15 +1190,15 @@ dialog.auth-screen #dbody { width: 100%; height: 100%; display: grid; grid-templ
         <div class="wrap">
           <h2>Simple and free to start</h2>
           <p>
-            Students and tutors both join for free, and the green Verified badge
-            is always free. Every student can send unlimited connection requests.
+            Learners and mentors both join for free, and the green Verified badge
+            is always free. Every learner can send unlimited guidance requests.
           </p>
           <div class="plans">
             <div class="plan">
-              <h3>Student</h3>
+              <h3>Learner</h3>
               <div class="price">₹0</div>
               <ul>
-                <li>Full profile and tutor search</li>
+                <li>Full profile and mentor search</li>
                 <li>Unlimited connection requests</li>
                 <li>Ask and answer study doubts</li>
                 <li>Build a profile with your class</li>
@@ -1195,18 +1206,18 @@ dialog.auth-screen #dbody { width: 100%; height: 100%; display: grid; grid-templ
               <button class="btn ghost" id="btnFree">Create a free account</button>
             </div>
             <div class="plan">
-              <h3>Tutor</h3>
+              <h3>Mentor</h3>
               <div class="price">Free</div>
               <ul>
-                <li>Your own tutor profile</li>
+                <li>Your own mentor profile</li>
                 <li>Verified badge after a teacher or topic test check</li>
-                <li>Accept or decline student requests</li>
+                <li>Accept or decline learner requests</li>
                 <li>Pause your profile when unavailable</li>
               </ul>
-              <button class="btn ghost" id="btnTutor2">Create tutor profile</button>
+              <button class="btn ghost" id="btnTutor2">Create mentor profile</button>
             </div>
             <div class="plan">
-              <h3>Tutor blue tick</h3>
+              <h3>Mentor blue tick</h3>
               <div class="price">One-time payment</div>
               <ul>
                 <li>Blue tick next to your name</li>
@@ -1229,7 +1240,7 @@ dialog.auth-screen #dbody { width: 100%; height: 100%; display: grid; grid-templ
 
     <nav class="tabbar" aria-label="Main">
       <a data-nav="home" href="#home">Home</a
-      ><a data-nav="tutors" href="#tutors">Tutors</a
+      ><a data-nav="tutors" href="#tutors">Mentors</a
       ><a class="tutor-only" data-role-nav="tutor" data-nav="dashboard" href="#dashboard" hidden>Dashboard</a
       ><a class="admin-only" data-nav="verification" href="#verification" hidden>Verify</a
       ><a data-nav="doubts" href="#doubts">Doubts</a
@@ -1238,7 +1249,7 @@ dialog.auth-screen #dbody { width: 100%; height: 100%; display: grid; grid-templ
     </nav>
     <footer>
       <div class="wrap">
-        Peer Connect is a student-run project. Tutors are students, so sessions
+        Peer Connect is a learner community. Mentors are learners too, so sessions
         take place in school or in a supervised space.
       </div>
     </footer>

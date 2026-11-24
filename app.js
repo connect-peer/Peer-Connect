@@ -37,6 +37,10 @@ var active = "All",
   tutorState = "",
   tutorCity = "";
 var activeTutorProfile = null;
+function canMentor(account) { return !!account && ["mentor", "both", "tutor"].indexOf(account.role) >= 0; }
+function canLearn(account) { return !!account && ["learner", "both", "student"].indexOf(account.role) >= 0; }
+function normalizeRole(role) { return role === "student" ? "learner" : role === "tutor" ? "mentor" : role; }
+function accountTypeLabel(role) { return role === "both" ? "Learner + Mentor" : canMentor({ role: role }) ? "Mentor" : "Learner"; }
 var grid = document.getElementById("grid"),
   chips = document.getElementById("chips");
 function ini(n) {
@@ -77,11 +81,11 @@ function draw() {
   list.sort(function (a, b) {
     return (b.blue ? 1 : 0) - (a.blue ? 1 : 0);
   });
-  document.getElementById("count").textContent = list.length + (list.length === 1 ? " verified tutor" : " verified tutors");
+  document.getElementById("count").textContent = list.length + (list.length === 1 ? " verified mentor" : " verified mentors");
   if (!list.length) {
     grid.innerHTML = tutors.length
-      ? '<div class="empty">No tutors match. Try another subject or a shorter search.</div>'
-      : '<div class="empty">No tutor profiles have been approved for search yet.</div>';
+      ? '<div class="empty">No mentors match. Try another subject or a shorter search.</div>'
+      : '<div class="empty">No mentor profiles have been approved for search yet.</div>';
     return;
   }
   grid.innerHTML = list
@@ -89,11 +93,11 @@ function draw() {
       var i = tutors.indexOf(t),
         done = sent[t.user_id];
       return (
-        '<article class="card" data-profile-index="' + i + '" tabindex="0" aria-label="View ' + esc(t.n) + ' tutor profile"><div class="cover" style="--c:' +
+        '<article class="card" data-profile-index="' + i + '" tabindex="0" aria-label="View ' + esc(t.n) + ' mentor profile"><div class="cover" style="--c:' +
         t.c +
         '"></div><div class="body">' +
         '<div class="av">' +
-        ini(t.n) +
+        (t.avatarUrl ? '<img src="' + esc(t.avatarUrl) + '" alt="">' : ini(t.n)) +
         "</div>" +
         '<h3><span class="tutor-name">' +
         esc(t.n) +
@@ -166,9 +170,9 @@ grid.addEventListener("click", async function (e) {
     openSign();
     return;
   }
-  if (user.role !== "student") {
+  if (!canLearn(user)) {
     document.getElementById("count").textContent =
-      "Student accounts can send connection requests.";
+      "Choose Learner or Both to send guidance requests.";
     return;
   }
   var tutor = tutors[Number(b.dataset.i)];
@@ -200,12 +204,18 @@ function renderTutorProfilePage() {
   var root = document.getElementById("tutorProfileContent");
   if (!tutor || !root) return;
   var locationText = [tutor.school, tutor.city, tutor.state, tutor.country].filter(Boolean).join(" · ");
-  root.innerHTML = '<button type="button" class="btn ghost profile-back" id="profileBack">← Back to tutors</button><div class="profile-cover"></div><section class="profile-head"><div class="av">' + esc(ini(tutor.n)) + '</div><h2>' + esc(tutor.n) + (tutor.verified ? ' <span class="verify-badge">Verified</span>' : tutor.me ? ' <span class="verify-review-state">' + esc(tutor.verificationStatus || "Not verified") + '</span>' : '') + '</h2><div class="profile-meta">' + esc(tutor.g) + ' · ' + esc(locationText) + '</div><p>' + esc(tutor.h) + '</p><div class="tags">' + tutor.s.map(function (subject) { return '<span class="tag">' + esc(subject) + '</span>'; }).join("") + '</div><button class="btn" id="profileConnect" ' + ((sent[tutor.user_id] && !tutor.me) ? 'disabled' : '') + '>' + (tutor.me ? 'Edit profile' : sent[tutor.user_id] ? 'Request sent' : 'Connect') + '</button></section><div class="profile-tabs"><button class="btn ghost" data-profile-tab="about" aria-pressed="true">About</button><button class="btn ghost" data-profile-tab="answers" aria-pressed="false">Answers</button></div><div class="profile-content" id="profileContent"><h3>About</h3><p>' + esc(tutor.h || 'Student tutor') + '</p><p class="muted">School: ' + esc(tutor.school || '—') + '<br>Location: ' + esc([tutor.city, tutor.state, tutor.country].filter(Boolean).join(', ') || '—') + '</p></div>';
+  root.innerHTML = '<button type="button" class="btn ghost profile-back" id="profileBack">← Back to mentors</button><div class="profile-cover" id="profileCover"></div><section class="profile-head"><div class="av" id="profileAvatar">' + (tutor.avatarUrl ? '<img src="' + esc(tutor.avatarUrl) + '" alt="">' : esc(ini(tutor.n))) + '</div><h2>' + esc(tutor.n) + (tutor.verified ? ' <span class="verify-badge">Verified</span>' : tutor.me ? ' <span class="verify-review-state">' + esc(tutor.verificationStatus || "Not verified") + '</span>' : '') + '</h2><div class="profile-meta">Class ' + esc(String(tutor.g || "").replace(/^Class\s*/i, "")) + ' · ' + esc(locationText) + '</div><p>' + esc(tutor.h) + '</p><div class="tags">' + tutor.s.map(function (subject) { return '<span class="tag">' + esc(subject) + '</span>'; }).join("") + '</div><div class="profile-social" id="profileSocialStats"><span>Loading followers…</span></div><button class="btn" id="profileConnect" ' + ((sent[tutor.user_id] && !tutor.me) ? 'disabled' : '') + '>' + (tutor.me ? 'Edit mentor profile' : sent[tutor.user_id] ? 'Request sent' : 'Connect') + '</button>' + (tutor.me ? '<div class="profile-appearance"><label class="btn ghost">Change profile photo<input type="file" accept="image/jpeg,image/png,image/webp" data-profile-image="avatar"></label><label class="btn ghost">Change banner<input type="file" accept="image/jpeg,image/png,image/webp" data-profile-image="banner"></label></div>' : '') + '</section><div class="profile-tabs"><button class="btn ghost" data-profile-tab="about" aria-pressed="true">About</button><button class="btn ghost" data-profile-tab="answers" aria-pressed="false">Answers</button></div><div class="profile-content" id="profileContent"><h3>About</h3><p>' + esc(tutor.h || 'Peer Connect mentor') + '</p><p class="muted">School: ' + esc(tutor.school || '—') + '<br>Location: ' + esc([tutor.city, tutor.state, tutor.country].filter(Boolean).join(', ') || '—') + '</p></div>';
+  var cover = document.getElementById("profileCover");
+  if (tutor.bannerUrl) cover.style.backgroundImage = 'url("' + tutor.bannerUrl.replace(/["\\\\]/g, "") + '")';
+  loadProfileSocial(tutor);
+  root.querySelectorAll("[data-profile-image]").forEach(function (input) {
+    input.onchange = async function () { if (input.files[0]) await uploadProfileImage(input.files[0], input.dataset.profileImage); };
+  });
   document.getElementById("profileBack").onclick = function () { location.hash = "tutors"; };
   document.getElementById("profileConnect").onclick = async function () {
     if (tutor.me) { openTutor(); return; }
     if (!user) { openSign(); return; }
-    if (user.role !== "student") { document.getElementById("profileContent").textContent = "Student accounts can send connection requests."; return; }
+    if (!canLearn(user)) { document.getElementById("profileContent").textContent = "Learner accounts can send connection requests."; return; }
     var result = await supabaseClient.from("connections").insert({ requester_id: user.id, recipient_id: tutor.user_id });
     if (result.error) { document.getElementById("profileContent").textContent = authErrorText(result.error); return; }
     sent[tutor.user_id] = true;
@@ -213,12 +223,23 @@ function renderTutorProfilePage() {
     this.textContent = "Request sent";
     draw();
   };
+  var socialRoot = document.getElementById("profileSocialStats");
+  socialRoot.onclick = async function (event) {
+    var followButton = event.target.closest("[data-follow-profile]");
+    if (!followButton) return;
+    if (!user) { openSign(); return; }
+    followButton.disabled = true;
+    var action = followButton.dataset.following === "true" ? supabaseClient.from("follows").delete().eq("follower_id", user.id).eq("following_id", tutor.user_id) : supabaseClient.from("follows").insert({ follower_id: user.id, following_id: tutor.user_id });
+    var result = await action;
+    if (result.error) { followButton.disabled = false; window.alert(authErrorText(result.error)); return; }
+    loadProfileSocial(tutor);
+  };
   root.querySelectorAll("[data-profile-tab]").forEach(function (button) {
     button.onclick = async function () {
       root.querySelectorAll("[data-profile-tab]").forEach(function (tab) { tab.setAttribute("aria-pressed", String(tab === button)); });
       var content = document.getElementById("profileContent");
       if (button.dataset.profileTab === "about") {
-        content.innerHTML = '<h3>About</h3><p>' + esc(tutor.h || 'Student tutor') + '</p><p class="muted">School: ' + esc(tutor.school || '—') + '<br>Location: ' + esc([tutor.city, tutor.state, tutor.country].filter(Boolean).join(', ') || '—') + '</p>';
+        content.innerHTML = '<h3>About</h3><p>' + esc(tutor.h || 'Peer Connect mentor') + '</p><p class="muted">School: ' + esc(tutor.school || '—') + '<br>Location: ' + esc([tutor.city, tutor.state, tutor.country].filter(Boolean).join(', ') || '—') + '</p>';
         return;
       }
       content.innerHTML = '<p class="muted">Loading answers…</p>';
@@ -227,6 +248,38 @@ function renderTutorProfilePage() {
       content.innerHTML = (result.data || []).length ? '<h3>Recent answers</h3>' + result.data.map(function (answer) { var doubt = Array.isArray(answer.doubts) ? answer.doubts[0] : answer.doubts || {}; return '<article class="box"><b>' + esc(doubt.subject || 'Answer') + '</b><p>' + esc(answer.content || '') + '</p>' + (doubt.title ? '<p class="muted">On: ' + esc(doubt.title) + '</p>' : '') + '</article>'; }).join("") : '<p class="muted">No answers yet.</p>';
     };
   });
+}
+async function loadProfileSocial(tutor) {
+  var target = document.getElementById("profileSocialStats");
+  if (!target || !tutor) return;
+  var queries = [
+    supabaseClient.from("follows").select("follower_id", { count: "exact", head: true }).eq("following_id", tutor.user_id),
+    supabaseClient.from("follows").select("following_id", { count: "exact", head: true }).eq("follower_id", tutor.user_id),
+  ];
+  if (user && user.id !== tutor.user_id) queries.push(supabaseClient.from("follows").select("following_id").eq("follower_id", user.id).eq("following_id", tutor.user_id).maybeSingle());
+  var results = await Promise.all(queries);
+  if (results[0].error || results[1].error) { target.innerHTML = '<span>Followers unavailable</span>'; return; }
+  var following = !!(user && user.id !== tutor.user_id && results[2] && results[2].data);
+  target.innerHTML = '<span><b>' + (results[0].count || 0) + '</b> followers</span><span><b>' + (results[1].count || 0) + '</b> following</span>' + (user && user.id !== tutor.user_id ? '<button type="button" class="btn ghost" data-follow-profile data-following="' + following + '">' + (following ? 'Following' : 'Follow') + '</button>' : '');
+}
+async function uploadProfileImage(file, kind) {
+  if (!user || !supabaseClient) return;
+  var allowed = ["image/jpeg", "image/png", "image/webp"];
+  if (allowed.indexOf(file.type) < 0 || file.size > 5 * 1024 * 1024) { window.alert("Choose a JPG, PNG, or WebP image under 5 MB."); return; }
+  var ext = file.name.split(".").pop().toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
+  var path = user.id + "/" + kind + "-" + Date.now() + "." + ext;
+  var upload = await supabaseClient.storage.from("profile-media").upload(path, file, { contentType: file.type, upsert: false });
+  if (upload.error) { window.alert(authErrorText(upload.error) + " — run the Peer Connect profile media SQL first."); return; }
+  var url = supabaseClient.storage.from("profile-media").getPublicUrl(path).data.publicUrl;
+  var field = kind === "avatar" ? "avatar_url" : "profile_banner_url";
+  var update = await supabaseClient.from("profiles").update({ [field]: url }).eq("id", user.id);
+  if (update.error) { await supabaseClient.storage.from("profile-media").remove([path]); window.alert(authErrorText(update.error)); return; }
+  if (kind === "avatar") user.avatarUrl = url; else user.bannerUrl = url;
+  if (activeTutorProfile && activeTutorProfile.user_id === user.id) {
+    if (kind === "avatar") activeTutorProfile.avatarUrl = url; else activeTutorProfile.bannerUrl = url;
+    renderTutorProfilePage();
+  }
+  if (curRoute === "me") drawMe();
 }
 
 async function loadTutorDirectory() {
@@ -253,7 +306,21 @@ async function loadTutorDirectory() {
       me: row.user_id === user.id,
     };
   });
-  if (user.role === "tutor" && !tutors.some(function (tutor) { return tutor.user_id === user.id; })) {
+  if (tutors.length) {
+    var directoryIds = tutors.map(function (tutor) { return tutor.user_id; });
+    var directoryMeta = await Promise.all([
+      supabaseClient.from("profiles").select("id, avatar_url, profile_banner_url").in("id", directoryIds),
+      supabaseClient.from("follows").select("follower_id, following_id").or("follower_id.in.(" + directoryIds.join(",") + "),following_id.in.(" + directoryIds.join(",") + ")"),
+    ]);
+    var mediaByUser = {}, followerCounts = {}, followingCounts = {};
+    (directoryMeta[0].data || []).forEach(function (profile) { mediaByUser[profile.id] = profile; });
+    (directoryMeta[1].data || []).forEach(function (follow) {
+      followerCounts[follow.following_id] = (followerCounts[follow.following_id] || 0) + 1;
+      followingCounts[follow.follower_id] = (followingCounts[follow.follower_id] || 0) + 1;
+    });
+    tutors.forEach(function (tutor) { var media = mediaByUser[tutor.user_id] || {}; tutor.avatarUrl = media.avatar_url || ""; tutor.bannerUrl = media.profile_banner_url || ""; tutor.followerCount = followerCounts[tutor.user_id] || 0; tutor.followingCount = followingCounts[tutor.user_id] || 0; });
+  }
+  if (canMentor(user) && !tutors.some(function (tutor) { return tutor.user_id === user.id; })) {
     var ownResults = await Promise.all([
       supabaseClient.from("tutor_profiles").select("user_id, headline, subjects, is_available").eq("user_id", user.id).maybeSingle(),
       supabaseClient.from("tutor_verification_requests").select("status").eq("user_id", user.id).order("submitted_at", { ascending: false }).limit(1),
@@ -269,6 +336,7 @@ async function loadTutorDirectory() {
         state: user.location && user.location.state || "", country: user.location && user.location.country || "",
         verified: !!(ownStatus && ownStatus.status === "verified"), verificationStatus: statusLabel,
         available: !!own.is_available, c: "#2B4EFF", me: true,
+        avatarUrl: user.avatarUrl || "", bannerUrl: user.bannerUrl || "",
       });
     }
   }
@@ -283,7 +351,7 @@ async function loadTutorDirectory() {
 }
 
 async function loadStudentConnections() {
-  if (!supabaseClient || !user || user.role !== "student") return;
+  if (!supabaseClient || !canLearn(user)) return;
   var result = await supabaseClient.from("connections")
     .select("recipient_id, status")
     .eq("requester_id", user.id);
@@ -369,12 +437,12 @@ async function syncAuthUser(authUser) {
       (authUser.user_metadata.display_name ||
         authUser.user_metadata.full_name ||
         authUser.user_metadata.name)) ||
-    (authUser.email ? authUser.email.split("@")[0] : "Student");
+    (authUser.email ? authUser.email.split("@")[0] : "Learner");
   var profileResult = null;
   if (supabaseClient) {
     profileResult = await supabaseClient
       .from("profiles")
-      .select("display_name, role, grade")
+      .select("display_name, role, grade, avatar_url, profile_banner_url")
       .eq("id", authUser.id)
       .maybeSingle();
     if (!profileResult.error && profileResult.data && profileResult.data.display_name) {
@@ -389,6 +457,8 @@ async function syncAuthUser(authUser) {
     e: authUser.email || "",
     role: profileResult && profileResult.data ? profileResult.data.role : null,
     grade: profileResult && profileResult.data ? profileResult.data.grade : null,
+    avatarUrl: profileResult && profileResult.data ? profileResult.data.avatar_url : null,
+    bannerUrl: profileResult && profileResult.data ? profileResult.data.profile_banner_url : null,
     location: locationResult && !locationResult.error ? locationResult.data : null,
   };
   var adminResult = await supabaseClient.from("verification_admins").select("user_id").eq("user_id", user.id).maybeSingle();
@@ -397,8 +467,8 @@ async function syncAuthUser(authUser) {
   paintRoleUI();
   if ((!user.role || !user.grade || missingProfileLocation(user.location)) && !onboardingOpen) openOnboarding(false);
   if (user.role) loadTutorDirectory();
-  if (user.role === "student") loadStudentConnections();
-  if (curRoute === "dashboard" && user.role === "tutor") drawTutorDashboard();
+  if (canLearn(user)) loadStudentConnections();
+  if (curRoute === "dashboard" && canMentor(user)) drawTutorDashboard();
   if (typeof drawMe === "function" && curRoute === "me") drawMe();
   route();
 }
@@ -516,11 +586,11 @@ function showAuthForm(mode) {
     '</p></section>' +
     '<aside class="auth-brand-panel" aria-label="About Peer Connect"><div class="auth-brand-top"><span class="auth-brand-mark">P</span>Peer Connect</div>' +
     '<div class="auth-brand-copy"><div class="auth-brand-eyebrow">Learn together, move forward</div><h2>Good guidance starts peer to peer.</h2>' +
-    '<p>Meet students who understand your classes, questions, and goals. Share what you know and get unstuck together.</p>' +
-    '<div class="auth-feature-stack"><div class="auth-feature"><b>◎</b><span><strong>Find a tutor</strong> who knows your subject</span></div>' +
+    '<p>Meet learners who understand your classes, questions, and goals. Share what you know and get unstuck together.</p>' +
+    '<div class="auth-feature-stack"><div class="auth-feature"><b>◎</b><span><strong>Find a mentor</strong> who knows your subject</span></div>' +
     '<div class="auth-feature"><b>↗</b><span><strong>Ask a doubt</strong> and learn from the community</span></div>' +
     '<div class="auth-feature"><b>✓</b><span><strong>Build connections</strong> around learning</span></div></div></div>' +
-    '<div class="auth-brand-foot">A student peer-learning community</div></aside>';
+    '<div class="auth-brand-foot">A peer-learning community</div></aside>';
   if (!dlg.open) dlg.showModal();
   document.getElementById("switchAuth").onclick = function () {
     showAuthForm(signingUp ? "signin" : "signup");
@@ -620,7 +690,7 @@ function openSign() {
       "<br>" +
       esc(user.e) +
       (user.role
-        ? "<br>Account type: " + (user.role === "tutor" ? "Tutor" : "Student")
+        ? "<br>Account type: " + accountTypeLabel(user.role)
         : "") +
       '</p><div class="row"><button class="btn ghost" id="cx">Close</button><button class="btn" id="so">Sign out</button></div>';
     dlg.showModal();
@@ -644,13 +714,11 @@ function openOnboarding(changeRole) {
   dlg.classList.remove("auth-screen");
   dlg.classList.remove("profile-dialog");
   onboardingOpen = true;
-  var selectedRole = changeRole ? "" : (user.role || "");
+  var selectedRole = normalizeRole(user.role) || (changeRole ? "" : "learner");
   var savedLocation = user.location || {};
-  var rolePicker = (!user.role || changeRole)
-    ? '<label>Choose your account type</label><div class="role-options"><button type="button" class="role-option' + (selectedRole === "student" ? " selected" : "") + '" data-role="student"><strong>Student</strong><span>Find tutors, ask questions, and connect without monthly limits.</span></button><button type="button" class="role-option' + (selectedRole === "tutor" ? " selected" : "") + '" data-role="tutor"><strong>Tutor</strong><span>Build a tutor profile, manage requests, and help students.</span></button></div>'
-    : '<p class="muted">Account type: ' + esc(user.role === "tutor" ? "Tutor" : "Student") + '</p>';
+  var rolePicker = '<label>How do you want to use Peer Connect?</label><div class="role-options"><button type="button" class="role-option' + (selectedRole === "learner" || selectedRole === "student" ? " selected" : "") + '" data-role="learner"><strong>Learner</strong><span>Find mentors, ask questions, and get guidance.</span></button><button type="button" class="role-option' + (selectedRole === "mentor" || selectedRole === "tutor" ? " selected" : "") + '" data-role="mentor"><strong>Mentor</strong><span>Share what you know and guide learners in lower classes.</span></button><button type="button" class="role-option' + (selectedRole === "both" ? " selected" : "") + '" data-role="both"><strong>Both</strong><span>Get guidance from seniors and mentor learners in lower classes.</span></button></div>';
   dbody.innerHTML =
-    '<h3 id="dt">Set up your profile</h3><p style="color:var(--muted);margin:6px 0 14px">Add your school and location so you can find peers nearby. Students’ location details are shared only with a tutor after they send you a request.</p>' +
+    '<h3 id="dt">Set up your profile</h3><p style="color:var(--muted);margin:6px 0 14px">Add your school and location so you can find peers nearby. Learner location details are shared only with a mentor after they send a request.</p>' +
     '<label for="profileName">Name</label><input id="profileName" autocomplete="name" value="' + esc(user.n) + '">' +
     '<label for="profileGrade">Class</label><select id="profileGrade"><option value="">Choose your class</option>' +
     [9, 10, 11, 12].map(function (grade) {
@@ -707,8 +775,8 @@ function openOnboarding(changeRole) {
     paintRoleUI();
     dlg.close();
     await loadTutorDirectory();
-    if (selectedRole === "student") await loadStudentConnections();
-    if (selectedRole === "tutor") openTutor();
+    if (canLearn(user)) await loadStudentConnections();
+    if (canMentor(user)) openTutor();
     else {
       location.hash = "home";
       route();
@@ -774,7 +842,7 @@ async function openTutor() {
     openSign();
     return;
   }
-  if (user.role !== "tutor") {
+  if (!canMentor(user)) {
     onboardingOpen = false;
     openOnboarding(true);
     return;
@@ -792,7 +860,7 @@ async function openTutor() {
   }
   var pick = existing.data ? (existing.data.subjects || []).slice() : [];
   dbody.innerHTML =
-    '<h3 id="dt">' + (existing.data ? "Edit your tutor profile" : "Set up your tutor profile") + '</h3><p style="color:var(--muted);margin:6px 0 0">Your class is saved as Class ' + user.grade + '.</p>' +
+    '<h3 id="dt">' + (existing.data ? "Edit your mentor profile" : "Set up your mentor profile") + '</h3><p style="color:var(--muted);margin:6px 0 0">Your class is saved as Class ' + user.grade + '.</p>' +
     '<label for="tn">Name</label><input id="tn" placeholder="Full name" autocomplete="name" value="' +
     (user ? esc(user.n) : "") +
     '">' +
@@ -812,7 +880,7 @@ async function openTutor() {
     '<label for="th">One line about what you teach best</label><input id="th" maxlength="70" placeholder="For example: Algebra and trigonometry, 95% in Class 10" value="' + esc(existing.data ? existing.data.headline || "" : "") + '">' +
     '<div class="err" id="err" role="alert"></div>' +
     '<div class="row"><button class="btn ghost" id="cx">Cancel</button><button class="btn" id="ok">Create profile</button></div>' +
-    '<div class="note">New tutor profiles stay out of search until the school ID and fee receipt are reviewed.</div>';
+    '<div class="note">Mentor profiles stay out of search until school ID and fee receipt verification is approved. All classes can apply.</div>';
   dlg.showModal();
   document.getElementById("cx").onclick = function () {
     dlg.close();
@@ -886,7 +954,7 @@ document.getElementById("btnFree").addEventListener("click", function () { showA
 document.getElementById("btnTutor2").addEventListener("click", openTutor);
 
 function paintRoleUI() {
-  var isTutor = !!user && user.role === "tutor";
+  var isTutor = canMentor(user);
   var isSignedIn = !!user;
   document.querySelectorAll('[data-role-nav="tutor"]').forEach(function (el) { el.hidden = !isTutor; });
   document.querySelectorAll('.admin-only').forEach(function (el) { el.hidden = !isVerificationAdmin; });
@@ -899,15 +967,15 @@ function paintRoleUI() {
   var actions = document.getElementById("homeActions");
   var cards = document.getElementById("homeCards");
   if (isTutor) {
-    title.textContent = "Help classmates learn with confidence.";
-    intro.textContent = "Manage your tutor profile, choose when you are available, and respond to students who want your help.";
-    actions.innerHTML = '<a class="btn" href="#dashboard">Open tutor dashboard</a><a class="btn ghost" href="#doubts">Answer a doubt</a>';
-    cards.innerHTML = '<a href="#dashboard"><b>Your dashboard</b><span>Manage tutor requests, profile, and availability in one place.</span></a><a href="#doubts"><b>Share what you know</b><span>Answer questions and build your reputation with students.</span></a><a href="#pricing"><b>Blue Tick</b><span>Optional one-time payment; price and launch date to be decided.</span></a>';
+    title.textContent = user.role === "both" ? "Learn and help others grow." : "Help learners grow with confidence.";
+    intro.textContent = user.role === "both" ? "Learn from mentors and guide learners in lower classes." : "Manage your mentor profile, choose when you are available, and guide learners.";
+    actions.innerHTML = '<a class="btn" href="#dashboard">Open mentor dashboard</a>' + (user.role === "both" ? '<a class="btn ghost" href="#tutors">Find a mentor</a>' : '<a class="btn ghost" href="#doubts">Answer a question</a>');
+    cards.innerHTML = '<a href="#dashboard"><b>Your dashboard</b><span>Manage learner requests, profile, and availability in one place.</span></a><a href="#doubts"><b>Share what you know</b><span>Answer questions and build your reputation.</span></a>' + (user.role === "both" ? '<a href="#tutors"><b>Get guidance</b><span>Find mentors for the subjects you are learning.</span></a>' : '<a href="#pricing"><b>Blue Tick</b><span>Optional one-time payment; price and launch date to be decided.</span></a>');
   } else {
-    title.textContent = "Find a classmate who gets it.";
-    intro.textContent = "Peer Connect is a peer tutoring network for your school. Find tutors, ask your doubts, and learn from students who have been through the same exams.";
-    actions.innerHTML = '<a class="btn" href="#tutors">Find a tutor</a><a class="btn ghost" href="#doubts">Ask a doubt</a>';
-    cards.innerHTML = '<a href="#tutors"><b>Tutors</b><span>Search tutors by subject and send unlimited connection requests.</span></a><a href="#doubts"><b>Doubts</b><span>Ask questions, upvote the best ones, and answer what you know.</span></a><a href="#pricing"><b>Pricing</b><span>Free for students and tutors. Optional tutor Blue Tick may come later.</span></a>';
+    title.textContent = "Find a mentor who gets it.";
+    intro.textContent = "Peer Connect is a learning network for your school. Find mentors, ask questions, and learn from people who know your topics.";
+    actions.innerHTML = '<a class="btn" href="#tutors">Find a mentor</a><a class="btn ghost" href="#doubts">Ask a question</a>';
+    cards.innerHTML = '<a href="#tutors"><b>Mentors</b><span>Find verified mentors by subject and location.</span></a><a href="#doubts"><b>Questions</b><span>Ask questions, upvote the best ones, and answer what you know.</span></a><a href="#pricing"><b>Pricing</b><span>Free for learners and mentors. Optional Blue Tick may come later.</span></a>';
   }
 }
 document.querySelectorAll('[data-nav="verification"]').forEach(function (link) {
@@ -916,20 +984,20 @@ document.querySelectorAll('[data-nav="verification"]').forEach(function (link) {
 
 var requestLocationState = "", requestLocationCity = "";
 function tutorVerificationPanel(status) {
-  if (Number(user && user.grade) < 11) return '<section class="box verify-status"><b>Tutor verification is for senior students</b><p class="muted">Class 11 and 12 students can apply. A reviewer checks the school ID, fee receipt, tutor subjects, and class before approving.</p></section>';
-  if (status && status.status === "verified") return '<section class="box verify-status"><b><span class="verify-badge">Verified</span> Your tutor profile is approved</b><p class="muted">Your profile can appear in tutor search while availability is on.</p></section>';
-  if (status && status.status === "pending") return '<section class="box verify-status"><b>Verification pending</b><p class="muted">Your school ID and fee receipt are private. A reviewer will check them before your tutor profile becomes visible.</p></section>';
-  if (status && status.status === "rejected") return '<section class="box verify-status"><b>Verification needs another review</b><p class="muted">Resubmit both documents if a reviewer declined them, or if your verified name, class, school, or tutor subjects changed.</p><button class="btn" data-start-verification>Submit documents again</button></section>';
-  return '<section class="box verify-status"><b>Verify your tutor profile</b><p class="muted">Class 11 and 12 tutors can submit a school ID and fee receipt. A trusted reviewer checks your class, school, and tutor subjects before approving the green badge. Files stay private and are removed after review.</p><button class="btn" data-start-verification>Submit for review</button></section>';
+  if (Number(user && user.grade) < 9 || Number(user && user.grade) > 12) return '<section class="box verify-status"><b>Finish your class details</b><p class="muted">Set your class before submitting mentor verification.</p></section>';
+  if (status && status.status === "verified") return '<section class="box verify-status"><b><span class="verify-badge">Verified</span> Your mentor profile is approved</b><p class="muted">Your profile can appear in mentor search while availability is on.</p></section>';
+  if (status && status.status === "pending") return '<section class="box verify-status"><b>Verification pending</b><p class="muted">Your school ID and fee receipt are private. A reviewer will check them before your mentor profile becomes visible.</p></section>';
+  if (status && status.status === "rejected") return '<section class="box verify-status"><b>Verification needs another review</b><p class="muted">Resubmit both documents if a reviewer declined them, or if your verified name, class, school, or subjects changed.</p><button class="btn" data-start-verification>Submit documents again</button></section>';
+  return '<section class="box verify-status"><b>Verify your mentor profile</b><p class="muted">Mentors from every class must submit a school ID and fee receipt. A trusted reviewer checks your class, school, and subjects before approving your profile. Files stay private and are removed after review.</p><button class="btn" data-start-verification>Submit for review</button></section>';
 }
 async function drawTutorDashboard() {
   var body = document.getElementById("tutorDashboardBody");
   if (!body) return;
-  if (!user || user.role !== "tutor") {
-    body.innerHTML = '<div class="box">Sign in with a tutor account to see this dashboard.</div>';
+  if (!canMentor(user)) {
+    body.innerHTML = '<div class="box">Choose Mentor or Both to open the mentor dashboard.</div>';
     return;
   }
-  body.innerHTML = '<div class="box">Loading your tutor dashboard…</div>';
+  body.innerHTML = '<div class="box">Loading your mentor dashboard…</div>';
   var results = await Promise.all([
     supabaseClient.from("tutor_profiles").select("headline, subjects, is_available").eq("user_id", user.id).maybeSingle(),
     supabaseClient.from("tutor_verification_requests").select("id, status, submitted_at").eq("user_id", user.id).order("submitted_at", { ascending: false }).limit(1),
@@ -949,7 +1017,7 @@ async function drawTutorDashboard() {
   var filteredRequests = requests.filter(function (r) { return (!requestLocationState || r.state === requestLocationState) && (!requestLocationCity || r.city === requestLocationCity); });
   body.innerHTML = '<div class="dash-stats"><div class="dash-stat"><b>' + pending + '</b><span>Requests to review</span></div><div class="dash-stat"><b>' + accepted + '</b><span>Connections</span></div><div class="dash-stat"><b>' + (profile && profile.is_available ? "Available" : "Paused") + '</b><span>Profile visibility</span></div></div>' +
     tutorVerificationPanel(status) +
-    '<div class="dash-grid"><section class="box"><div class="dash-heading"><div><b>Your tutor profile</b><p class="muted">' + esc(profile ? profile.headline || "Add a headline" : "Create your profile so classmates can find you.") + '</p></div><button class="btn ghost" data-edit-tutor>Edit profile</button></div><p class="muted">Subjects: ' + esc(profile && profile.subjects ? profile.subjects.join(", ") : "Not set") + '<br>School: ' + esc(user.location && user.location.school || "—") + '<br>Location: ' + esc(user.location ? [user.location.city,user.location.state,user.location.country].join(", ") : "—") + '</p><label class="availability"><input type="checkbox" data-available ' + (profile && profile.is_available ? "checked" : "") + ' ' + (!profile || !status || status.status !== "verified" ? "disabled" : "") + '> Show my profile in tutor search</label></section><section class="box"><b>Privacy</b><p class="muted">Your school and location appear on your tutor profile only after you are verified. Student locations are shared with the tutor receiving their request.</p></section></div>' +
+    '<div class="dash-grid"><section class="box"><div class="dash-heading"><div><b>Your mentor profile</b><p class="muted">' + esc(profile ? profile.headline || "Add a headline" : "Create your profile so learners can find you.") + '</p></div><button class="btn ghost" data-edit-tutor>Edit profile</button></div><p class="muted">Subjects: ' + esc(profile && profile.subjects ? profile.subjects.join(", ") : "Not set") + '<br>School: ' + esc(user.location && user.location.school || "—") + '<br>Location: ' + esc(user.location ? [user.location.city,user.location.state,user.location.country].join(", ") : "—") + '</p><label class="availability"><input type="checkbox" data-available ' + (profile && profile.is_available ? "checked" : "") + ' ' + (!profile || !status || status.status !== "verified" ? "disabled" : "") + '> Show my profile in mentor search</label></section><section class="box"><b>Privacy</b><p class="muted">Your school and location appear on your mentor profile only after verification. Learner locations are shared with the mentor receiving their request.</p></section></div>' +
     '<section class="box request-box"><div class="dash-heading"><div><b>Student requests</b><p class="muted">Accept requests from classmates you can help.</p></div></div><div class="location-filters"><select id="requestStateFilter"><option value="">All states</option>' + states.map(function (s) { return '<option' + (s === requestLocationState ? ' selected' : '') + '>' + esc(s) + '</option>'; }).join("") + '</select><select id="requestCityFilter"><option value="">All cities</option>' + cities.map(function (s) { return '<option' + (s === requestLocationCity ? ' selected' : '') + '>' + esc(s) + '</option>'; }).join("") + '</select></div>' + (filteredRequests.length ? filteredRequests.map(function (r) { return '<article class="request-row"><div><b>' + esc(r.display_name || "Student") + '</b><p class="muted">Class ' + esc(String(r.grade || "—")) + ' · ' + esc([r.school,r.city,r.state,r.country].filter(Boolean).join(", ") || "Location not added") + ' · ' + esc(r.status) + '</p></div>' + (r.status === "pending" ? '<div class="row"><button class="btn" data-request-action="accepted" data-request-id="' + esc(r.connection_id) + '">Accept</button><button class="btn ghost" data-request-action="rejected" data-request-id="' + esc(r.connection_id) + '">Decline</button></div>' : '') + '</article>'; }).join("") : '<p class="muted">No student requests match those filters.</p>') + '</section>';
   document.getElementById("requestStateFilter").onchange = function (event) { requestLocationState = event.target.value; requestLocationCity = ""; drawTutorDashboard(); };
   document.getElementById("requestCityFilter").onchange = function (event) { requestLocationCity = event.target.value; drawTutorDashboard(); };
@@ -973,10 +1041,10 @@ document.getElementById("tutorDashboardBody").addEventListener("change", async f
 });
 
 function openTutorVerificationForm() {
-  if (!user || user.role !== "tutor") return;
+  if (!canMentor(user)) return;
   dlg.classList.remove("auth-screen");
   dlg.classList.remove("profile-dialog");
-  dbody.innerHTML = '<h3 id="dt">Submit tutor verification</h3><p class="muted">Upload a school ID card and a school fee receipt. These files are private and can only be viewed by you and the trusted reviewer.</p><div class="verify-doc-fields"><label>School ID card<input id="verifySchoolId" type="file" accept="image/jpeg,image/png,image/webp,application/pdf"></label><label>Fee receipt<input id="verifyFeeReceipt" type="file" accept="image/jpeg,image/png,image/webp,application/pdf"></label></div><p class="note">Each file must be JPG, PNG, WebP, or PDF and no larger than 5 MB. Do not upload unrelated personal documents.</p><div class="err" id="verificationError" role="alert"></div><div class="row"><button class="btn ghost" id="cancelVerification">Cancel</button><button class="btn" id="submitVerification">Send for review</button></div>';
+  dbody.innerHTML = '<h3 id="dt">Submit mentor verification</h3><p class="muted">Learners from every class can apply to mentor younger learners. Upload a school ID card and fee receipt so a reviewer can verify your class and school. Files remain private.</p><div class="verify-doc-fields"><label>School ID card<input id="verifySchoolId" type="file" accept="image/jpeg,image/png,image/webp,application/pdf"></label><label>Fee receipt<input id="verifyFeeReceipt" type="file" accept="image/jpeg,image/png,image/webp,application/pdf"></label></div><p class="note">Each file must be JPG, PNG, WebP, or PDF and no larger than 5 MB. Do not upload unrelated personal documents.</p><div class="err" id="verificationError" role="alert"></div><div class="row"><button class="btn ghost" id="cancelVerification">Cancel</button><button class="btn" id="submitVerification">Send for review</button></div>';
   if (!dlg.open) dlg.showModal();
   document.getElementById("cancelVerification").onclick = function () { dlg.close(); };
   document.getElementById("submitVerification").onclick = async function () {
@@ -1047,7 +1115,7 @@ async function drawVerificationAdmin() {
       links.push('<div class="admin-doc"><span>' + (items[k].document_type === "school_id" ? "School ID card" : "Fee receipt") + '</span>' + (signed.error ? '<span class="muted">Preview unavailable</span>' : '<a class="btn ghost" target="_blank" rel="noopener" href="' + esc(signed.data.signedUrl) + '">Open private file</a>') + '</div>');
     }
     var tp = tutorProfiles[row.user_id] || {}, hasId = items.some(function (d) { return d.document_type === "school_id"; }), hasReceipt = items.some(function (d) { return d.document_type === "fee_receipt"; });
-    cards.push('<article class="box"><h3>' + esc(p.display_name || "Tutor") + ' · Class ' + esc(String(p.grade || "—")) + '</h3><p class="muted">' + esc([l.school,l.city,l.state,l.country].filter(Boolean).join(" · ") || "Location not set") + '<br>Subjects: ' + esc((tp.subjects || []).join(", ") || "Not set") + '<br>About: ' + esc(tp.headline || "Not set") + '<br>Submitted ' + esc(new Date(row.submitted_at).toLocaleString()) + '</p>' + (links.join("") || '<p class="err">No documents attached.</p>') + '<label>Reviewer note (optional)<input data-review-note="' + esc(row.id) + '" maxlength="500" placeholder="Private note; not shown on the tutor profile"></label><div class="row"><button class="btn" data-review="verified" data-review-id="' + esc(row.id) + '" data-user-id="' + esc(row.user_id) + '" ' + (!(hasId && hasReceipt && Number(p.grade) >= 11 && allDocsAvailable) ? 'disabled title="Both documents must be available and the profile must be Class 11 or 12"' : '') + '>Approve and verify</button><button class="btn ghost" data-review="rejected" data-review-id="' + esc(row.id) + '" data-user-id="' + esc(row.user_id) + '">Reject</button></div></article>');
+    cards.push('<article class="box"><h3>' + esc(p.display_name || "Learner") + ' · Class ' + esc(String(p.grade || "—")) + '</h3><p class="muted">' + esc([l.school,l.city,l.state,l.country].filter(Boolean).join(" · ") || "Location not set") + '<br>Subjects: ' + esc((tp.subjects || []).join(", ") || "Not set") + '<br>About: ' + esc(tp.headline || "Not set") + '<br>Submitted ' + esc(new Date(row.submitted_at).toLocaleString()) + '</p>' + (links.join("") || '<p class="err">No documents attached.</p>') + '<label>Reviewer note (optional)<input data-review-note="' + esc(row.id) + '" maxlength="500" placeholder="Private note; not shown on the mentor profile"></label><div class="row"><button class="btn" data-review="verified" data-review-id="' + esc(row.id) + '" data-user-id="' + esc(row.user_id) + '" ' + (!(hasId && hasReceipt && Number(p.grade) >= 9 && Number(p.grade) <= 12 && allDocsAvailable) ? 'disabled title="Both documents must be available and class must be 9–12"' : '') + '>Approve and verify</button><button class="btn ghost" data-review="rejected" data-review-id="' + esc(row.id) + '" data-user-id="' + esc(row.user_id) + '">Reject</button></div></article>');
   }
   body.innerHTML = cards.join("");
 }
@@ -1456,7 +1524,7 @@ function drawFeed() {
   flist.innerHTML = list.length
     ? list.map(postHtml).join("")
     : user
-      ? '<div class="empty">No saved doubts yet. Be the first to ask one.</div>'
+    ? '<div class="empty">No saved doubts yet. Be the first to ask one.</div>'
       : '<div class="empty">Sign in to view saved doubts and post a question.</div>';
 }
 document.getElementById("ftabs").addEventListener("click", function (e) {
@@ -1468,13 +1536,23 @@ document.getElementById("ftabs").addEventListener("click", function (e) {
 function drawMe() {
   var h = "";
   var mu = 'style="margin:6px 0 12px;color:var(--muted)"';
-  h += '<div class="box"><b>Account</b><p ' + mu + '>' + (user ? esc(user.n) + " · " + esc(user.e) + "<br>" + (user.role === "tutor" ? "Tutor" : "Student") + " · Class " + esc(String(user.grade || "")) + '<br>' + esc(user.location ? [user.location.school,user.location.city,user.location.state,user.location.country].join(" · ") : "Location not set") : "You are not signed in.") + '</p>' + (user ? '<button class="btn ghost" data-edit-details>Edit school and location</button>' : '<button class="btn" data-go="signin">Sign up / Sign in</button>') + '</div>';
-  h += '<div class="box"><b>Connections</b><p ' + mu + '>Unlimited connection requests for every student account.</p><a class="btn ghost" href="#tutors">Find a tutor</a></div>';
-  h += '<div class="box"><b>Tutor profile</b><p ' + mu + '>' + (user && user.role === "tutor" ? 'Your tutor tools and incoming requests are on your <a href="#dashboard">dashboard</a>.' : 'Want to help classmates? Choose Tutor in your account profile.') + '</p>' + (user && user.role === "tutor" ? '<a class="btn" href="#dashboard">Tutor dashboard</a>' : '') + '</div>';
+  h += '<div class="box"><b>Account</b><p ' + mu + '>' + (user ? esc(user.n) + " · " + esc(user.e) + "<br>" + accountTypeLabel(user.role) + " · Class " + esc(String(user.grade || "")) + '<br>' + esc(user.location ? [user.location.school,user.location.city,user.location.state,user.location.country].join(" · ") : "Location not set") : "You are not signed in.") + '</p>' + (user ? '<button class="btn ghost" data-edit-details>Edit profile details</button><div class="profile-appearance"><label class="btn ghost">Change profile photo<input type="file" accept="image/jpeg,image/png,image/webp" data-profile-image="avatar"></label><label class="btn ghost">Change banner<input type="file" accept="image/jpeg,image/png,image/webp" data-profile-image="banner"></label></div><div class="profile-social" id="myFollowStats">Loading followers…</div>' : '<button class="btn" data-go="signin">Sign up / Sign in</button>') + '</div>';
+  h += '<div class="box"><b>Connections</b><p ' + mu + '>Connect with mentors and peers. Guidance tools are available to every learner.</p><a class="btn ghost" href="#tutors">Find a mentor</a></div>';
+  h += '<div class="box"><b>Mentor profile</b><p ' + mu + '>' + (canMentor(user) ? 'Your mentor tools and incoming requests are on your <a href="#dashboard">dashboard</a>.' : 'Want to guide learners in lower classes? Choose Mentor or Both in your profile.') + '</p>' + (canMentor(user) ? '<a class="btn" href="#dashboard">Mentor dashboard</a>' : '') + '</div>';
   var w = who();
   var mp = posts.filter(function (p) { return p.n === w.n; });
   h += '<div class="box"><b>Your doubts (' + mp.length + ')</b>' + (mp.length ? '<ul style="margin:8px 0 0;padding-left:20px">' + mp.map(function (p) { return "<li>" + esc(p.t) + "</li>"; }).join("") + '</ul>' : '<p ' + mu + '>You have not asked a doubt yet.</p><a class="btn ghost" href="#doubts">Ask a doubt</a>') + '</div>';
   document.getElementById("meBody").innerHTML = h;
+  document.querySelectorAll('#meBody [data-profile-image]').forEach(function (input) { input.onchange = async function () { if (input.files[0]) await uploadProfileImage(input.files[0], input.dataset.profileImage); }; });
+  if (user) loadProfileSocialForMe();
+}
+async function loadProfileSocialForMe() {
+  var target = document.getElementById("myFollowStats"); if (!target || !user) return;
+  var results = await Promise.all([
+    supabaseClient.from("follows").select("follower_id", { count: "exact", head: true }).eq("following_id", user.id),
+    supabaseClient.from("follows").select("following_id", { count: "exact", head: true }).eq("follower_id", user.id),
+  ]);
+  target.innerHTML = '<span><b>' + (results[0].count || 0) + '</b> followers</span><span><b>' + (results[1].count || 0) + '</b> following</span>';
 }
 document.getElementById("meBody").addEventListener("click", function (e) {
   var b = e.target.closest("[data-go]");
@@ -1513,7 +1591,7 @@ function route() {
   var h = location.hash.replace("#", "");
   if (routes.indexOf(h) < 0) h = "home";
   if (h === "profile" && !activeTutorProfile) h = "tutors";
-  var isStudent = user && String(user.role || "").trim().toLowerCase() === "student";
+  var isStudent = canLearn(user);
   if (isStudent && studentEntryPending) {
     studentEntryPending = false;
     var introKey = "peerConnectIntroSeen:" + user.id;
@@ -1525,7 +1603,7 @@ function route() {
     }
     if (location.hash !== "#" + h) history.replaceState(null, document.title, location.pathname + location.search + "#" + h);
   }
-  if (h === "dashboard" && (!user || user.role !== "tutor")) h = "home";
+  if (h === "dashboard" && !canMentor(user)) h = "home";
   if (h === "verification" && (!user || !isVerificationAdmin)) h = "home";
   curRoute = h;
   document.querySelectorAll("[data-v]").forEach(function (el) {
