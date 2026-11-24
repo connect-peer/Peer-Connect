@@ -36,6 +36,7 @@ var active = "All",
   sent = {},
   tutorState = "",
   tutorCity = "";
+var activeTutorProfile = null;
 var grid = document.getElementById("grid"),
   chips = document.getElementById("chips");
 function ini(n) {
@@ -190,14 +191,19 @@ grid.addEventListener("keydown", function (e) {
 
 async function showTutorProfile(tutor) {
   if (!tutor) return;
-  dlg.classList.remove("auth-screen");
-  dlg.classList.add("profile-dialog");
+  activeTutorProfile = tutor;
+  if (location.hash !== "#profile") location.hash = "profile";
+  else route();
+}
+function renderTutorProfilePage() {
+  var tutor = activeTutorProfile;
+  var root = document.getElementById("tutorProfileContent");
+  if (!tutor || !root) return;
   var locationText = [tutor.school, tutor.city, tutor.state, tutor.country].filter(Boolean).join(" · ");
-  dbody.innerHTML = '<button type="button" class="profile-close" id="closeTutorProfile" aria-label="Close tutor profile">×</button><div class="profile-cover"></div><section class="profile-head"><div class="av">' + esc(ini(tutor.n)) + '</div><h2>' + esc(tutor.n) + (tutor.verified ? ' <span class="verify-badge">Verified</span>' : tutor.me ? ' <span class="verify-review-state">' + esc(tutor.verificationStatus || "Not verified") + '</span>' : '') + '</h2><div class="profile-meta">' + esc(tutor.g) + ' · ' + esc(locationText) + '</div><p>' + esc(tutor.h) + '</p><div class="tags">' + tutor.s.map(function (subject) { return '<span class="tag">' + esc(subject) + '</span>'; }).join("") + '</div><button class="btn" id="profileConnect" ' + ((sent[tutor.user_id] && !tutor.me) ? 'disabled' : '') + '>' + (tutor.me ? 'Edit profile' : sent[tutor.user_id] ? 'Request sent' : 'Connect') + '</button></section><div class="profile-tabs"><button class="btn ghost" data-profile-tab="about" aria-pressed="true">About</button><button class="btn ghost" data-profile-tab="answers" aria-pressed="false">Answers</button></div><div class="profile-content" id="profileContent"><h3>About</h3><p>' + esc(tutor.h || 'Student tutor') + '</p><p class="muted">School: ' + esc(tutor.school || '—') + '<br>Location: ' + esc([tutor.city, tutor.state, tutor.country].filter(Boolean).join(', ') || '—') + '</p></div>';
-  if (!dlg.open) dlg.showModal();
-  document.getElementById("closeTutorProfile").onclick = function () { dlg.close(); };
+  root.innerHTML = '<button type="button" class="btn ghost profile-back" id="profileBack">← Back to tutors</button><div class="profile-cover"></div><section class="profile-head"><div class="av">' + esc(ini(tutor.n)) + '</div><h2>' + esc(tutor.n) + (tutor.verified ? ' <span class="verify-badge">Verified</span>' : tutor.me ? ' <span class="verify-review-state">' + esc(tutor.verificationStatus || "Not verified") + '</span>' : '') + '</h2><div class="profile-meta">' + esc(tutor.g) + ' · ' + esc(locationText) + '</div><p>' + esc(tutor.h) + '</p><div class="tags">' + tutor.s.map(function (subject) { return '<span class="tag">' + esc(subject) + '</span>'; }).join("") + '</div><button class="btn" id="profileConnect" ' + ((sent[tutor.user_id] && !tutor.me) ? 'disabled' : '') + '>' + (tutor.me ? 'Edit profile' : sent[tutor.user_id] ? 'Request sent' : 'Connect') + '</button></section><div class="profile-tabs"><button class="btn ghost" data-profile-tab="about" aria-pressed="true">About</button><button class="btn ghost" data-profile-tab="answers" aria-pressed="false">Answers</button></div><div class="profile-content" id="profileContent"><h3>About</h3><p>' + esc(tutor.h || 'Student tutor') + '</p><p class="muted">School: ' + esc(tutor.school || '—') + '<br>Location: ' + esc([tutor.city, tutor.state, tutor.country].filter(Boolean).join(', ') || '—') + '</p></div>';
+  document.getElementById("profileBack").onclick = function () { location.hash = "tutors"; };
   document.getElementById("profileConnect").onclick = async function () {
-    if (tutor.me) { dlg.close(); openTutor(); return; }
+    if (tutor.me) { openTutor(); return; }
     if (!user) { openSign(); return; }
     if (user.role !== "student") { document.getElementById("profileContent").textContent = "Student accounts can send connection requests."; return; }
     var result = await supabaseClient.from("connections").insert({ requester_id: user.id, recipient_id: tutor.user_id });
@@ -207,9 +213,9 @@ async function showTutorProfile(tutor) {
     this.textContent = "Request sent";
     draw();
   };
-  dbody.querySelectorAll("[data-profile-tab]").forEach(function (button) {
+  root.querySelectorAll("[data-profile-tab]").forEach(function (button) {
     button.onclick = async function () {
-      dbody.querySelectorAll("[data-profile-tab]").forEach(function (tab) { tab.setAttribute("aria-pressed", String(tab === button)); });
+      root.querySelectorAll("[data-profile-tab]").forEach(function (tab) { tab.setAttribute("aria-pressed", String(tab === button)); });
       var content = document.getElementById("profileContent");
       if (button.dataset.profileTab === "about") {
         content.innerHTML = '<h3>About</h3><p>' + esc(tutor.h || 'Student tutor') + '</p><p class="muted">School: ' + esc(tutor.school || '—') + '<br>Location: ' + esc([tutor.city, tutor.state, tutor.country].filter(Boolean).join(', ') || '—') + '</p>';
@@ -1483,10 +1489,11 @@ dlg.addEventListener("close", function () {
   if (user && (!user.role || !user.grade || missingProfileLocation(user.location))) onboardingOpen = false;
   if (curRoute === "me") drawMe();
 });
-var routes = ["home", "tutors", "doubts", "pricing", "me", "dashboard", "verification"],
+var routes = ["home", "tutors", "profile", "doubts", "pricing", "me", "dashboard", "verification"],
   names = {
     home: "Home",
     tutors: "Tutors",
+    profile: "Tutor profile",
     doubts: "Doubts",
     pricing: "Pricing",
     me: "My page",
@@ -1505,6 +1512,7 @@ function markStudentIntroSeen(key) {
 function route() {
   var h = location.hash.replace("#", "");
   if (routes.indexOf(h) < 0) h = "home";
+  if (h === "profile" && !activeTutorProfile) h = "tutors";
   var isStudent = user && String(user.role || "").trim().toLowerCase() === "student";
   if (isStudent && studentEntryPending) {
     studentEntryPending = false;
@@ -1524,7 +1532,7 @@ function route() {
     el.hidden = el.dataset.v.split(" ").indexOf(h) < 0;
   });
   document.querySelectorAll("[data-nav]").forEach(function (a) {
-    if (a.dataset.nav === h) a.setAttribute("aria-current", "page");
+    if (a.dataset.nav === (h === "profile" ? "tutors" : h)) a.setAttribute("aria-current", "page");
     else a.removeAttribute("aria-current");
   });
   document.title = names[h] + " | Peer Connect";
@@ -1533,6 +1541,7 @@ function route() {
     else drawFeed();
   }
   if (h === "verification") drawVerificationAdmin();
+  if (h === "profile") renderTutorProfilePage();
   if (h === "home" && user) loadHomeCommunityQuestions();
   if (h === "me") drawMe();
   if (h === "dashboard") drawTutorDashboard();
