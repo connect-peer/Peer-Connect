@@ -832,7 +832,18 @@ header nav a.h:hover, header nav a.h[aria-current="page"] { background: var(--so
 .homecards a:hover, .card:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--brand) 36%, var(--line)); box-shadow: 0 14px 34px rgba(20, 34, 70, .09); }
 .homecards b { font-size: 17px; }
 .grid { gap: 18px; }
-.card { transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease; }
+.grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.card { min-width: 0; border-radius: 19px; transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease; }
+.cover { height: 138px; background: linear-gradient(145deg, color-mix(in srgb, var(--c) 68%, #b7c4d3), color-mix(in srgb, var(--c) 40%, var(--surface))); }
+.card .body { padding: 0 18px 18px; }
+.av { width: 54px; height: 54px; margin-top: -27px; }
+.card h3 { justify-content: space-between; align-items: flex-start; gap: 10px; }
+.tutor-name { min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.tutor-online { flex: 0 0 12px; width: 12px; height: 12px; margin: 6px 2px 0 auto; border-radius: 50%; background: #77b894; box-shadow: 0 0 0 4px #e4f3e9; }
+.card .sub { min-height: 42px; line-height: 1.5; }
+.card .tags { min-height: 34px; align-content: flex-start; }
+.card .btn { width: auto; min-width: 128px; align-self: flex-end; border-radius: 10px; background: #20272b; border-color: #20272b; color: #fff; }
+.card .btn.ghost { background: var(--soft); border-color: var(--line); color: var(--muted); }
 .post { padding: 18px; margin-bottom: 13px; transition: border-color .16s ease, box-shadow .16s ease; }
 .post:hover { border-color: color-mix(in srgb, var(--brand) 30%, var(--line)); box-shadow: 0 10px 28px rgba(20, 34, 70, .07); }
 .composer { border-radius: 20px; padding: 17px; box-shadow: 0 8px 26px rgba(20, 34, 70, .045); }
@@ -855,7 +866,10 @@ section[data-v="dashboard"] h2, section[data-v="me"] h2 { font-size: clamp(30px,
   .doubts-layout { grid-template-columns: 1fr; }
   .doubt-side { position: static; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+@media (max-width: 1080px) { .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 640px) {
+  .grid { grid-template-columns: 1fr; }
   .doubt-side { grid-template-columns: 1fr; }
   .hero[data-v="home"] { padding-top: 30px; }
   .hero[data-v="home"] h1 { font-size: clamp(40px, 12vw, 58px); }

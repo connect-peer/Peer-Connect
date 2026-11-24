@@ -93,13 +93,13 @@ function draw() {
         '<div class="av">' +
         ini(t.n) +
         "</div>" +
-        "<h3>" +
+        '<h3><span class="tutor-name">' +
         esc(t.n) +
         (t.blue ? BT : "") +
         (t.me
           ? ' <span class="ver" style="color:var(--muted);border-color:var(--line)">Pending</span>'
           : ' <span class="ver">Verified</span>') +
-        "</h3>" +
+        '</span><span class="tutor-online" title="Available"></span></h3>' +
         '<div class="sub">' +
         t.g +
         " · " +
@@ -112,14 +112,6 @@ function draw() {
           })
           .join("") +
         "</div>" +
-        '<div class="stats"><span><b>' +
-        t.r +
-        "</b> rating</span><span><b>" +
-        t.x +
-        "</b> sessions</span></div>" +
-        '<div class="mutual">' +
-        t.m +
-        " mutual connections</div>" +
         '<button class="btn' +
         (done ? " ghost" : "") +
         '" data-i="' +
