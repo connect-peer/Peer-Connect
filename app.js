@@ -421,7 +421,7 @@ function showAuthForm(mode) {
       ? 'Already have an account? <button class="text-button" id="switchAuth">Sign in</button>'
       : 'New to Peer Connect? <button class="text-button" id="switchAuth">Create an account</button>') +
     (signingUp ? "" : '<br><button class="text-button" id="forgotPassword">Forgot password?</button>') +
-    '</p><button class="btn ghost gfull" id="cx">Back to Peer Connect</button></section>' +
+    '</p></section>' +
     '<aside class="auth-brand-panel" aria-label="About Peer Connect"><div class="auth-brand-top"><span class="auth-brand-mark">P</span>Peer Connect</div>' +
     '<div class="auth-brand-copy"><div class="auth-brand-eyebrow">Learn together, move forward</div><h2>Good guidance starts peer to peer.</h2>' +
     '<p>Meet students who understand your classes, questions, and goals. Share what you know and get unstuck together.</p>' +
@@ -430,7 +430,6 @@ function showAuthForm(mode) {
     '<div class="auth-feature"><b>✓</b><span><strong>Build connections</strong> around learning</span></div></div></div>' +
     '<div class="auth-brand-foot">A student peer-learning community</div></aside>';
   if (!dlg.open) dlg.showModal();
-  document.getElementById("cx").onclick = function () { dlg.close(); };
   document.getElementById("switchAuth").onclick = function () {
     showAuthForm(signingUp ? "signin" : "signup");
   };
@@ -629,6 +628,7 @@ if (
     window.setTimeout(async function () {
       await syncAuthUser(session ? session.user : null);
       if (_event === "PASSWORD_RECOVERY") showPasswordUpdateForm();
+      else if (_event === "SIGNED_OUT") showAuthForm("signin");
     }, 0);
   });
   restoreAuthSession().then(async function (session) {
@@ -636,9 +636,12 @@ if (
     if (passwordRecoveryPending) {
       passwordRecoveryPending = false;
       showPasswordUpdateForm();
+    } else if (!session) {
+      showAuthForm("signin");
     }
   }).catch(function (error) {
     console.error("Could not restore Peer Connect session:", error.message);
+    if (!user) showAuthForm("signin");
   });
 }
 
@@ -1203,5 +1206,8 @@ function route() {
   window.scrollTo(0, 0);
 }
 window.addEventListener("hashchange", route);
+dlg.addEventListener("cancel", function (event) {
+  if (dlg.classList.contains("auth-screen") && !user) event.preventDefault();
+});
 drawFeed();
 route();

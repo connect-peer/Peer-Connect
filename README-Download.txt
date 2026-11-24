@@ -1,7 +1,7 @@
-Peer Connect UI update
+Peer Connect default sign-in update
 
-The sign-in and account-creation screen uses a split layout: account form on the left and Peer Connect introduction on the right. On smaller screens, it becomes a one-column form. Successful email sign-in closes the screen and returns to the app.
+Visitors who open Peer Connect without a valid signed-in session are shown the full-screen sign-in page immediately. The sign-up switch remains available. The sign-in page fills the viewport, does not scroll, and cannot be dismissed to bypass sign-in. Successful sign-in returns to the app; a signed-in session skips the sign-in screen. Password recovery continues to work.
 
-The main pages now use a consistent social-learning layout, with a more prominent home feed and a community tips rail beside the Doubts feed. Existing routes, Supabase authentication, saved doubts, and answers are retained. No SQL changes are needed.
+The right panel introduces Peer Connect. Existing Supabase authentication and persistent doubts/answers remain in place. No SQL changes are needed.
 
 Replace index.html, app.js, supabase-config.js, and README.md in the repository root, then publish the site.

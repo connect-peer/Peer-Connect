@@ -864,33 +864,37 @@ section[data-v="dashboard"] h2, section[data-v="me"] h2 { font-size: clamp(30px,
 }
 
 /* Two-panel sign-in experience, borrowing familiar social-product patterns. */
+body:has(dialog.auth-screen[open]) { overflow: hidden; }
 dialog.auth-screen {
-  width: min(1120px, calc(100vw - 40px));
+  position: fixed;
+  inset: 0;
+  width: 100vw;
   max-width: none;
-  height: min(760px, calc(100dvh - 40px));
+  height: 100vh;
+  height: 100dvh;
   max-height: none;
+  margin: 0;
   padding: 0;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--brand) 20%, var(--line));
-  border-radius: 26px;
-  box-shadow: 0 28px 90px rgba(7, 15, 40, .32);
-  background: var(--surface);
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: #000;
 }
-dialog.auth-screen::backdrop { background: rgba(5, 10, 24, .78); backdrop-filter: blur(8px); }
-dialog.auth-screen #dbody { height: 100%; display: grid; grid-template-columns: minmax(360px, .92fr) minmax(380px, 1.08fr); }
-.auth-form-panel { position: relative; display: flex; flex-direction: column; justify-content: center; padding: clamp(28px, 5vw, 64px); overflow-y: auto; }
+dialog.auth-screen::backdrop { background: #000; }
+dialog.auth-screen #dbody { width: 100%; height: 100%; display: grid; grid-template-columns: 1fr 1fr; overflow: hidden; }
+.auth-form-panel { position: relative; display: flex; flex-direction: column; justify-content: center; width: min(100%, 560px); justify-self: center; padding: clamp(28px, 5vw, 72px); overflow: hidden; background: #000; color: #f7f7f7; }
 .auth-form-panel h3 { font-size: clamp(28px, 3vw, 36px); letter-spacing: -.035em; }
 .auth-form-panel > p { margin-bottom: 22px !important; }
 .auth-form-panel label { margin-top: 15px; }
-.auth-form-panel input { min-height: 48px; border-radius: 13px; }
+.auth-form-panel input { min-height: 48px; border-radius: 13px; border-color: #353535; background: #080808; color: #f7f7f7; }
 .auth-form-panel .btn { min-height: 48px; border-radius: 999px; }
-.auth-brand-panel { position: relative; display: flex; flex-direction: column; justify-content: space-between; padding: clamp(32px, 5vw, 66px); overflow: hidden; color: white; background: radial-gradient(ellipse at 85% 16%, rgba(126, 153, 255, .72), transparent 38%), linear-gradient(145deg, #263fbd, #5744c7 56%, #9b58c9); }
-.auth-brand-panel::before, .auth-brand-panel::after { position: absolute; content: ""; border: 1px solid rgba(255,255,255,.18); border-radius: 50%; pointer-events: none; }
-.auth-brand-panel::before { width: 470px; height: 470px; right: -190px; bottom: -170px; }
-.auth-brand-panel::after { width: 330px; height: 330px; right: -120px; bottom: -100px; }
+.auth-brand-panel { position: relative; display: flex; flex-direction: column; justify-content: center; padding: clamp(32px, 5vw, 74px); overflow: hidden; color: #f7f7f7; background: #000; }
+.auth-brand-panel::before { position: absolute; content: "P"; right: 3%; bottom: -5%; color: transparent; -webkit-text-stroke: 2px rgba(255,255,255,.13); font: 900 clamp(300px, 40vw, 620px)/.8 "Bricolage Grotesque", system-ui, sans-serif; pointer-events: none; }
+.auth-brand-panel::after { display: none; }
 .auth-brand-top { position: relative; z-index: 1; display: flex; align-items: center; gap: 11px; font-size: 18px; font-weight: 800; }
 .auth-brand-mark { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 13px; background: white; color: #3c45bd; font-weight: 900; }
-.auth-brand-copy { position: relative; z-index: 1; max-width: 520px; }
+.auth-brand-copy { position: relative; z-index: 1; max-width: 520px; margin-top: 52px; }
 .auth-brand-eyebrow { margin-bottom: 14px; font-size: 12px; font-weight: 800; letter-spacing: .15em; text-transform: uppercase; opacity: .82; }
 .auth-brand-copy h2 { max-width: 12ch; font-size: clamp(36px, 4vw, 56px); letter-spacing: -.045em; line-height: 1.02; }
 .auth-brand-copy p { max-width: 42ch; margin: 17px 0 0; color: rgba(255,255,255,.86); font-size: 17px; }
@@ -898,11 +902,23 @@ dialog.auth-screen #dbody { height: 100%; display: grid; grid-template-columns: 
 .auth-feature { display: flex; align-items: center; gap: 12px; padding: 11px 13px; border: 1px solid rgba(255,255,255,.23); border-radius: 14px; background: rgba(255,255,255,.12); backdrop-filter: blur(8px); font-size: 14px; }
 .auth-feature b { display: grid; place-items: center; flex: 0 0 27px; width: 27px; height: 27px; border-radius: 9px; background: rgba(255,255,255,.2); }
 .auth-brand-foot { position: relative; z-index: 1; color: rgba(255,255,255,.75); font-size: 12px; }
+.auth-form-panel .btn.gfull { background: #f4f4f4; border-color: #f4f4f4; color: #101010; }
+.auth-form-panel .btn.ghost { background: transparent; border-color: #454545; color: #f4f4f4; }
+.auth-form-panel .text-button { color: #a8b8ff; }
 @media (max-width: 760px) {
-  dialog.auth-screen { width: min(520px, calc(100vw - 20px)); height: min(820px, calc(100dvh - 20px)); border-radius: 20px; }
-  dialog.auth-screen #dbody { display: block; overflow-y: auto; }
-  .auth-form-panel { min-height: 100%; padding: 30px 24px; }
+  dialog.auth-screen { width: 100vw; height: 100vh; height: 100dvh; }
+  dialog.auth-screen #dbody { display: block; overflow: hidden; }
+  .auth-form-panel { width: min(100%, 540px); height: 100%; min-height: 0; margin: auto; padding: 26px 24px; overflow: hidden; }
   .auth-brand-panel { display: none; }
+}
+@media (max-height: 700px) {
+  .auth-form-panel { padding-top: 18px; padding-bottom: 18px; }
+  .auth-form-panel > p { margin-bottom: 10px !important; }
+  .auth-form-panel label { margin-top: 9px; }
+  .auth-form-panel input { min-height: 42px; padding-top: 8px; padding-bottom: 8px; }
+  .auth-form-panel .btn { min-height: 42px; padding-top: 8px; padding-bottom: 8px; }
+  .auth-separator { margin: 7px 0; }
+  .auth-form-panel .note { margin-top: 7px; }
 }
 </style>
   </head>
