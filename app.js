@@ -2,7 +2,7 @@
  * Peer Connect app.js
  * ------------------------------------------------------------
  * All behavior lives in this file. There is no framework and no build step.
- * Supabase handles Auth and profiles; demo tutor and doubt data is in memory.
+ * Supabase handles Auth, profiles, doubts, and answers; tutor examples remain in memory.
  *
  * Map of this file (search for these names):
  *   STATE        tutors, posts, sent, user, mine, fSub, fSort, openR
@@ -871,8 +871,7 @@ document.getElementById("tutorDashboardBody").addEventListener("change", async f
 
 var posts = [];
 var fSub = "All",
-  openR = {},
-  nextId = 1;
+  openR = {};
 var fsel = document.getElementById("fSub"),
   fch = document.getElementById("fchips"),
   flist = document.getElementById("flist");
@@ -893,25 +892,96 @@ function hasBlue(n) {
     return t.n === n && t.blue;
   });
 }
+
+function relationRow(value) {
+  return Array.isArray(value) ? (value[0] || {}) : (value || {});
+}
+
+function relativeTime(value) {
+  var seconds = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 1000));
+  if (seconds < 60) return "just now";
+  if (seconds < 3600) return Math.floor(seconds / 60) + "m";
+  if (seconds < 86400) return Math.floor(seconds / 3600) + "h";
+  if (seconds < 604800) return Math.floor(seconds / 86400) + "d";
+  return new Date(value).toLocaleDateString();
+}
+
+async function loadDoubtsFromSupabase() {
+  if (!supabaseClient || !user) {
+    posts = [];
+    drawFeed();
+    return;
+  }
+  var loadingUserId = user.id;
+  flist.innerHTML = '<div class="empty">Loading saved doubts…</div>';
+  var result = await supabaseClient
+    .from("doubts")
+    .select("id, author_id, title, body, subject, grade, created_at, profiles!doubts_author_id_fkey(display_name, grade), answers(id, author_id, content, is_accepted, created_at, profiles!answers_author_id_fkey(display_name, grade))")
+    .order("created_at", { ascending: false });
+  if (!user || user.id !== loadingUserId) return;
+  if (result.error) {
+    posts = [];
+    drawFeed();
+    flist.innerHTML = '<div class="empty">Could not load saved doubts: ' + esc(authErrorText(result.error)) + '</div>';
+    return;
+  }
+  posts = (result.data || []).map(function (row) {
+    var author = relationRow(row.profiles);
+    var authorGrade = author.grade || row.grade;
+    var answers = Array.isArray(row.answers) ? row.answers.slice() : [];
+    answers.sort(function (a, b) {
+      if (a.is_accepted !== b.is_accepted) return a.is_accepted ? -1 : 1;
+      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    });
+    return {
+      id: row.id,
+      authorId: row.author_id,
+      n: author.display_name || "Peer Connect member",
+      g: authorGrade ? "Class " + authorGrade : "Student",
+      sub: row.subject || "General",
+      t: row.body || row.title,
+      created_at: row.created_at,
+      ago: relativeTime(row.created_at),
+      likes: 0,
+      liked: false,
+      rep: answers.map(function (answer) {
+        var answerAuthor = relationRow(answer.profiles);
+        return {
+          id: answer.id,
+          authorId: answer.author_id,
+          n: answerAuthor.display_name || "Peer Connect member",
+          t: answer.content,
+          isAccepted: answer.is_accepted,
+        };
+      }),
+    };
+  });
+  drawFeed();
+}
 fch.addEventListener("click", function (e) {
   var b = e.target.closest("[data-fs]");
   if (!b) return;
   fSub = b.dataset.fs;
   drawFeed();
 });
-flist.addEventListener("click", function (e) {
+flist.addEventListener("click", async function (e) {
   var b = e.target.closest("[data-act]");
   if (!b) return;
-  var id = +b.dataset.id,
+  var id = b.dataset.id,
     p = posts.filter(function (x) {
-      return x.id === id;
+      return String(x.id) === String(id);
     })[0],
     a = b.dataset.act;
+  if (!p) return;
   if (a === "like") {
     p.liked = !p.liked;
     p.likes += p.liked ? 1 : -1;
     drawFeed();
   } else if (a === "reply") {
+    if (!user) {
+      openSign();
+      return;
+    }
     openR[id] = !openR[id];
     drawFeed();
     if (openR[id]) {
@@ -925,7 +995,22 @@ flist.addEventListener("click", function (e) {
       inp.focus();
       return;
     }
-    p.rep.push({ n: who().n, t: v });
+    if (!user) {
+      openSign();
+      return;
+    }
+    b.disabled = true;
+    var answer = await supabaseClient.from("answers").insert({
+      doubt_id: p.id,
+      author_id: user.id,
+      content: v,
+    }).select("id, author_id, content, is_accepted, created_at").single();
+    if (answer.error) {
+      document.getElementById("ferr").textContent = authErrorText(answer.error);
+      b.disabled = false;
+      return;
+    }
+    p.rep.push({ id: answer.data.id, authorId: user.id, n: user.n, t: answer.data.content, isAccepted: answer.data.is_accepted });
     drawFeed();
   }
 });
@@ -934,23 +1019,46 @@ var ft = document.getElementById("fText"),
 ft.addEventListener("input", function () {
   fc.textContent = 200 - ft.value.length;
 });
-document.getElementById("fPost").addEventListener("click", function () {
+document.getElementById("fPost").addEventListener("click", async function () {
   var v = ft.value.trim(),
     er = document.getElementById("ferr");
+  if (!user) {
+    er.textContent = "Sign in to post a doubt and see saved questions.";
+    openSign();
+    return;
+  }
   if (!v) {
     er.textContent = "Write your doubt first.";
     return;
   }
   er.textContent = "";
-  var w = who();
+  var button = this;
+  button.disabled = true;
+  button.textContent = "Saving…";
+  var created = await supabaseClient.from("doubts").insert({
+    author_id: user.id,
+    title: v.length > 120 ? v.slice(0, 117) + "…" : v,
+    body: v,
+    subject: fsel.value,
+    grade: user.grade ? Number(user.grade) : null,
+  }).select("id, author_id, title, body, subject, grade, created_at").single();
+  button.disabled = false;
+  button.textContent = "Post doubt";
+  if (created.error) {
+    er.textContent = authErrorText(created.error);
+    return;
+  }
   posts.unshift({
-    id: nextId++,
-    n: w.n,
-    g: w.g,
-    sub: fsel.value,
-    t: v,
-    ago: "now",
+    id: created.data.id,
+    authorId: user.id,
+    n: user.n,
+    g: user.grade ? "Class " + user.grade : "Student",
+    sub: created.data.subject || "General",
+    t: created.data.body,
+    created_at: created.data.created_at,
+    ago: "just now",
     likes: 0,
+    liked: false,
     rep: [],
   });
   ft.value = "";
@@ -972,7 +1080,7 @@ function postHtml(p) {
     p.likes +
     '</span></div><div class="pm">' +
     '<div class="sub2"><span class="tag">#' +
-    p.sub.replace(/ /g, "") +
+    esc(p.sub).replace(/ /g, "") +
     "</span> Asked by <b>" +
     esc(p.n) +
     "</b>" +
@@ -1060,13 +1168,15 @@ function drawFeed() {
     return fSub === "All" || p.sub === fSub;
   });
   list.sort(function (a, b) {
-    if (fSort === "new") return b.id - a.id;
+    if (fSort === "new") return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     if (fSort === "top") return b.likes - a.likes;
     return b.likes + 2 * b.rep.length - (a.likes + 2 * a.rep.length);
   });
   flist.innerHTML = list.length
     ? list.map(postHtml).join("")
-    : '<div class="empty">No doubts here yet. Be the first to ask one.</div>';
+    : user
+      ? '<div class="empty">No saved doubts yet. Be the first to ask one.</div>'
+      : '<div class="empty">Sign in to view saved doubts and post a question.</div>';
 }
 document.getElementById("ftabs").addEventListener("click", function (e) {
   var b = e.target.closest("[data-sort]");
