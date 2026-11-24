@@ -1631,3 +1631,10 @@ dlg.addEventListener("cancel", function (event) {
 });
 drawFeed();
 route();
+fetch("version.json", { cache: "no-store" }).then(function (response) {
+  if (!response.ok) throw new Error("Version file unavailable");
+  return response.json();
+}).then(function (versionInfo) {
+  var versionLabel = document.getElementById("appVersion");
+  if (versionLabel && versionInfo.version) versionLabel.textContent = "v" + versionInfo.version;
+}).catch(function () {});

@@ -4,6 +4,14 @@ Peer Connect is a peer tutoring network for a school, like LinkedIn for studying
 
 The page styling is embedded in `index.html`; the app behavior is in `app.js`.
 
+## Automatic semantic releases
+
+Peer Connect uses GitHub Actions and Conventional Commits. Use `fix:` for a
+patch, `feat:` for a minor release, and `!` or a `BREAKING CHANGE:` footer for
+a major release. The workflow opens a release pull request that updates
+`version.json`; merging it creates the matching `vX.Y.Z` GitHub Release and
+tag. See [CONTRIBUTING.md](CONTRIBUTING.md) for examples and setup details.
+
 ## 1. What exists today
 
 A front-end prototype connected to Supabase Auth. People can create an account with email and password or use Google, then choose Student or Tutor and add their class (9–12), school, city, state, and country. Tutors submit a school ID and fee receipt for private review. Only approved tutors appear in search with a green Verified badge. Tutor cards open a social-style profile, and tutors can filter incoming student requests by state and city.
