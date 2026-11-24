@@ -1,7 +1,7 @@
-Peer Connect signed-in UI update
+Peer Connect Home community feature
 
-The Tutors page now uses a responsive expert-card grid inspired by the reference: large profile header area, name and availability indicator, class/headline, subject tags, and a clear Connect action. It avoids displaying untracked session and mutual-connection counts.
+Home now includes three recent unanswered questions from the Peer Connect community, with subject, time, and a link to the Doubts feed. It uses the existing doubts and answers tables; no SQL changes are needed.
 
-Student onboarding intro appears once per account in the browser; later visits route to Doubts. Guest entry remains the full-screen sign-in screen. Existing Supabase auth and saved doubts/answers are retained.
+Student entry behavior: the intro is shown once per student account in the browser. On future sign-ins, students start on Doubts. Choosing Home manually remains available and shows the Home feature. Tutors retain their existing route.
 
 Replace index.html, app.js, supabase-config.js, and README.md in the repository root, then publish the site.
