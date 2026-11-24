@@ -1,7 +1,5 @@
-Peer Connect first-visit tutorial flow
+Peer Connect first-visit tutorial flow (updated)
 
-The homepage introduction is shown once per student account. On later visits, students are sent directly to the Doubts feed. The first-visit choice is saved in browser local storage by user ID. Tutors retain their existing home and dashboard flow.
+Student accounts see the home introduction once, then go directly to the Doubts feed on future visits. The account role check accepts capitalization differences. The first-visit flag uses browser local storage, with session storage as a fallback.
 
-The guest entry remains the full-screen sign-in screen. Existing Supabase authentication and persistent doubts/answers are retained. No SQL changes are needed.
-
-Replace index.html, app.js, supabase-config.js, and README.md in the repository root, then publish the site.
+Tutors retain their current home/dashboard flow. Existing authentication and saved doubts/answers are retained. Replace the project files and publish this package to update the live site.

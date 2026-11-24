@@ -1190,17 +1190,26 @@ var routes = ["home", "tutors", "doubts", "pricing", "me", "dashboard"],
     me: "My page",
     dashboard: "Tutor dashboard",
   };
+function hasSeenStudentIntro(key) {
+  try { if (window.localStorage.getItem(key) === "1") return true; } catch (_localReadError) {}
+  try { if (window.sessionStorage.getItem(key) === "1") return true; } catch (_sessionReadError) {}
+  return false;
+}
+function markStudentIntroSeen(key) {
+  try { window.localStorage.setItem(key, "1"); return; } catch (_localWriteError) {}
+  try { window.sessionStorage.setItem(key, "1"); } catch (_sessionWriteError) {}
+}
 function route() {
   var previousRoute = curRoute;
   var h = location.hash.replace("#", "");
   if (routes.indexOf(h) < 0) h = "home";
-  if (user && user.role === "student") {
+  var isStudent = user && String(user.role || "").trim().toLowerCase() === "student";
+  if (isStudent) {
     var introKey = "peerConnectIntroSeen:" + user.id;
     if (previousRoute === "home" && h !== "home") studentIntroShownThisPage[user.id] = false;
-    var hasSeenIntro = false;
-    try { hasSeenIntro = localStorage.getItem(introKey) === "1"; } catch (_storageError) {}
+    var hasSeenIntro = hasSeenStudentIntro(introKey);
     if (!hasSeenIntro) {
-      try { localStorage.setItem(introKey, "1"); } catch (_storageError) {}
+      markStudentIntroSeen(introKey);
       studentIntroShownThisPage[user.id] = true;
       if (h !== "home") h = "home";
     } else if (h === "home" && !studentIntroShownThisPage[user.id]) {
