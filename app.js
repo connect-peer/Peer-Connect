@@ -986,6 +986,41 @@ flist.addEventListener("click", async function (e) {
       var i = document.getElementById("ri" + id);
       if (i) i.focus();
     }
+  } else if (a === "delete-doubt") {
+    if (!user || p.authorId !== user.id) return;
+    if (!window.confirm("Delete this doubt and all of its answers? This cannot be undone.")) return;
+    b.disabled = true;
+    b.textContent = "Deleting…";
+    var deletedDoubt = await supabaseClient.from("doubts").delete().eq("id", p.id).eq("author_id", user.id);
+    if (deletedDoubt.error) {
+      document.getElementById("ferr").textContent = authErrorText(deletedDoubt.error);
+      b.disabled = false;
+      b.textContent = "Delete doubt";
+      return;
+    }
+    posts = posts.filter(function (post) { return String(post.id) !== String(p.id); });
+    delete openR[id];
+    document.getElementById("ferr").textContent = "Doubt deleted.";
+    drawFeed();
+    if (curRoute === "me") drawMe();
+  } else if (a === "delete-answer") {
+    var ownedAnswer = p.rep.filter(function (answer) { return String(answer.id) === String(b.dataset.aid); })[0];
+    if (!user || !ownedAnswer || ownedAnswer.authorId !== user.id) return;
+    if (!window.confirm("Delete your answer? This cannot be undone.")) return;
+    b.disabled = true;
+    b.textContent = "Deleting…";
+    var deletedAnswer = await supabaseClient.from("answers").delete()
+      .eq("id", ownedAnswer.id)
+      .eq("author_id", user.id);
+    if (deletedAnswer.error) {
+      document.getElementById("ferr").textContent = authErrorText(deletedAnswer.error);
+      b.disabled = false;
+      b.textContent = "Delete answer";
+      return;
+    }
+    p.rep = p.rep.filter(function (answer) { return String(answer.id) !== String(ownedAnswer.id); });
+    document.getElementById("ferr").textContent = "Answer deleted.";
+    drawFeed();
   } else if (a === "send") {
     var inp = document.getElementById("ri" + id),
       v = inp.value.trim();
@@ -1097,10 +1132,14 @@ function postHtml(p) {
         return (
           '<div class="rep">' +
           (i === 0 ? '<div class="best">Top answer</div>' : "") +
-          "<b>" +
+          '<div class="rep-meta"><b>' +
           esc(r.n) +
           "</b>" +
           (hasBlue(r.n) ? BT : "") +
+          (user && r.authorId === user.id
+            ? '<button class="act delete-action" data-act="delete-answer" data-id="' + p.id + '" data-aid="' + esc(String(r.id)) + '">Delete answer</button>'
+            : "") +
+          '</div>' +
           "<div>" +
           esc(r.t) +
           "</div></div>"
@@ -1113,7 +1152,11 @@ function postHtml(p) {
     !!open +
     '">' +
     (n ? "Add an answer (" + n + ")" : "Be the first to answer") +
-    "</button></div>" +
+    "</button>" +
+    (user && p.authorId === user.id
+      ? '<button class="act delete-action" data-act="delete-doubt" data-id="' + p.id + '">Delete doubt</button>'
+      : "") +
+    "</div>" +
     (open
       ? '<div class="rrow"><input id="ri' +
         p.id +

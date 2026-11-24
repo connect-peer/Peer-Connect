@@ -629,6 +629,11 @@ dialog label {
   color: #e0245e;
   border-color: #e0245e;
 }
+.pa { flex-wrap: wrap; align-items: center; }
+.rep-meta { display: flex; align-items: center; gap: 7px; min-height: 30px; }
+.delete-action { color: #b42335; border-color: color-mix(in srgb, #b42335 36%, var(--line)); font-size: 12px; padding: 4px 10px; }
+.delete-action:hover:not(:disabled) { color: #8e1425; background: color-mix(in srgb, #b42335 8%, var(--surface)); }
+.delete-action:disabled { opacity: .62; cursor: wait; }
 .rep {
   border-left: 3px solid var(--soft);
   padding: 4px 0 4px 12px;
