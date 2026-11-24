@@ -322,6 +322,7 @@ function authErrorText(error) {
 }
 
 function showPasswordResetForm(email) {
+  dlg.classList.remove("auth-screen");
   dbody.innerHTML =
     '<h3 id="dt">Reset your password</h3>' +
     '<p style="color:var(--muted);margin:6px 0 12px">We’ll email you a secure link to choose a new password.</p>' +
@@ -360,6 +361,7 @@ function showPasswordResetForm(email) {
 }
 
 function showPasswordUpdateForm() {
+  dlg.classList.remove("auth-screen");
   dbody.innerHTML =
     '<h3 id="dt">Choose a new password</h3>' +
     '<p style="color:var(--muted);margin:6px 0 12px">Use at least 8 characters.</p>' +
@@ -397,8 +399,9 @@ function showPasswordUpdateForm() {
 
 function showAuthForm(mode) {
   var signingUp = mode === "signup";
+  dlg.classList.add("auth-screen");
   dbody.innerHTML =
-    '<h3 id="dt">' + (signingUp ? "Create your account" : "Sign in") + '</h3>' +
+    '<section class="auth-form-panel"><h3 id="dt">' + (signingUp ? "Create your account" : "Sign in") + '</h3>' +
     '<p style="color:var(--muted);margin:6px 0 12px">' +
     (signingUp ? "Start with email and password, then finish your profile." : "Use your email and password to sign in.") +
     '</p>' +
@@ -418,7 +421,14 @@ function showAuthForm(mode) {
       ? 'Already have an account? <button class="text-button" id="switchAuth">Sign in</button>'
       : 'New to Peer Connect? <button class="text-button" id="switchAuth">Create an account</button>') +
     (signingUp ? "" : '<br><button class="text-button" id="forgotPassword">Forgot password?</button>') +
-    '</p><button class="btn ghost gfull" id="cx">Cancel</button>';
+    '</p><button class="btn ghost gfull" id="cx">Back to Peer Connect</button></section>' +
+    '<aside class="auth-brand-panel" aria-label="About Peer Connect"><div class="auth-brand-top"><span class="auth-brand-mark">P</span>Peer Connect</div>' +
+    '<div class="auth-brand-copy"><div class="auth-brand-eyebrow">Learn together, move forward</div><h2>Good guidance starts peer to peer.</h2>' +
+    '<p>Meet students who understand your classes, questions, and goals. Share what you know and get unstuck together.</p>' +
+    '<div class="auth-feature-stack"><div class="auth-feature"><b>◎</b><span><strong>Find a tutor</strong> who knows your subject</span></div>' +
+    '<div class="auth-feature"><b>↗</b><span><strong>Ask a doubt</strong> and learn from the community</span></div>' +
+    '<div class="auth-feature"><b>✓</b><span><strong>Build connections</strong> around learning</span></div></div></div>' +
+    '<div class="auth-brand-foot">A student peer-learning community</div></aside>';
   if (!dlg.open) dlg.showModal();
   document.getElementById("cx").onclick = function () { dlg.close(); };
   document.getElementById("switchAuth").onclick = function () {
@@ -474,7 +484,10 @@ function showAuthForm(mode) {
       } else {
         var signin = await supabaseClient.auth.signInWithPassword({ email: email, password: password });
         if (signin.error) message.textContent = authErrorText(signin.error);
-        else if (signin.data && signin.data.user) await syncAuthUser(signin.data.user);
+        else if (signin.data && signin.data.user) {
+          dlg.close();
+          await syncAuthUser(signin.data.user);
+        }
         else message.textContent = "Sign-in finished without a user session. Please try again.";
       }
     } catch (error) {
@@ -497,6 +510,7 @@ function showAuthForm(mode) {
 
 function openSign() {
   if (!supabaseClient) {
+    dlg.classList.remove("auth-screen");
     dbody.innerHTML =
       '<h3 id="dt">Sign-in is not configured</h3><p style="color:var(--muted)">Add the Supabase project settings in supabase-config.js, then reload this page.</p><div class="row"><button class="btn" id="cx">Close</button></div>';
     dlg.showModal();
@@ -508,6 +522,7 @@ function openSign() {
     return;
   }
   if (user) {
+    dlg.classList.remove("auth-screen");
     dbody.innerHTML =
       '<h3 id="dt">Your Peer Connect account</h3><p style="color:var(--muted)">' +
       esc(user.n) +
@@ -535,6 +550,7 @@ function openSign() {
 
 function openOnboarding(changeRole) {
   if (!user || !supabaseClient || onboardingOpen) return;
+  dlg.classList.remove("auth-screen");
   onboardingOpen = true;
   var selectedRole = changeRole ? "" : (user.role || "");
   dbody.innerHTML =
