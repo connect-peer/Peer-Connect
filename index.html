@@ -955,6 +955,24 @@ dialog.auth-screen #dbody { width: 100%; height: 100%; display: grid; grid-templ
   .auth-separator { margin: 7px 0; }
   .auth-form-panel .note { margin-top: 7px; }
 }
+.location-filters { display:flex; gap:10px; flex-wrap:wrap; margin:12px 0; }
+.location-filters select { min-width:170px; max-width:100%; }
+.card[data-profile-index] { cursor:pointer; }
+.card[data-profile-index] .btn { cursor:pointer; }
+.profile-cover { min-height:150px; border-radius:18px 18px 0 0; background:linear-gradient(125deg,#1d2d65,#3459df 54%,#8496ff); }
+.profile-head { position:relative; padding:0 22px 18px; border-bottom:1px solid var(--line); }
+.profile-head .av { width:88px; height:88px; margin-top:-44px; border-width:5px; font-size:26px; }
+.profile-head h2 { margin:10px 0 2px; }
+.profile-meta { color:var(--muted); margin:8px 0; }
+.profile-tabs { display:flex; gap:8px; border-bottom:1px solid var(--line); padding:12px 20px; }
+.profile-tabs button[aria-pressed="true"] { background:var(--soft); color:var(--brand); }
+.profile-content { padding:18px 22px; max-height:42vh; overflow:auto; }
+.verify-badge { color:var(--green); border:1px solid var(--green); border-radius:99px; padding:2px 9px; font-size:12px; font-weight:700; }
+.verify-status { border-left:4px solid var(--brand); }
+.verify-doc-fields { display:grid; gap:12px; margin:14px 0; }
+.verify-doc-fields input { padding:10px; border:1px solid var(--line); border-radius:10px; background:var(--surface); color:var(--ink); }
+.admin-doc { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; padding:8px 0; }
+@media(max-width:640px){.profile-cover{min-height:110px}.profile-head{padding-left:16px;padding-right:16px}.profile-content{padding:14px 16px}.location-filters select{flex:1;min-width:135px}}
 </style>
   </head>
   <body>
@@ -965,6 +983,7 @@ dialog.auth-screen #dbody { width: 100%; height: 100%; display: grid; grid-templ
           <a class="h" data-nav="home" href="#home">Home</a
           ><a class="h" data-nav="tutors" href="#tutors">Tutors</a
           ><a class="h tutor-only" data-role-nav="tutor" data-nav="dashboard" href="#dashboard" hidden>Tutor dashboard</a
+          ><a class="h admin-only" data-nav="verification" href="#verification" hidden>Verify tutors</a
           ><a class="h" data-nav="doubts" href="#doubts">Doubts</a
           ><a class="h" data-nav="pricing" href="#pricing">Pricing</a
           ><a class="h" data-nav="me" href="#me">My page</a
@@ -1017,10 +1036,10 @@ dialog.auth-screen #dbody { width: 100%; height: 100%; display: grid; grid-templ
         </div>
       </section>
       <div class="wrap hero" data-v="tutors">
-        <h1>Tutors at your school</h1>
+        <h1>Verified tutors</h1>
         <p>
-          Search by subject, check ratings and results, then send a connection
-          request.
+          Find a senior tutor by subject and location. Open a profile to see
+          their school, subjects, and recent answers.
         </p>
         <div class="search">
           <input
@@ -1029,6 +1048,10 @@ dialog.auth-screen #dbody { width: 100%; height: 100%; display: grid; grid-templ
             placeholder="Search by name or topic, for example “integration”"
             aria-label="Search tutors"
           />
+        </div>
+        <div class="location-filters" aria-label="Filter tutors by location">
+          <select id="tutorStateFilter" aria-label="Filter tutors by state"><option value="">All states</option></select>
+          <select id="tutorCityFilter" aria-label="Filter tutors by city"><option value="">All cities</option></select>
         </div>
         <div
           class="chips"
@@ -1045,6 +1068,14 @@ dialog.auth-screen #dbody { width: 100%; height: 100%; display: grid; grid-templ
           <h2>Tutor dashboard</h2>
           <p>Manage your availability, review requests, and help students get unstuck.</p>
           <div id="tutorDashboardBody"></div>
+        </div>
+      </section>
+
+      <section id="verification" data-v="verification" hidden>
+        <div class="wrap">
+          <h2>Tutor verification review</h2>
+          <p>Review both submitted documents. Approving gives the tutor a green Verified badge and lists their profile in tutor search.</p>
+          <div id="verificationAdminBody"></div>
         </div>
       </section>
 
@@ -1180,6 +1211,7 @@ dialog.auth-screen #dbody { width: 100%; height: 100%; display: grid; grid-templ
       <a data-nav="home" href="#home">Home</a
       ><a data-nav="tutors" href="#tutors">Tutors</a
       ><a class="tutor-only" data-role-nav="tutor" data-nav="dashboard" href="#dashboard" hidden>Dashboard</a
+      ><a class="admin-only" data-nav="verification" href="#verification" hidden>Verify</a
       ><a data-nav="doubts" href="#doubts">Doubts</a
       ><a data-nav="pricing" href="#pricing">Pricing</a
       ><a data-nav="me" href="#me">Me</a>
