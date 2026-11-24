@@ -86,7 +86,7 @@ function draw() {
   grid.innerHTML = list
     .map(function (t) {
       var i = tutors.indexOf(t),
-        done = sent[t.user_id] || t.me;
+        done = sent[t.user_id];
       return (
         '<article class="card" data-profile-index="' + i + '" tabindex="0" aria-label="View ' + esc(t.n) + ' tutor profile"><div class="cover" style="--c:' +
         t.c +
@@ -97,8 +97,8 @@ function draw() {
         '<h3><span class="tutor-name">' +
         esc(t.n) +
         (t.blue ? BT : "") +
-        (t.verified ? ' <span class="verify-badge">Verified</span>' : '') +
-        '</span><span class="tutor-online" title="Available"></span></h3>' +
+        (t.verified ? ' <span class="verify-badge">Verified</span>' : t.me ? ' <span class="verify-review-state">' + esc(t.verificationStatus || "Not verified") + '</span>' : '') +
+        '</span>' + (t.verified && t.available ? '<span class="tutor-online" title="Available"></span>' : '') + '</h3>' +
         '<div class="sub">' +
         esc(t.g) + " · " + esc(t.h) + '<br>' + esc([t.school, t.city, t.state].filter(Boolean).join(" · ")) +
         "</div>" +
@@ -109,15 +109,9 @@ function draw() {
           })
           .join("") +
         "</div>" +
-        '<button class="btn' +
-        (done ? " ghost" : "") +
-        '" data-i="' +
-        i +
-        '"' +
-        (done ? " disabled" : "") +
-        ">" +
-        (t.me ? "Your profile" : done ? "Request sent" : "Connect") +
-        "</button>" +
+        (t.me
+          ? '<button class="btn ghost" data-edit-tutor-card>Edit profile</button>'
+          : '<button class="btn' + (done ? " ghost" : "") + '" data-i="' + i + '"' + (done ? " disabled" : "") + ">" + (done ? "Request sent" : "Connect") + "</button>") +
         "</div></article>"
       );
     })
@@ -159,6 +153,7 @@ document.getElementById("tutorCityFilter").addEventListener("change", function (
   draw();
 });
 grid.addEventListener("click", async function (e) {
+  if (e.target.closest("[data-edit-tutor-card]")) { e.stopPropagation(); openTutor(); return; }
   var b = e.target.closest("button[data-i]");
   if (!b) {
     var card = e.target.closest("[data-profile-index]");
@@ -195,10 +190,13 @@ grid.addEventListener("keydown", function (e) {
 
 async function showTutorProfile(tutor) {
   if (!tutor) return;
+  dlg.classList.remove("auth-screen");
+  dlg.classList.add("profile-dialog");
   var locationText = [tutor.school, tutor.city, tutor.state, tutor.country].filter(Boolean).join(" · ");
-  dbody.innerHTML = '<div class="profile-cover"></div><section class="profile-head"><div class="av">' + esc(ini(tutor.n)) + '</div><h2>' + esc(tutor.n) + (tutor.verified ? ' <span class="verify-badge">Verified</span>' : '') + '</h2><div class="profile-meta">' + esc(tutor.g) + ' · ' + esc(locationText) + '</div><p>' + esc(tutor.h) + '</p><div class="tags">' + tutor.s.map(function (subject) { return '<span class="tag">' + esc(subject) + '</span>'; }).join("") + '</div><button class="btn" id="profileConnect" ' + ((sent[tutor.user_id] || tutor.me) ? 'disabled' : '') + '>' + (tutor.me ? 'Your profile' : sent[tutor.user_id] ? 'Request sent' : 'Connect') + '</button></section><div class="profile-tabs"><button class="btn ghost" data-profile-tab="about" aria-pressed="true">About</button><button class="btn ghost" data-profile-tab="answers" aria-pressed="false">Answers</button></div><div class="profile-content" id="profileContent"><h3>About</h3><p>' + esc(tutor.h || 'Student tutor') + '</p><p class="muted">School: ' + esc(tutor.school || '—') + '<br>Location: ' + esc([tutor.city, tutor.state, tutor.country].filter(Boolean).join(', ') || '—') + '</p></div>';
+  dbody.innerHTML = '<div class="profile-cover"></div><section class="profile-head"><div class="av">' + esc(ini(tutor.n)) + '</div><h2>' + esc(tutor.n) + (tutor.verified ? ' <span class="verify-badge">Verified</span>' : tutor.me ? ' <span class="verify-review-state">' + esc(tutor.verificationStatus || "Not verified") + '</span>' : '') + '</h2><div class="profile-meta">' + esc(tutor.g) + ' · ' + esc(locationText) + '</div><p>' + esc(tutor.h) + '</p><div class="tags">' + tutor.s.map(function (subject) { return '<span class="tag">' + esc(subject) + '</span>'; }).join("") + '</div><button class="btn" id="profileConnect" ' + ((sent[tutor.user_id] && !tutor.me) ? 'disabled' : '') + '>' + (tutor.me ? 'Edit profile' : sent[tutor.user_id] ? 'Request sent' : 'Connect') + '</button></section><div class="profile-tabs"><button class="btn ghost" data-profile-tab="about" aria-pressed="true">About</button><button class="btn ghost" data-profile-tab="answers" aria-pressed="false">Answers</button></div><div class="profile-content" id="profileContent"><h3>About</h3><p>' + esc(tutor.h || 'Student tutor') + '</p><p class="muted">School: ' + esc(tutor.school || '—') + '<br>Location: ' + esc([tutor.city, tutor.state, tutor.country].filter(Boolean).join(', ') || '—') + '</p></div>';
   if (!dlg.open) dlg.showModal();
   document.getElementById("profileConnect").onclick = async function () {
+    if (tutor.me) { dlg.close(); openTutor(); return; }
     if (!user) { openSign(); return; }
     if (user.role !== "student") { document.getElementById("profileContent").textContent = "Student accounts can send connection requests."; return; }
     var result = await supabaseClient.from("connections").insert({ requester_id: user.id, recipient_id: tutor.user_id });
@@ -243,10 +241,30 @@ async function loadTutorDirectory() {
       state: row.state || "",
       country: row.country || "",
       verified: !!row.verified,
+      available: !!row.is_available,
       c: "#2B4EFF",
       me: row.user_id === user.id,
     };
   });
+  if (user.role === "tutor" && !tutors.some(function (tutor) { return tutor.user_id === user.id; })) {
+    var ownResults = await Promise.all([
+      supabaseClient.from("tutor_profiles").select("user_id, headline, subjects, is_available").eq("user_id", user.id).maybeSingle(),
+      supabaseClient.from("tutor_verification_requests").select("status").eq("user_id", user.id).order("submitted_at", { ascending: false }).limit(1),
+    ]);
+    var own = ownResults[0].data;
+    if (own) {
+      var ownStatus = (ownResults[1].data || [])[0],
+        statusLabel = ownStatus && ownStatus.status === "pending" ? "Pending review" : ownStatus && ownStatus.status === "rejected" ? "Needs resubmission" : "Not verified";
+      tutors.push({
+        user_id: own.user_id, n: user.n, g: user.grade ? "Class " + user.grade : "Student tutor",
+        s: own.subjects || [], h: own.headline || "Peer tutor",
+        school: user.location && user.location.school || "", city: user.location && user.location.city || "",
+        state: user.location && user.location.state || "", country: user.location && user.location.country || "",
+        verified: !!(ownStatus && ownStatus.status === "verified"), verificationStatus: statusLabel,
+        available: !!own.is_available, c: "#2B4EFF", me: true,
+      });
+    }
+  }
   subjects = ["All"].concat(
     Array.from(new Set(tutors.reduce(function (all, tutor) {
       return all.concat(tutor.s);
@@ -465,6 +483,7 @@ function showPasswordUpdateForm() {
 
 function showAuthForm(mode) {
   var signingUp = mode === "signup";
+  dlg.classList.remove("profile-dialog");
   dlg.classList.add("auth-screen");
   dbody.innerHTML =
     '<section class="auth-form-panel"><h3 id="dt">' + (signingUp ? "Create your account" : "Sign in") + '</h3>' +
@@ -616,6 +635,7 @@ function openSign() {
 function openOnboarding(changeRole) {
   if (!user || !supabaseClient || onboardingOpen) return;
   dlg.classList.remove("auth-screen");
+  dlg.classList.remove("profile-dialog");
   onboardingOpen = true;
   var selectedRole = changeRole ? "" : (user.role || "");
   var savedLocation = user.location || {};
@@ -742,6 +762,7 @@ var allSubs = [
   "Economics",
 ];
 async function openTutor() {
+  dlg.classList.remove("profile-dialog");
   if (!user) {
     openSign();
     return;
@@ -947,6 +968,7 @@ document.getElementById("tutorDashboardBody").addEventListener("change", async f
 function openTutorVerificationForm() {
   if (!user || user.role !== "tutor") return;
   dlg.classList.remove("auth-screen");
+  dlg.classList.remove("profile-dialog");
   dbody.innerHTML = '<h3 id="dt">Submit tutor verification</h3><p class="muted">Upload a school ID card and a school fee receipt. These files are private and can only be viewed by you and the trusted reviewer.</p><div class="verify-doc-fields"><label>School ID card<input id="verifySchoolId" type="file" accept="image/jpeg,image/png,image/webp,application/pdf"></label><label>Fee receipt<input id="verifyFeeReceipt" type="file" accept="image/jpeg,image/png,image/webp,application/pdf"></label></div><p class="note">Each file must be JPG, PNG, WebP, or PDF and no larger than 5 MB. Do not upload unrelated personal documents.</p><div class="err" id="verificationError" role="alert"></div><div class="row"><button class="btn ghost" id="cancelVerification">Cancel</button><button class="btn" id="submitVerification">Send for review</button></div>';
   if (!dlg.open) dlg.showModal();
   document.getElementById("cancelVerification").onclick = function () { dlg.close(); };
