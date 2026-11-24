@@ -6,7 +6,7 @@ The page styling is embedded in `index.html`; the app behavior is in `app.js`.
 
 ## 1. What exists today
 
-A front-end prototype connected to Supabase Auth. People can create an account with email and password or use Google, then choose Student or Tutor and add their class (9–12). Student and tutor home screens differ. Tutors can create a tutor profile, manage incoming connection requests, and pause their search visibility. Student/tutor profiles, tutor listings, and connection requests use Supabase. Doubt posts and answers are still demo data in memory and reset when the page is refreshed.
+A front-end prototype connected to Supabase Auth. People can create an account with email and password or use Google, then choose Student or Tutor and add their class (9–12). Student and tutor home screens differ. Tutors can create a tutor profile, manage incoming connection requests, and pause their search visibility. Student/tutor profiles, tutor listings, connection requests, doubts, and answers use Supabase. Doubt posts and answers persist across refreshes and accounts; upvote counts are still temporary.
 
 | Page | Route | What it does |
 |---|---|---|
@@ -53,7 +53,7 @@ Main state variables in `app.js`: `tutors`, `posts`, `sent`, `user` (signed-in p
 
 | Fake today | Real version |
 |---|---|
-| Doubt posts, answers and votes are still local | Save doubts, answers and votes in database tables |
+| Doubt upvotes are still local | Save upvotes in a database table |
 | Optional Blue Tick payment | Payment provider and price are undecided; no payment is active |
 | Data in `tutors` and `posts` arrays | Database tables, loaded through an API |
 | Verification is just a label | A real review flow for teachers or a topic test |
@@ -112,7 +112,7 @@ Most users will be under 18, so plan for this before launch:
 
 ## 10. Good first tasks to ask ChatGPT
 
-1. "Connect doubts, answers and votes to Supabase tables."
+1. "Persist doubt upvotes in Supabase."
 2. "Add a separate profile page for each tutor, with their reviews and a request button."
 3. "Make connection requests real: the tutor sees a list and can accept or decline."
 4. "Add a one-time checkout for the tutor Blue Tick after its price is decided."

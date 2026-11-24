@@ -276,8 +276,11 @@ async function restoreAuthSession() {
 async function syncAuthUser(authUser) {
   if (!authUser) {
     user = null;
+    posts = [];
+    openR = {};
     paintSign();
     paintRoleUI();
+    drawFeed();
     if (curRoute === "workspace") location.hash = "home";
     if (typeof drawMe === "function" && curRoute === "me") drawMe();
     return;
@@ -1231,6 +1234,10 @@ function route() {
   });
   document.title = names[h] + " | Peer Connect";
   if (h === "workspace") drawWorkspace();
+  if (h === "doubts") {
+    if (user) loadDoubtsFromSupabase();
+    else drawFeed();
+  }
   if (h === "me") drawMe();
   if (h === "dashboard") drawTutorDashboard();
   window.scrollTo(0, 0);
