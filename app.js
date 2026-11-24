@@ -753,9 +753,12 @@ document.getElementById("btnTutor2").addEventListener("click", openTutor);
 
 function paintRoleUI() {
   var isTutor = !!user && user.role === "tutor";
+  var isSignedIn = !!user;
   document.querySelectorAll('[data-role-nav="tutor"]').forEach(function (el) { el.hidden = !isTutor; });
   var become = document.getElementById("btnTutor");
-  if (become) become.hidden = isTutor;
+  var becomeFromPricing = document.getElementById("btnTutor2");
+  if (become) become.hidden = isSignedIn;
+  if (becomeFromPricing) becomeFromPricing.hidden = isSignedIn;
   var title = document.getElementById("homeTitle");
   var intro = document.getElementById("homeIntro");
   var actions = document.getElementById("homeActions");
