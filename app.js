@@ -247,6 +247,30 @@ function paintSign() {
   }
 }
 
+async function restoreAuthSession() {
+  var params = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  var accessToken = params.get("access_token");
+  var refreshToken = params.get("refresh_token");
+  if (accessToken && refreshToken) {
+    var restored = await supabaseClient.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    });
+    if (restored.error) {
+      console.error("Could not restore Peer Connect session:", restored.error.message);
+      dbody.innerHTML = '<h3 id="dt">Google sign-in did not finish</h3><p class="muted">Please start sign-in again. If it keeps happening, send us the error: ' + esc(restored.error.message) + '</p><button class="btn" id="retryAuth">Try again</button>';
+      if (!dlg.open) dlg.showModal();
+      document.getElementById("retryAuth").onclick = function () { dlg.close(); openSign(); };
+      return null;
+    }
+    window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+    return restored.data.session;
+  }
+  var current = await supabaseClient.auth.getSession();
+  if (current.error) console.error("Could not restore Peer Connect session:", current.error.message);
+  return current.data.session;
+}
+
 async function syncAuthUser(authUser) {
   if (!authUser) {
     user = null;
@@ -475,15 +499,23 @@ if (
   supabaseClient = window.supabase.createClient(
     window.STUDYLINK_SUPABASE_URL,
     window.STUDYLINK_SUPABASE_PUBLISHABLE_KEY,
+    {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: false,
+      },
+    },
   );
-  supabaseClient.auth.getSession().then(function (result) {
-    if (result.error) console.error("Could not restore Peer Connect session:", result.error.message);
-    syncAuthUser(result.data.session ? result.data.session.user : null);
-  });
   supabaseClient.auth.onAuthStateChange(function (_event, session) {
     window.setTimeout(function () {
       syncAuthUser(session ? session.user : null);
     }, 0);
+  });
+  restoreAuthSession().then(function (session) {
+    syncAuthUser(session ? session.user : null);
+  }).catch(function (error) {
+    console.error("Could not restore Peer Connect session:", error.message);
   });
 }
 
