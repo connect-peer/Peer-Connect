@@ -1,7 +1,5 @@
-Peer Connect persistent doubts update
+Peer Connect update: original UI + saved doubts
 
-Includes the latest Peer Connect files: index.html, app.js, supabase-config.js, and README.md.
+This package keeps the original public site layout and sign-in styling. The doubts page saves doubts and answers in the existing Supabase tables so they remain after refresh and across signed-in accounts. No SQL changes are needed.
 
-The Doubts page now reads/writes the existing public.doubts and public.answers tables. The existing Supabase RLS policies already allow authenticated users to read the shared feed and only permit each signed-in user to create records under their own author ID. No SQL changes are required.
-
-Replace these files in the repository root and push to publish. Doubts created before this update existed only in browser memory and cannot be restored from the database.
+Replace index.html, app.js, supabase-config.js, and README.md in the repository root, then publish the site. Existing doubts that only lived temporarily in the browser cannot be recovered.

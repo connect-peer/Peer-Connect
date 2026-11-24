@@ -281,7 +281,6 @@ async function syncAuthUser(authUser) {
     paintSign();
     paintRoleUI();
     drawFeed();
-    if (curRoute === "workspace") location.hash = "home";
     if (typeof drawMe === "function" && curRoute === "me") drawMe();
     return;
   }
@@ -316,38 +315,14 @@ async function syncAuthUser(authUser) {
   if (user.role === "student") loadStudentConnections();
   if (curRoute === "dashboard" && user.role === "tutor") drawTutorDashboard();
   if (typeof drawMe === "function" && curRoute === "me") drawMe();
-  if (curRoute === "home") location.hash = "workspace";
-  if (curRoute === "workspace") drawWorkspace();
 }
 
 function authErrorText(error) {
   return error && error.message ? error.message : "Something went wrong. Please try again.";
 }
 
-function drawWorkspace() {
-  if (!user) return;
-  var tutor = user.role === "tutor";
-  var roleName = tutor ? "Tutor" : user.role === "student" ? "Student" : "Profile setup";
-  document.getElementById("workspaceWelcome").textContent = "Welcome back, " + user.n;
-  document.getElementById("workspaceRoleLabel").textContent = roleName + " workspace";
-  document.getElementById("workspaceIntro").textContent = tutor
-    ? "Manage your tutor space, respond to students, and share what you know."
-    : "Find support, ask study questions, and keep your peer learning in one place.";
-  document.getElementById("workspaceAccountRole").textContent = roleName;
-  document.getElementById("workspaceAccountGrade").textContent = user.grade ? "Class " + user.grade : "Not set yet";
-  document.getElementById("workspaceAccountEmail").textContent = user.e || "No email on file";
-  document.getElementById("workspaceStatusText").textContent = user.role
-    ? "Signed in as a " + roleName.toLowerCase() + " · Class " + (user.grade || "not set") + "."
-    : "Signed in, but your profile setup is not finished yet.";
-  document.getElementById("workspaceActions").innerHTML = tutor
-    ? '<a class="workspace-action" href="#dashboard"><strong>Open tutor dashboard</strong><span>Review student requests and update your availability.</span></a><a class="workspace-action" href="#doubts"><strong>Answer a study doubt</strong><span>Share an explanation with classmates.</span></a><a class="workspace-action" href="#me"><strong>View your profile</strong><span>Check the account details saved in Peer Connect.</span></a>'
-    : '<a class="workspace-action" href="#tutors"><strong>Find a tutor</strong><span>Search by subject and request help from a classmate.</span></a><a class="workspace-action" href="#doubts"><strong>Ask a study doubt</strong><span>Post a question or browse what classmates are asking.</span></a><a class="workspace-action" href="#me"><strong>View your profile</strong><span>Check your class and account details.</span></a>';
-}
-
 function showPasswordResetForm(email) {
-  dlg.classList.add("auth-dialog");
   dbody.innerHTML =
-    '<div class="auth-brandline"><span class="auth-brandmark">P</span><span>Peer Connect</span><span class="auth-mode-tag">ACCOUNT RECOVERY</span></div>' +
     '<h3 id="dt">Reset your password</h3>' +
     '<p style="color:var(--muted);margin:6px 0 12px">We’ll email you a secure link to choose a new password.</p>' +
     '<label for="resetEmail">Email</label><input id="resetEmail" type="email" autocomplete="email" placeholder="you@example.com" value="' + esc(email || "") + '">' +
@@ -385,9 +360,7 @@ function showPasswordResetForm(email) {
 }
 
 function showPasswordUpdateForm() {
-  dlg.classList.add("auth-dialog");
   dbody.innerHTML =
-    '<div class="auth-brandline"><span class="auth-brandmark">P</span><span>Peer Connect</span><span class="auth-mode-tag">SECURE ACCOUNT</span></div>' +
     '<h3 id="dt">Choose a new password</h3>' +
     '<p style="color:var(--muted);margin:6px 0 12px">Use at least 8 characters.</p>' +
     '<label for="newPassword">New password</label><input id="newPassword" type="password" minlength="8" autocomplete="new-password" placeholder="At least 8 characters">' +
@@ -424,9 +397,7 @@ function showPasswordUpdateForm() {
 
 function showAuthForm(mode) {
   var signingUp = mode === "signup";
-  dlg.classList.add("auth-dialog");
   dbody.innerHTML =
-    '<div class="auth-brandline"><span class="auth-brandmark">P</span><span>Peer Connect</span><span class="auth-mode-tag">' + (signingUp ? "CREATE ACCOUNT" : "SIGN IN") + '</span></div>' +
     '<h3 id="dt">' + (signingUp ? "Create your account" : "Sign in") + '</h3>' +
     '<p style="color:var(--muted);margin:6px 0 12px">' +
     (signingUp ? "Start with email and password, then finish your profile." : "Use your email and password to sign in.") +
@@ -526,7 +497,6 @@ function showAuthForm(mode) {
 
 function openSign() {
   if (!supabaseClient) {
-    dlg.classList.remove("auth-dialog");
     dbody.innerHTML =
       '<h3 id="dt">Sign-in is not configured</h3><p style="color:var(--muted)">Add the Supabase project settings in supabase-config.js, then reload this page.</p><div class="row"><button class="btn" id="cx">Close</button></div>';
     dlg.showModal();
@@ -538,7 +508,6 @@ function openSign() {
     return;
   }
   if (user) {
-    dlg.classList.remove("auth-dialog");
     dbody.innerHTML =
       '<h3 id="dt">Your Peer Connect account</h3><p style="color:var(--muted)">' +
       esc(user.n) +
@@ -566,7 +535,6 @@ function openSign() {
 
 function openOnboarding(changeRole) {
   if (!user || !supabaseClient || onboardingOpen) return;
-  dlg.classList.remove("auth-dialog");
   onboardingOpen = true;
   var selectedRole = changeRole ? "" : (user.role || "");
   dbody.innerHTML =
@@ -675,7 +643,6 @@ async function openTutor() {
     openSign();
     return;
   }
-  dlg.classList.remove("auth-dialog");
   if (user.role !== "tutor") {
     onboardingOpen = false;
     openOnboarding(true);
@@ -786,34 +753,15 @@ async function openTutor() {
 document.getElementById("btnTutor").addEventListener("click", openTutor);
 document.getElementById("btnFree").addEventListener("click", function () { showAuthForm("signup"); });
 document.getElementById("btnTutor2").addEventListener("click", openTutor);
-document.getElementById("workspaceSignOut").addEventListener("click", async function () {
-  var button = this;
-  var message = document.getElementById("workspaceSignOutError");
-  button.disabled = true;
-  message.textContent = "";
-  try {
-    var result = await supabaseClient.auth.signOut();
-    if (result.error) message.textContent = authErrorText(result.error);
-  } catch (error) {
-    message.textContent = authErrorText(error);
-  } finally {
-    button.disabled = false;
-  }
-});
 
 function paintRoleUI() {
   var isTutor = !!user && user.role === "tutor";
   var isSignedIn = !!user;
-  document.body.classList.toggle("is-signed-in", isSignedIn);
   document.querySelectorAll('[data-role-nav="tutor"]').forEach(function (el) { el.hidden = !isTutor; });
   var become = document.getElementById("btnTutor");
   var becomeFromPricing = document.getElementById("btnTutor2");
   if (become) become.hidden = isSignedIn;
   if (becomeFromPricing) becomeFromPricing.hidden = isSignedIn;
-  var railName = document.getElementById("workspaceRailName");
-  var railRole = document.getElementById("workspaceRailRole");
-  if (railName) railName.textContent = user ? user.n : "Signed-in account";
-  if (railRole) railRole.textContent = user ? ((user.role === "tutor" ? "Tutor" : user.role === "student" ? "Student" : "Member") + (user.grade ? " · Class " + user.grade : "")) : "Peer Connect member";
   var title = document.getElementById("homeTitle");
   var intro = document.getElementById("homeIntro");
   var actions = document.getElementById("homeActions");
@@ -1192,7 +1140,7 @@ function drawMe() {
   var mu = 'style="margin:6px 0 12px;color:var(--muted)"';
   h += '<div class="box"><b>Account</b><p ' + mu + '>' + (user ? esc(user.n) + " · " + esc(user.e) + "<br>" + (user.role === "tutor" ? "Tutor" : "Student") + " · Class " + esc(String(user.grade || "")) : "You are not signed in.") + '</p>' + (user ? '' : '<button class="btn" data-go="signin">Sign up / Sign in</button>') + '</div>';
   h += '<div class="box"><b>Connections</b><p ' + mu + '>Unlimited connection requests for every student account.</p><a class="btn ghost" href="#tutors">Find a tutor</a></div>';
-  h += '<div class="box"><b>Tutor profile</b><p ' + mu + '>' + (user && user.role === "tutor" ? 'Your tutor tools and incoming requests are on your <a href="#dashboard">dashboard</a>.' : user ? 'This account is set up for student access.' : 'Sign in and choose your account type to get started.') + '</p>' + (user && user.role === "tutor" ? '<a class="btn" href="#dashboard">Tutor dashboard</a>' : '') + '</div>';
+  h += '<div class="box"><b>Tutor profile</b><p ' + mu + '>' + (user && user.role === "tutor" ? 'Your tutor tools and incoming requests are on your <a href="#dashboard">dashboard</a>.' : 'Want to help classmates? Choose Tutor in your account profile.') + '</p>' + (user && user.role === "tutor" ? '<a class="btn" href="#dashboard">Tutor dashboard</a>' : '') + '</div>';
   var w = who();
   var mp = posts.filter(function (p) { return p.n === w.n; });
   h += '<div class="box"><b>Your doubts (' + mp.length + ')</b>' + (mp.length ? '<ul style="margin:8px 0 0;padding-left:20px">' + mp.map(function (p) { return "<li>" + esc(p.t) + "</li>"; }).join("") + '</ul>' : '<p ' + mu + '>You have not asked a doubt yet.</p><a class="btn ghost" href="#doubts">Ask a doubt</a>') + '</div>';
@@ -1208,10 +1156,9 @@ dlg.addEventListener("close", function () {
   if (user && (!user.role || !user.grade)) onboardingOpen = false;
   if (curRoute === "me") drawMe();
 });
-var routes = ["home", "workspace", "tutors", "doubts", "pricing", "me", "dashboard"],
+var routes = ["home", "tutors", "doubts", "pricing", "me", "dashboard"],
   names = {
     home: "Home",
-    workspace: "Workspace",
     tutors: "Tutors",
     doubts: "Doubts",
     pricing: "Pricing",
@@ -1221,9 +1168,7 @@ var routes = ["home", "workspace", "tutors", "doubts", "pricing", "me", "dashboa
 function route() {
   var h = location.hash.replace("#", "");
   if (routes.indexOf(h) < 0) h = "home";
-  if (user && h === "home") h = "workspace";
-  if (!user && h === "workspace") h = "home";
-  if (h === "dashboard" && (!user || user.role !== "tutor")) h = user ? "workspace" : "home";
+  if (h === "dashboard" && (!user || user.role !== "tutor")) h = "home";
   curRoute = h;
   document.querySelectorAll("[data-v]").forEach(function (el) {
     el.hidden = el.dataset.v.split(" ").indexOf(h) < 0;
@@ -1233,7 +1178,6 @@ function route() {
     else a.removeAttribute("aria-current");
   });
   document.title = names[h] + " | Peer Connect";
-  if (h === "workspace") drawWorkspace();
   if (h === "doubts") {
     if (user) loadDoubtsFromSupabase();
     else drawFeed();
