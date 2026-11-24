@@ -228,7 +228,8 @@ var dlg = document.getElementById("dlg"),
 var user = null,
   gs = document.getElementById("gsign"),
   supabaseClient = null,
-  onboardingOpen = false;
+  onboardingOpen = false,
+  passwordRecoveryPending = false;
 var G =
   '<svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.6 5.9c4.5-4.2 7-10.3 7-17.6z"/><path fill="#FBBC05" d="M10.5 28.7c-.5-1.4-.8-3-.8-4.7s.3-3.2.8-4.7l-7.9-6.1C.9 16.4 0 20.1 0 24s.9 7.6 2.6 10.8l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.6-5.9c-2.1 1.4-4.9 2.3-8.3 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/></svg>';
 
@@ -249,6 +250,7 @@ function paintSign() {
 
 async function restoreAuthSession() {
   var params = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  passwordRecoveryPending = params.get("type") === "recovery";
   var accessToken = params.get("access_token");
   var refreshToken = params.get("refresh_token");
   if (accessToken && refreshToken) {
@@ -316,6 +318,80 @@ function authErrorText(error) {
   return error && error.message ? error.message : "Something went wrong. Please try again.";
 }
 
+function showPasswordResetForm(email) {
+  dbody.innerHTML =
+    '<h3 id="dt">Reset your password</h3>' +
+    '<p style="color:var(--muted);margin:6px 0 12px">We’ll email you a secure link to choose a new password.</p>' +
+    '<label for="resetEmail">Email</label><input id="resetEmail" type="email" autocomplete="email" placeholder="you@example.com" value="' + esc(email || "") + '">' +
+    '<div class="err" id="resetErr" role="alert"></div>' +
+    '<button class="btn gfull" id="sendReset">Send reset link</button>' +
+    '<button class="btn ghost gfull" id="backToSignIn">Back to sign in</button>';
+  if (!dlg.open) dlg.showModal();
+  document.getElementById("backToSignIn").onclick = function () {
+    showAuthForm("signin");
+  };
+  document.getElementById("sendReset").onclick = async function () {
+    var button = document.getElementById("sendReset");
+    var message = document.getElementById("resetErr");
+    var resetEmail = document.getElementById("resetEmail").value.trim();
+    if (!resetEmail) {
+      message.textContent = "Enter the email address for your account.";
+      return;
+    }
+    button.disabled = true;
+    button.textContent = "Sending…";
+    message.textContent = "";
+    try {
+      var result = await supabaseClient.auth.resetPasswordForEmail(resetEmail, {
+        redirectTo: window.location.origin + window.location.pathname,
+      });
+      if (result.error) message.textContent = authErrorText(result.error);
+      else message.textContent = "If an account uses that email, a reset link is on its way. Check your inbox and spam folder.";
+    } catch (error) {
+      message.textContent = authErrorText(error);
+    } finally {
+      button.disabled = false;
+      button.textContent = "Send reset link";
+    }
+  };
+}
+
+function showPasswordUpdateForm() {
+  dbody.innerHTML =
+    '<h3 id="dt">Choose a new password</h3>' +
+    '<p style="color:var(--muted);margin:6px 0 12px">Use at least 8 characters.</p>' +
+    '<label for="newPassword">New password</label><input id="newPassword" type="password" minlength="8" autocomplete="new-password" placeholder="At least 8 characters">' +
+    '<div class="err" id="passwordUpdateErr" role="alert"></div>' +
+    '<button class="btn gfull" id="saveNewPassword">Save new password</button>';
+  if (!dlg.open) dlg.showModal();
+  document.getElementById("saveNewPassword").onclick = async function () {
+    var button = document.getElementById("saveNewPassword");
+    var message = document.getElementById("passwordUpdateErr");
+    var password = document.getElementById("newPassword").value;
+    if (password.length < 8) {
+      message.textContent = "Use a password with at least 8 characters.";
+      return;
+    }
+    button.disabled = true;
+    button.textContent = "Saving…";
+    try {
+      var result = await supabaseClient.auth.updateUser({ password: password });
+      if (result.error) message.textContent = authErrorText(result.error);
+      else {
+        dlg.close();
+        await syncAuthUser(result.data.user);
+      }
+    } catch (error) {
+      message.textContent = authErrorText(error);
+    } finally {
+      if (button.isConnected) {
+        button.disabled = false;
+        button.textContent = "Save new password";
+      }
+    }
+  };
+}
+
 function showAuthForm(mode) {
   var signingUp = mode === "signup";
   dbody.innerHTML =
@@ -338,13 +414,21 @@ function showAuthForm(mode) {
     (signingUp
       ? 'Already have an account? <button class="text-button" id="switchAuth">Sign in</button>'
       : 'New to Peer Connect? <button class="text-button" id="switchAuth">Create an account</button>') +
+    (signingUp ? "" : '<br><button class="text-button" id="forgotPassword">Forgot password?</button>') +
     '</p><button class="btn ghost gfull" id="cx">Cancel</button>';
   if (!dlg.open) dlg.showModal();
   document.getElementById("cx").onclick = function () { dlg.close(); };
   document.getElementById("switchAuth").onclick = function () {
     showAuthForm(signingUp ? "signin" : "signup");
   };
+  var forgotPassword = document.getElementById("forgotPassword");
+  if (forgotPassword) {
+    forgotPassword.onclick = function () {
+      showPasswordResetForm(document.getElementById("authEmail").value.trim());
+    };
+  }
   document.getElementById("emailSubmit").onclick = async function () {
+    var button = document.getElementById("emailSubmit");
     var email = document.getElementById("authEmail").value.trim();
     var password = document.getElementById("authPassword").value;
     var message = document.getElementById("authErr");
@@ -362,26 +446,41 @@ function showAuthForm(mode) {
         message.textContent = "Use a password with at least 8 characters.";
         return;
       }
-      var signup = await supabaseClient.auth.signUp({
-        email: email,
-        password: password,
-        options: { data: { display_name: name } },
-      });
-      if (signup.error) {
-        message.textContent = authErrorText(signup.error);
-      } else if (signup.data.session) {
-        dlg.close();
-        await syncAuthUser(signup.data.user);
+    }
+    button.disabled = true;
+    button.textContent = signingUp ? "Creating account…" : "Signing in…";
+    message.textContent = "";
+    try {
+      if (signingUp) {
+        var signup = await supabaseClient.auth.signUp({
+          email: email,
+          password: password,
+          options: {
+            data: { display_name: name },
+            emailRedirectTo: window.location.origin + window.location.pathname,
+          },
+        });
+        if (signup.error) {
+          message.textContent = authErrorText(signup.error);
+        } else if (signup.data.session) {
+          dlg.close();
+          await syncAuthUser(signup.data.user);
+        } else {
+          message.textContent = "Account created. Check your email to confirm it, then return here to sign in.";
+        }
       } else {
-        message.textContent = "Check your email to confirm your address. After you sign in, Peer Connect will ask for your class and account type.";
+        var signin = await supabaseClient.auth.signInWithPassword({ email: email, password: password });
+        if (signin.error) message.textContent = authErrorText(signin.error);
+        else if (signin.data && signin.data.user) await syncAuthUser(signin.data.user);
+        else message.textContent = "Sign-in finished without a user session. Please try again.";
       }
-    } else {
-      var signin = await supabaseClient.auth.signInWithPassword({
-        email: email,
-        password: password,
-      });
-      if (signin.error) message.textContent = authErrorText(signin.error);
-      else dlg.close();
+    } catch (error) {
+      message.textContent = authErrorText(error);
+    } finally {
+      if (button.isConnected) {
+        button.disabled = false;
+        button.textContent = signingUp ? "Create account" : "Sign in";
+      }
     }
   };
   document.getElementById("googleSignIn").onclick = async function () {
@@ -508,12 +607,17 @@ if (
     },
   );
   supabaseClient.auth.onAuthStateChange(function (_event, session) {
-    window.setTimeout(function () {
-      syncAuthUser(session ? session.user : null);
+    window.setTimeout(async function () {
+      await syncAuthUser(session ? session.user : null);
+      if (_event === "PASSWORD_RECOVERY") showPasswordUpdateForm();
     }, 0);
   });
-  restoreAuthSession().then(function (session) {
-    syncAuthUser(session ? session.user : null);
+  restoreAuthSession().then(async function (session) {
+    await syncAuthUser(session ? session.user : null);
+    if (passwordRecoveryPending) {
+      passwordRecoveryPending = false;
+      showPasswordUpdateForm();
+    }
   }).catch(function (error) {
     console.error("Could not restore Peer Connect session:", error.message);
   });
