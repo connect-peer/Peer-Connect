@@ -1926,6 +1926,7 @@ function route() {
   if (h === "dashboard" && !canMentor(user)) h = "home";
   if (h === "verification" && (!user || !isVerificationAdmin)) h = "home";
   curRoute = h;
+  document.body.classList.toggle("home-feed", h === "home");
   document.querySelectorAll("[data-v]").forEach(function (el) {
     el.hidden = el.dataset.v.split(" ").indexOf(h) < 0;
   });
