@@ -373,6 +373,7 @@ var user = null,
   gs = document.getElementById("gsign"),
   supabaseClient = null,
   onboardingOpen = false,
+  signingOutInApp = false,
   passwordRecoveryPending = false;
 var isVerificationAdmin = false;
 var studentEntryPending = true;
@@ -429,6 +430,10 @@ async function syncAuthUser(authUser) {
     paintSign();
     paintRoleUI();
     drawFeed();
+    if (location.hash !== "#home") {
+      history.replaceState(null, document.title, location.pathname + location.search + "#home");
+      route();
+    }
     if (typeof drawMe === "function" && curRoute === "me") drawMe();
     return;
   }
@@ -451,6 +456,14 @@ async function syncAuthUser(authUser) {
   }
   var locationResult = supabaseClient ? await supabaseClient.from("profile_locations")
     .select("city, state, country, school").eq("user_id", authUser.id).maybeSingle() : null;
+  if (profileResult && profileResult.error) {
+    showProfileLoadError(profileResult.error);
+    return;
+  }
+  if (locationResult && locationResult.error) {
+    showProfileLoadError(locationResult.error);
+    return;
+  }
   user = {
     id: authUser.id,
     n: name,
@@ -480,6 +493,21 @@ function missingProfileLocation(location) {
   return !location || [location.school, location.city, location.state, location.country].some(function (value) {
     return !value || String(value).trim() === "" || String(value).toLowerCase() === "not set";
   });
+}
+
+function showProfileLoadError(error) {
+  onboardingOpen = false;
+  dlg.classList.remove("auth-screen", "profile-dialog", "setup-dialog");
+  dbody.innerHTML = '<h3 id="dt">Couldn’t load your saved profile</h3><p class="muted">Peer Connect could not read your account setup, so it won’t ask you to fill it in again until the read works.</p><div class="err" id="profileLoadErr" role="alert">' + esc(authErrorText(error)) + '</div><div class="row"><button class="btn ghost" id="retryProfileLoad">Try again</button><button class="btn" id="profileErrorSignOut">Sign out</button></div>';
+  if (!dlg.open) dlg.showModal();
+  document.getElementById("retryProfileLoad").onclick = async function () {
+    dlg.close();
+    var session = await supabaseClient.auth.getSession();
+    if (session.error) showProfileLoadError(session.error);
+    else if (session.data.session) await syncAuthUser(session.data.session.user);
+    else { showAuthForm("signin"); }
+  };
+  document.getElementById("profileErrorSignOut").onclick = signOutToLanding;
 }
 
 function showPasswordResetForm(email) {
@@ -561,6 +589,7 @@ function showPasswordUpdateForm() {
 function showAuthForm(mode) {
   var signingUp = mode === "signup";
   dlg.classList.remove("profile-dialog");
+  dlg.classList.remove("setup-dialog");
   dlg.classList.add("auth-screen");
   dbody.innerHTML =
     '<section class="auth-form-panel"><h3 id="dt">' + (signingUp ? "Create your account" : "Sign in") + '</h3>' +
@@ -683,7 +712,7 @@ function openSign() {
     return;
   }
   if (user) {
-    dlg.classList.remove("auth-screen");
+    dlg.classList.remove("auth-screen", "setup-dialog");
     dbody.innerHTML =
       '<h3 id="dt">Your Peer Connect account</h3><p style="color:var(--muted)">' +
       esc(user.n) +
@@ -692,35 +721,54 @@ function openSign() {
       (user.role
         ? "<br>Account type: " + accountTypeLabel(user.role)
         : "") +
-      '</p><div class="row"><button class="btn ghost" id="cx">Close</button><button class="btn" id="so">Sign out</button></div>';
+      '</p><div class="err" id="accountErr" role="alert"></div><div class="row"><button class="btn ghost" id="cx">Close</button><button class="btn" id="so">Sign out</button></div>';
     dlg.showModal();
     document.getElementById("cx").onclick = function () { dlg.close(); };
-    document.getElementById("so").onclick = async function () {
-      var result = await supabaseClient.auth.signOut();
-      if (result.error) {
-        var message = document.getElementById("authErr");
-        if (message) message.textContent = authErrorText(result.error);
-        return;
-      }
-      dlg.close();
-    };
+    document.getElementById("so").onclick = signOutToLanding;
     return;
   }
   showAuthForm("signin");
+}
+
+async function signOutToLanding() {
+  var button = document.getElementById("so") || document.getElementById("profileErrorSignOut");
+  var message = document.getElementById("accountErr") || document.getElementById("profileLoadErr");
+  if (button) { button.disabled = true; button.textContent = "Signing out…"; }
+  signingOutInApp = true;
+  try {
+    var result = await supabaseClient.auth.signOut();
+    if (result.error) {
+      if (message) message.textContent = authErrorText(result.error);
+      if (button) { button.disabled = false; button.textContent = "Sign out"; }
+      signingOutInApp = false;
+      return;
+    }
+    await syncAuthUser(null);
+    history.replaceState(null, document.title, location.pathname + location.search + "#home");
+    route();
+    if (dlg.open) dlg.close();
+    showAuthForm("signin");
+    window.setTimeout(function () { signingOutInApp = false; }, 1200);
+  } catch (error) {
+    if (message) message.textContent = authErrorText(error);
+    if (button) { button.disabled = false; button.textContent = "Sign out"; }
+    signingOutInApp = false;
+  }
 }
 
 function openOnboarding(changeRole) {
   if (!user || !supabaseClient || onboardingOpen) return;
   dlg.classList.remove("auth-screen");
   dlg.classList.remove("profile-dialog");
+  dlg.classList.add("setup-dialog");
   onboardingOpen = true;
   var selectedRole = normalizeRole(user.role) || (changeRole ? "" : "learner");
   var savedLocation = user.location || {};
-  var rolePicker = '<label>How do you want to use Peer Connect?</label><div class="role-options"><button type="button" class="role-option' + (selectedRole === "learner" || selectedRole === "student" ? " selected" : "") + '" data-role="learner"><strong>Learner</strong><span>Find mentors, ask questions, and get guidance.</span></button><button type="button" class="role-option' + (selectedRole === "mentor" || selectedRole === "tutor" ? " selected" : "") + '" data-role="mentor"><strong>Mentor</strong><span>Share what you know and guide learners in lower classes.</span></button><button type="button" class="role-option' + (selectedRole === "both" ? " selected" : "") + '" data-role="both"><strong>Both</strong><span>Get guidance from seniors and mentor learners in lower classes.</span></button></div>';
+  var rolePicker = '<fieldset class="role-options"><legend>How do you want to use Peer Connect?</legend><button type="button" class="role-option' + (selectedRole === "learner" || selectedRole === "student" ? " selected" : "") + '" data-role="learner" aria-pressed="' + (selectedRole === "learner" || selectedRole === "student") + '"><strong>Learner</strong><span>Find mentors, ask questions, and get guidance.</span></button><button type="button" class="role-option' + (selectedRole === "mentor" || selectedRole === "tutor" ? " selected" : "") + '" data-role="mentor" aria-pressed="' + (selectedRole === "mentor" || selectedRole === "tutor") + '"><strong>Mentor</strong><span>Share what you know and guide learners in lower classes.</span></button><button type="button" class="role-option' + (selectedRole === "both" ? " selected" : "") + '" data-role="both" aria-pressed="' + (selectedRole === "both") + '"><strong>Both</strong><span>Get guidance from seniors and mentor learners in lower classes.</span></button></fieldset>';
   dbody.innerHTML =
     '<h3 id="dt">Set up your profile</h3><p style="color:var(--muted);margin:6px 0 14px">Add your school and location so you can find peers nearby. Learner location details are shared only with a mentor after they send a request.</p>' +
     '<label for="profileName">Name</label><input id="profileName" autocomplete="name" value="' + esc(user.n) + '">' +
-    '<label for="profileGrade">Class</label><select id="profileGrade"><option value="">Choose your class</option>' +
+    '<label for="profileGrade">Class</label><select id="profileGrade" required aria-label="Choose your class"><option value="">Choose your class</option>' +
     [9, 10, 11, 12].map(function (grade) {
       return '<option value="' + grade + '"' + (Number(user.grade) === grade ? " selected" : "") + '>Class ' + grade + '</option>';
     }).join("") +
@@ -736,11 +784,14 @@ function openOnboarding(changeRole) {
     button.onclick = function () {
       selectedRole = button.dataset.role;
       dbody.querySelectorAll("[data-role]").forEach(function (option) {
-        option.classList.toggle("selected", option.dataset.role === selectedRole);
+        var selected = option.dataset.role === selectedRole;
+        option.classList.toggle("selected", selected);
+        option.setAttribute("aria-pressed", String(selected));
       });
     };
   });
   document.getElementById("saveProfile").onclick = async function () {
+    var saveButton = this;
     var name = document.getElementById("profileName").value.trim();
     var grade = Number(document.getElementById("profileGrade").value);
     var school = document.getElementById("profileSchool").value.trim();
@@ -752,19 +803,28 @@ function openOnboarding(changeRole) {
       message.textContent = "Add your name, class, school, city, state, country, and account type.";
       return;
     }
-    var result = await supabaseClient.from("profiles")
-      .update({ display_name: name, grade: grade, role: selectedRole })
-      .eq("id", user.id)
-      .select("id")
-      .single();
-    if (result.error) {
-      message.textContent = authErrorText(result.error);
-      return;
-    }
-    var locationSave = await supabaseClient.from("profile_locations").upsert({ user_id: user.id, school: school, city: city, state: state, country: country });
-    if (locationSave.error) {
-      message.textContent = authErrorText(locationSave.error) + " — run the Peer Connect setup SQL first.";
-      return;
+    if (grade < 9 || grade > 12) { message.textContent = "Choose a class from 9 to 12."; return; }
+    saveButton.disabled = true;
+    saveButton.textContent = "Saving profile…";
+    message.textContent = "";
+    var saved = await supabaseClient.rpc("save_peer_connect_profile", {
+      p_display_name: name, p_grade: grade, p_role: selectedRole,
+      p_school: school, p_city: city, p_state: state, p_country: country,
+    });
+    if (saved.error && saved.error.code === "PGRST202") {
+      var profileSave = await supabaseClient.from("profiles").update({ display_name: name, grade: grade, role: selectedRole }).eq("id", user.id).select("id").maybeSingle();
+      if (profileSave.error || !profileSave.data) {
+        message.textContent = authErrorText(profileSave.error || { message: "Your account profile was not found." }) + " — run peer_connect_profile_setup_fix.sql in Supabase SQL Editor.";
+        saveButton.disabled = false; saveButton.textContent = "Continue"; return;
+      }
+      var locationSave = await supabaseClient.from("profile_locations").upsert({ user_id: user.id, school: school, city: city, state: state, country: country });
+      if (locationSave.error) {
+        message.textContent = authErrorText(locationSave.error) + " — run peer_connect_profile_setup_fix.sql in Supabase SQL Editor.";
+        saveButton.disabled = false; saveButton.textContent = "Continue"; return;
+      }
+    } else if (saved.error) {
+      message.textContent = authErrorText(saved.error);
+      saveButton.disabled = false; saveButton.textContent = "Continue"; return;
     }
     user.n = name;
     user.grade = grade;
@@ -774,6 +834,7 @@ function openOnboarding(changeRole) {
     paintSign();
     paintRoleUI();
     dlg.close();
+    dlg.classList.remove("setup-dialog");
     await loadTutorDirectory();
     if (canLearn(user)) await loadStudentConnections();
     if (canMentor(user)) openTutor();
@@ -805,9 +866,15 @@ if (
   );
   supabaseClient.auth.onAuthStateChange(function (_event, session) {
     window.setTimeout(async function () {
+      if (_event === "SIGNED_OUT" && signingOutInApp) { signingOutInApp = false; return; }
       await syncAuthUser(session ? session.user : null);
       if (_event === "PASSWORD_RECOVERY") showPasswordUpdateForm();
-      else if (_event === "SIGNED_OUT") showAuthForm("signin");
+      else if (_event === "SIGNED_OUT") {
+        history.replaceState(null, document.title, location.pathname + location.search + "#home");
+        route();
+        if (dlg.open) dlg.close();
+        showAuthForm("signin");
+      }
     }, 0);
   });
   restoreAuthSession().then(async function (session) {

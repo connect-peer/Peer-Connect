@@ -746,7 +746,11 @@ nav a[aria-current="page"] {
   display: grid;
   gap: 10px;
   margin-top: 18px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
 }
+.role-options legend { margin-bottom: 10px; padding: 0; font-weight: 700; }
 .role-option {
   width: 100%;
   padding: 16px;
@@ -763,6 +767,16 @@ nav a[aria-current="page"] {
   border-color: var(--brand);
   background: var(--soft);
 }
+.role-option.selected,
+.role-option[aria-pressed="true"] {
+  border-color: var(--brand);
+  background: var(--soft);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand) 22%, transparent);
+}
+.role-option { position: relative; z-index: 1; touch-action: manipulation; }
+dialog.setup-dialog { width: min(560px, calc(100% - 24px)); max-width: 560px; max-height: min(92vh, 860px); max-height: min(92dvh, 860px); overflow-y: auto; overscroll-behavior: contain; }
+dialog.setup-dialog #dbody { display: block; width: auto; height: auto; min-height: 0; overflow: visible; }
+dialog.setup-dialog .row { position: sticky; bottom: -1px; padding: 12px 0 2px; background: var(--surface); z-index: 2; }
 .role-option strong,
 .role-option span {
   display: block;

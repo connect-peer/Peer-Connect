@@ -61,6 +61,17 @@ files only in their own folder. Media should not contain private school or
 account information. A static GitHub Pages site must use only the Supabase publishable
 key in `supabase-config.js`; never put a service-role key in frontend files.
 
+## Profile setup save fix
+
+If account setup keeps appearing after reload, or the role cards / Continue
+button do not work, deploy the frontend changes and run
+`peer_connect_profile_setup_fix.sql` in **Supabase → SQL Editor → New query**.
+The migration adds a small authenticated database function that saves the
+signed-in user's profile and location together. It checks the caller with
+`auth.uid()` and does not use or expose a service-role key. The app also shows
+database read/save errors instead of silently treating a failed read as a new
+profile.
+
 ## 3. Current business rules
 
 - Student and tutor accounts are free. Students can send unlimited connection requests.
