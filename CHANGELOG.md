@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.4.0](https://github.com/connect-peer/Peer-Connect/compare/v2.3.0...v2.4.0) (2026-11-25)
+
+
+### Features
+
+* add more subjects ([ad55445](https://github.com/connect-peer/Peer-Connect/commit/ad55445430ad908548553d7af49622feac0e4080))
+
+
+### Bug Fixes
+
+* tab ([e6e6168](https://github.com/connect-peer/Peer-Connect/commit/e6e616890e3e7a80730837a0508101ed9a7ac009))
+* ui ([4cbc292](https://github.com/connect-peer/Peer-Connect/commit/4cbc2927b9504bd7298cc342f200b3e94d531098))
+* ui ([832e2c9](https://github.com/connect-peer/Peer-Connect/commit/832e2c9a94be925306259d4d08d8bb5a85f574e1))
+
 ## [2.3.0](https://github.com/connect-peer/Peer-Connect/compare/v2.2.1...v2.3.0) (2026-11-25)
 
 
