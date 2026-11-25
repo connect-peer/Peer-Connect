@@ -37,6 +37,8 @@ var active = "All",
   tutorState = "",
   tutorCity = "";
 var activeTutorProfile = null;
+var acceptedScheduleMentors = {};
+var pendingBookingMentorId = "";
 function canMentor(account) { return !!account && ["mentor", "both", "tutor"].indexOf(account.role) >= 0; }
 function canLearn(account) { return !!account && ["learner", "both", "student"].indexOf(account.role) >= 0; }
 function normalizeRole(role) { return role === "student" ? "learner" : role === "tutor" ? "mentor" : role; }
@@ -93,9 +95,9 @@ function draw() {
       var i = tutors.indexOf(t),
         done = sent[t.user_id];
       return (
-        '<article class="card" data-profile-index="' + i + '" tabindex="0" aria-label="View ' + esc(t.n) + ' mentor profile"><div class="cover" style="--c:' +
+        '<article class="card" data-profile-index="' + i + '" tabindex="0" aria-label="View ' + esc(t.n) + ' mentor profile"><div class="cover mentor-card-cover" style="--c:' +
         t.c +
-        '"></div><div class="body">' +
+        '"><span class="mentor-card-kicker">' + (acceptedScheduleMentors[t.user_id] ? 'Booking unlocked' : 'Peer mentorship') + '</span></div><div class="body">' +
         '<div class="av">' +
         (t.avatarUrl ? '<img src="' + esc(t.avatarUrl) + '" alt="">' : ini(t.n)) +
         "</div>" +
@@ -116,7 +118,9 @@ function draw() {
         "</div>" +
         (t.me
           ? '<button class="btn ghost" data-edit-tutor-card>Edit profile</button>'
-          : '<button class="btn' + (done ? " ghost" : "") + '" data-i="' + i + '"' + (done ? " disabled" : "") + ">" + (done ? "Request sent" : "Connect") + "</button>") +
+          : (acceptedScheduleMentors[t.user_id]
+            ? '<button class="btn" data-book-mentor="' + esc(t.user_id) + '">Book now</button>'
+            : '<button class="btn' + (done ? " ghost" : "") + '" data-i="' + i + '"' + (done ? " disabled" : "") + ">" + (done ? "Request sent" : "Connect") + "</button>")) +
         "</div></article>"
       );
     })
@@ -159,6 +163,13 @@ document.getElementById("tutorCityFilter").addEventListener("change", function (
 });
 grid.addEventListener("click", async function (e) {
   if (e.target.closest("[data-edit-tutor-card]")) { e.stopPropagation(); openTutor(); return; }
+  var book = e.target.closest("[data-book-mentor]");
+  if (book) {
+    e.stopPropagation();
+    pendingBookingMentorId = book.dataset.bookMentor;
+    location.hash = "sessions";
+    return;
+  }
   var b = e.target.closest("button[data-i]");
   if (!b) {
     var card = e.target.closest("[data-profile-index]");
@@ -288,6 +299,17 @@ async function loadTutorDirectory() {
   if (result.error) {
     document.getElementById("count").textContent = authErrorText(result.error);
     return;
+  }
+  acceptedScheduleMentors = {};
+  if (canLearn(user)) {
+    var acceptedResult = await supabaseClient.from("connections")
+      .select("id,requester_id,recipient_id")
+      .eq("status", "accepted")
+      .or("requester_id.eq." + user.id + ",recipient_id.eq." + user.id);
+    if (!acceptedResult.error) (acceptedResult.data || []).forEach(function (connection) {
+      var mentorId = connection.requester_id === user.id ? connection.recipient_id : connection.requester_id;
+      acceptedScheduleMentors[mentorId] = connection.id;
+    });
   }
   tutors = (result.data || []).map(function (row) {
     return {
@@ -1061,6 +1083,7 @@ document.querySelectorAll('[data-nav="verification"]').forEach(function (link) {
 
 var requestLocationState = "", requestLocationCity = "";
 var scheduleConnections = [], scheduleTypes = [], scheduleSlots = [], scheduleSlotsContext = null;
+var selectedScheduleSlotIndex = null;
 function isoTodayIn(timezone) {
   var parts = new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
   var values = {}; parts.forEach(function (part) { values[part.type] = part.value; });
@@ -1082,22 +1105,57 @@ function zonedInputToIso(value, timezone) {
 function sessionTime(value, timezone) {
   return new Intl.DateTimeFormat(undefined, { timeZone: timezone || "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) + " · " + (timezone || "Asia/Kolkata");
 }
+function sessionClock(value, timezone) {
+  return new Intl.DateTimeFormat(undefined, { timeZone: timezone || "Asia/Kolkata", timeStyle: "short" }).format(new Date(value));
+}
+function moveIsoDate(value, days) {
+  var date = new Date(value + "T12:00:00Z");
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+function paintSessionDateStrip() {
+  var strip = document.getElementById("sessionDateStrip"), input = document.getElementById("sessionDate");
+  if (!strip || !input) return;
+  var first = input.value || isoTodayIn("Asia/Kolkata"), today = isoTodayIn("Asia/Kolkata");
+  strip.innerHTML = Array.from({ length: 7 }, function (_, index) {
+    var date = moveIsoDate(first, index), label = date === today ? "Today" : new Intl.DateTimeFormat(undefined, { weekday: "short", timeZone: "UTC" }).format(new Date(date + "T12:00:00Z"));
+    return '<button type="button" class="session-date' + (date === first ? ' selected' : '') + '" data-session-date="' + date + '"><span>' + label + '</span><b>' + Number(date.slice(-2)) + '</b></button>';
+  }).join("");
+}
 function renderBookingForm() {
   var root = document.getElementById("bookingForm"); if (!root) return;
   if (!scheduleConnections.length) { root.innerHTML = '<div class="community-empty">No accepted mentor connections yet. Find a mentor, connect, and wait for them to accept before scheduling.</div><a class="btn ghost" href="#tutors">Find a mentor</a>'; return; }
-  var options = scheduleConnections.map(function (connection) { return '<option value="' + esc(connection.id) + '">' + esc(connection.name) + '</option>'; }).join("");
-  root.innerHTML = '<div class="schedule-form"><label>Accepted mentor<select id="sessionConnection">' + options + '</select></label><label>Session type<select id="sessionType"><option value="">Choose a session type</option></select></label><label>Starting from<input id="sessionDate" type="date" min="' + isoTodayIn("Asia/Kolkata") + '" value="' + isoTodayIn("Asia/Kolkata") + '"></label><p id="sessionBookingMessage" class="muted" role="status"></p></div><div id="sessionSlots" class="schedule-slots"></div>';
+  var options = scheduleConnections.map(function (connection) { return '<option value="' + esc(connection.id) + '"' + (connection.mentorId === pendingBookingMentorId ? ' selected' : '') + '>' + esc(connection.name) + '</option>'; }).join("");
+  root.innerHTML = '<div class="schedule-form"><label>Accepted mentor<select id="sessionConnection">' + options + '</select></label><label>Session type<select id="sessionType"><option value="">Choose a session type</option></select></label><label class="session-date-label">Choose a day<input id="sessionDate" type="date" min="' + isoTodayIn("Asia/Kolkata") + '" value="' + isoTodayIn("Asia/Kolkata") + '"></label><div id="sessionDateStrip" class="session-date-strip" aria-label="Choose a day"></div><p id="sessionBookingMessage" class="muted" role="status"></p></div><div id="sessionSlots" class="schedule-slots"></div><div class="session-booking-footer"><span class="session-free-note">Peer Connect sessions are free</span><button class="btn" id="requestSession" type="button" hidden disabled>Request booking</button></div>';
+  paintSessionDateStrip();
   document.getElementById("sessionConnection").onchange = loadSessionTypes;
   document.getElementById("sessionType").onchange = loadSessionSlots;
-  document.getElementById("sessionDate").onchange = loadSessionSlots;
-  document.getElementById("sessionSlots").onclick = async function (event) {
-    var button = event.target.closest("[data-session-slot]"); if (!button || !scheduleSlotsContext) return;
-    button.disabled = true;
-    var slot = scheduleSlots[Number(button.dataset.sessionSlot)];
-    var result = await supabaseClient.from("peer_sessions").insert({ connection_id: scheduleSlotsContext.connectionId, session_type_id: scheduleSlotsContext.typeId, learner_id: user.id, mentor_id: scheduleSlotsContext.mentorId, starts_at: slot.starts_at, ends_at: slot.ends_at, timezone: slot.timezone, status: "pending" });
-    var message = document.getElementById("sessionBookingMessage");
-    if (result.error) { message.textContent = authErrorText(result.error); button.disabled = false; }
-    else { message.textContent = "Session request sent. It will appear as pending until the mentor confirms it."; await loadSessionSlots(); await loadPeerSessionList(); }
+  document.getElementById("sessionDate").onchange = function () { paintSessionDateStrip(); loadSessionSlots(); };
+  document.getElementById("sessionDateStrip").onclick = function (event) {
+    var day = event.target.closest("[data-session-date]"); if (!day) return;
+    document.getElementById("sessionDate").value = day.dataset.sessionDate;
+    selectedScheduleSlotIndex = null;
+    paintSessionDateStrip();
+    loadSessionSlots();
+  };
+  root.onclick = async function (event) {
+    var slotButton = event.target.closest("[data-session-slot]");
+    if (slotButton) {
+      selectedScheduleSlotIndex = Number(slotButton.dataset.sessionSlot);
+      root.querySelectorAll("[data-session-slot]").forEach(function (button) { button.classList.toggle("selected", button === slotButton); });
+      var slot = scheduleSlots[selectedScheduleSlotIndex], requestButton = document.getElementById("requestSession"), message = document.getElementById("sessionBookingMessage");
+      if (requestButton) { requestButton.hidden = false; requestButton.disabled = false; }
+      if (message && slot) message.textContent = "Selected " + sessionTime(slot.starts_at, slot.timezone) + ". Confirm to send your request.";
+      return;
+    }
+    var request = event.target.closest("#requestSession");
+    if (!request || selectedScheduleSlotIndex === null || !scheduleSlotsContext) return;
+    request.disabled = true; request.textContent = "Sending request…";
+    var chosen = scheduleSlots[selectedScheduleSlotIndex];
+    var result = await supabaseClient.from("peer_sessions").insert({ connection_id: scheduleSlotsContext.connectionId, session_type_id: scheduleSlotsContext.typeId, learner_id: user.id, mentor_id: scheduleSlotsContext.mentorId, starts_at: chosen.starts_at, ends_at: chosen.ends_at, timezone: chosen.timezone, status: "pending" });
+    var status = document.getElementById("sessionBookingMessage");
+    if (result.error) { if (status) status.textContent = authErrorText(result.error); request.disabled = false; request.textContent = "Request booking"; }
+    else { selectedScheduleSlotIndex = null; if (status) status.textContent = "Request sent. The mentor must confirm it before it is booked."; await loadSessionSlots(); await loadPeerSessionList(); }
   };
   loadSessionTypes();
 }
@@ -1108,6 +1166,9 @@ function selectedScheduleConnection() {
 async function loadSessionTypes() {
   var connection = selectedScheduleConnection(), select = document.getElementById("sessionType");
   if (!connection || !select) return;
+  scheduleTypes = [];
+  scheduleSlots = [];
+  selectedScheduleSlotIndex = null;
   select.innerHTML = '<option value="">Loading session types…</option>';
   var result = await supabaseClient.from("peer_session_types").select("id,title,duration_minutes,timezone").eq("mentor_id", connection.mentorId).eq("is_active", true).order("duration_minutes");
   if (result.error) { select.innerHTML = '<option value="">Session setup is not ready</option>'; var msg=document.getElementById("sessionBookingMessage"); if(msg)msg.textContent=authErrorText(result.error)+" — run the v2.0.0 Supabase SQL setup."; return; }
@@ -1118,15 +1179,17 @@ async function loadSessionTypes() {
 }
 async function loadSessionSlots() {
   var connection = selectedScheduleConnection(), typeSelect = document.getElementById("sessionType"), dateInput = document.getElementById("sessionDate"), slotsRoot = document.getElementById("sessionSlots");
-  if (!connection || !typeSelect || !dateInput || !slotsRoot || !typeSelect.value) { if(slotsRoot)slotsRoot.innerHTML=""; return; }
+  selectedScheduleSlotIndex = null;
+  var requestButton = document.getElementById("requestSession"); if (requestButton) { requestButton.hidden = true; requestButton.disabled = true; }
+  if (!connection || !typeSelect || !dateInput || !slotsRoot || !typeSelect.value) { if(slotsRoot)slotsRoot.innerHTML='<div class="community-empty">Choose a session type to see open times.</div>'; return; }
   var type = scheduleTypes.find(function (item) { return item.id === typeSelect.value; });
   if (!type) return;
   slotsRoot.innerHTML = '<div class="muted">Finding open times…</div>';
-  var result = await supabaseClient.rpc("get_peer_session_slots", { p_mentor_id: connection.mentorId, p_session_type_id: type.id, p_from: dateInput.value, p_days: 14 });
+  var result = await supabaseClient.rpc("get_peer_session_slots", { p_mentor_id: connection.mentorId, p_session_type_id: type.id, p_from: dateInput.value, p_days: 1 });
   if (result.error) { slotsRoot.innerHTML = '<div class="community-empty">' + esc(authErrorText(result.error)) + '</div>'; return; }
   scheduleSlots = result.data || [];
   scheduleSlotsContext = { connectionId: connection.id, mentorId: connection.mentorId, typeId: type.id };
-  slotsRoot.innerHTML = scheduleSlots.length ? scheduleSlots.map(function (slot, index) { return '<button class="schedule-slot" type="button" data-session-slot="' + index + '">' + esc(sessionTime(slot.starts_at, slot.timezone)) + '</button>'; }).join("") : '<div class="community-empty">No open slots in the next 14 days. Try another date or check back later.</div>';
+  slotsRoot.innerHTML = scheduleSlots.length ? scheduleSlots.map(function (slot, index) { return '<button class="schedule-slot" type="button" data-session-slot="' + index + '">' + esc(sessionClock(slot.starts_at, slot.timezone)) + '</button>'; }).join("") : '<div class="community-empty">No open times on this day. Pick another date or check back later.</div>';
 }
 async function loadPeerSessionList() {
   var root = document.getElementById("sessionList"); if (!root || !user) return;
@@ -1155,6 +1218,9 @@ async function loadPeerSessionsPage() {
   var result = await supabaseClient.from("connections").select("id,requester_id,recipient_id,status,requester:profiles!connections_requester_id_fkey(display_name,role),recipient:profiles!connections_recipient_id_fkey(display_name,role)").eq("status","accepted").or("requester_id.eq."+user.id+",recipient_id.eq."+user.id);
   if (result.error) { if(booking)booking.innerHTML='<div class="community-empty">'+esc(authErrorText(result.error))+'</div>'; await loadPeerSessionList(); return; }
   scheduleConnections = (result.data||[]).map(function(row){ var otherId=row.requester_id===user.id?row.recipient_id:row.requester_id; var other=relationRow(row.requester_id===otherId?row.requester:row.recipient); return {id:row.id,mentorId:otherId,name:other.display_name||"Accepted peer"}; }).filter(function(connection){return connection.mentorId!==user.id;});
+  acceptedScheduleMentors = {};
+  scheduleConnections.forEach(function (connection) { acceptedScheduleMentors[connection.mentorId] = connection.id; });
+  draw();
   if (booking) renderBookingForm();
   await loadPeerSessionList();
 }

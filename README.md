@@ -61,6 +61,11 @@ files only in their own folder. Media should not contain private school or
 account information. A static GitHub Pages site must use only the Supabase publishable
 key in `supabase-config.js`; never put a service-role key in frontend files.
 
+If booking slots show `column reference "timezone" is ambiguous`, run
+`peer_connect_schedule_timezone_fix.sql` in the Supabase SQL Editor. It replaces
+the existing slot function with a version that qualifies the session-type
+timezone column, while keeping the same function signature and access rules.
+
 ## Profile setup save fix
 
 If account setup keeps appearing after reload, or the role cards / Continue

@@ -1012,6 +1012,20 @@ dialog.auth-screen #dbody { width: 100%; height: 100%; display: grid; grid-templ
 .profile-appearance label { cursor:pointer; }
 .profile-page .profile-cover { background-size:cover; background-position:center; }
 .app-version { margin-left:8px; padding:3px 7px; border:1px solid var(--line); border-radius:999px; color:var(--muted); font-size:11px; font-weight:600; letter-spacing:0; vertical-align:middle; }
+.mentor-card-cover { position: relative; display: flex; align-items: flex-start; padding: 14px; }
+.mentor-card-kicker { border-radius: 999px; padding: 4px 10px; background: color-mix(in srgb, var(--surface) 90%, transparent); color: var(--brand); font-size: 12px; font-weight: 750; }
+.schedule-slot.selected { color: var(--brand-ink); background: var(--brand); }
+.session-date-label { max-width: 220px; }
+.session-date-strip { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 7px; margin-top: 3px; }
+.session-date { min-width: 0; padding: 9px 4px; border: 1px solid var(--line); border-radius: 13px; background: var(--bg); color: var(--muted); cursor: pointer; display: grid; justify-items: center; gap: 4px; }
+.session-date span { font-size: 12px; }
+.session-date b { font-size: 15px; color: var(--ink); }
+.session-date.selected { border-color: var(--brand); background: var(--soft); color: var(--brand); box-shadow: inset 0 0 0 1px var(--brand); }
+.session-date.selected b { color: var(--brand); }
+.session-booking-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--bg); }
+.session-free-note { color: var(--muted); font-size: 14px; }
+.session-booking-footer [hidden] { display: none; }
+@media (max-width: 520px) { .session-date-strip { gap: 4px; } .session-date { padding-inline: 2px; } .session-date span { font-size: 11px; } .session-booking-footer { align-items: stretch; flex-direction: column; } }
 .verify-badge { color:var(--green); border:1px solid var(--green); border-radius:99px; padding:2px 9px; font-size:12px; font-weight:700; }
 .verify-review-state { color:var(--muted); border:1px solid var(--line); border-radius:99px; padding:2px 9px; font-size:12px; font-weight:700; }
 .verify-status { border-left:4px solid var(--brand); }

@@ -240,8 +240,9 @@ begin
       or (c.recipient_id = (select auth.uid()) and c.requester_id = p_mentor_id))) then
     raise exception 'An accepted connection is required before viewing booking times';
   end if;
-  select duration_minutes, timezone into v_duration, v_timezone from public.peer_session_types
-    where id = p_session_type_id and mentor_id = p_mentor_id and is_active;
+  select st.duration_minutes, st.timezone into v_duration, v_timezone
+    from public.peer_session_types as st
+    where st.id = p_session_type_id and st.mentor_id = p_mentor_id and st.is_active;
   if not found then raise exception 'This session type is unavailable'; end if;
   for v_date in select generate_series(p_from, p_from + (p_days - 1), interval '1 day')::date loop
     for v_availability in select * from public.peer_weekly_availability a
