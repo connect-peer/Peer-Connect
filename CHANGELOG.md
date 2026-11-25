@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.3.0](https://github.com/connect-peer/Peer-Connect/compare/v2.2.1...v2.3.0) (2026-11-25)
+
+
+### Features
+
+* timer cancel ([e1221a0](https://github.com/connect-peer/Peer-Connect/commit/e1221a0af4fd9bb587320e5eb2c65d3ff53416cc))
+
+
+### Bug Fixes
+
+* boookings ([ad2ead9](https://github.com/connect-peer/Peer-Connect/commit/ad2ead983a642bb941e1a3e8413410ffe43a6d2b))
+* ui ([063dfe9](https://github.com/connect-peer/Peer-Connect/commit/063dfe9a6ec3f9cc0a17b4cfeaee41d76c9a07bd))
+* ui ([6b8651f](https://github.com/connect-peer/Peer-Connect/commit/6b8651f02afb60885ef4928286d7f3ea50708a2b))
+* ui ([248ad30](https://github.com/connect-peer/Peer-Connect/commit/248ad30a943b3747e5e939a642cc3cb314b4b2ce))
+* verification ([5bd1b3a](https://github.com/connect-peer/Peer-Connect/commit/5bd1b3aac6c95cfc33d4d1ce8c9bf4efd1b20a9d))
+
 ## [2.2.1](https://github.com/connect-peer/Peer-Connect/compare/v2.2.0...v2.2.1) (2026-11-25)
 
 
