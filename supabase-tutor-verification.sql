@@ -141,22 +141,7 @@ create trigger invalidate_tutor_verification_on_name_change
   after update of display_name, grade on public.profiles
   for each row execute function public.invalidate_tutor_verification_on_name_change();
 
-create or replace function public.invalidate_tutor_verification_on_tutor_profile_change()
-returns trigger language plpgsql security definer
-set search_path = public, pg_temp as $$
-begin
-  if old.subjects is distinct from new.subjects or old.headline is distinct from new.headline then
-    update public.tutor_verification_requests
-       set status = 'rejected', reviewed_at = now()
-     where user_id = new.user_id and status = 'verified';
-  end if;
-  return new;
-end;
-$$;
 drop trigger if exists invalidate_tutor_verification_on_tutor_profile_change on public.tutor_profiles;
-create trigger invalidate_tutor_verification_on_tutor_profile_change
-  after update of subjects, headline on public.tutor_profiles
-  for each row execute function public.invalidate_tutor_verification_on_tutor_profile_change();
 
 create table if not exists public.tutor_verification_documents (
   id uuid primary key default gen_random_uuid(),

@@ -1,6 +1,6 @@
 # Peer Connect: project handoff
 
-Peer Connect is a peer tutoring network for a school, like LinkedIn for studying. Students find tutors, send connection requests, and ask and answer doubts. This folder is the working front-end prototype. The goal is to turn it into a live website.
+Peer Connect is a peer guidance community for learners. They can connect with mentors for support with school subjects, exams, Olympiads, debate, art, theater, sports, and other interests. This folder is the working front-end prototype.
 
 The page styling is embedded in `index.html`; the app behavior is in `app.js`.
 
@@ -14,7 +14,7 @@ tag. See [CONTRIBUTING.md](CONTRIBUTING.md) for examples and setup details.
 
 ## 1. What exists today
 
-A front-end prototype connected to Supabase Auth. People can create an account with email and password or use Google, then choose Student or Tutor and add their class (9–12), school, city, state, and country. Tutors submit a school ID and fee receipt for private review. Only approved tutors appear in search with a green Verified badge. Tutor cards open a social-style profile, and tutors can filter incoming student requests by state and city.
+A front-end prototype connected to Supabase Auth. People can create an account with email and password or use Google, then choose Learner, Mentor, or Both and add their class (9–12), school, city, state, and country. Mentors submit a school ID and fee receipt for private review. Only approved mentors appear in search with a green Verified badge. Mentor profiles show guidance areas and reviewed achievement highlights.
 
 | Page | Route | What it does |
 |---|---|---|
@@ -83,7 +83,7 @@ profile.
 - The green **Verified** badge is free. A trusted reviewer checks a school ID and fee receipt; the client cannot grant the badge.
 - Verification files live in a private bucket and the review page removes them after approval or rejection. They are never displayed on tutor profiles.
 - Student locations stay in a row-level protected table. They are shown to the tutor receiving that student’s connection request. Verified tutor school/location details are shown in tutor search and profiles.
-- Changing a verified tutor’s name, class, school, headline, or subject list clears approval and requires another review.
+- Changing a verified mentor’s name, class, or school clears approval and requires another review. Updating a bio or guidance areas does not.
 - Tutor verification remains separate from the optional Blue Tick.
 
 ## 4. Data shapes
@@ -137,6 +137,12 @@ Then add the trusted reviewer account from the bottom of that SQL file:
 4. Review the school ID and fee receipt from the private queue. Approval adds
    the green badge; approval or rejection removes the uploaded files from
    storage. Only the reviewer can open those files.
+
+### Mentor guidance areas and achievement highlights
+
+After `supabase-tutor-verification.sql`, run `peer_connect_mentor_guidance_achievements.sql` in Supabase SQL Editor. Mentors can select up to eight guidance areas, add their own, and submit exam results, certificates, medals, or other milestones.
+
+Original supporting proof is stored privately for review, then deleted after the decision. Learners see only summaries that a reviewer approves. Mentors may optionally submit a separate redacted copy; it stays private until a reviewer approves it. Hide school ID and roll numbers, addresses, dates of birth, QR codes, signatures, and contact details before submitting a copy. Never publish identity documents or fee receipts.
 
 Do not manually set a verification status or add a reviewer from browser code.
 The browser uses only the Supabase publishable key; never add a service-role

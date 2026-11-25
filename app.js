@@ -181,12 +181,40 @@ async function showTutorProfile(tutor) {
   if (location.hash !== "#profile") location.hash = "profile";
   else route();
 }
+async function loadMentorAchievementShowcase(tutor, target) {
+  if (!target || !tutor) return;
+  var result = tutor.me
+    ? await supabaseClient.from("mentor_achievements").select("id,category,title,issuer,achievement_year,public_summary,public_evidence_path,status").eq("user_id", tutor.user_id).order("created_at", { ascending: false })
+    : await supabaseClient.rpc("get_peer_public_mentor_achievements", { p_user_id: tutor.user_id });
+  if (result.error) { target.innerHTML = '<p class="muted">Achievement highlights will appear here when available.</p>'; return; }
+  var rows = (result.data || []).filter(function (row) { return tutor.me || row.status === undefined || row.status === "approved"; });
+  if (!rows.length) { target.innerHTML = '<p class="muted">No approved achievements shared yet.</p>'; return; }
+  var cards = [];
+  for (var i = 0; i < rows.length; i++) {
+    var row = rows[i], copyLink = "";
+    if (row.status === "approved" || !tutor.me) {
+      if (row.public_evidence_path) {
+        var signed = await supabaseClient.storage.from("mentor-achievements").createSignedUrl(row.public_evidence_path, 600);
+        if (!signed.error) copyLink = '<a class="btn ghost achievement-copy-link" target="_blank" rel="noopener" href="' + esc(signed.data.signedUrl) + '">View approved copy</a>';
+      }
+    }
+    cards.push('<article class="mentor-achievement-item"><div><span class="achievement-category">' + esc(row.category) + '</span><h4>' + esc(row.title) + '</h4><p class="muted">' + esc([row.issuer, row.achievement_year].filter(Boolean).join(" · ")) + '</p><p>' + esc(row.public_summary) + '</p>' + (tutor.me ? '<span class="achievement-status">' + esc(achievementStatusLabel(row.status)) + '</span>' : '') + '</div>' + copyLink + '</article>');
+  }
+  target.innerHTML = cards.join("");
+}
+function renderTutorAbout(tutor, content) {
+  content.innerHTML = '<h3>About</h3><p>' + esc(tutor.h || 'Peer Connect mentor') + '</p><p class="muted">School: ' + esc(tutor.school || '—') + '<br>Location: ' + esc([tutor.city, tutor.state, tutor.country].filter(Boolean).join(', ') || '—') + '</p><section class="mentor-achievement-showcase"><div class="achievement-section-heading"><div><h3>Achievements and credentials</h3><p class="muted">Reviewed highlights that show experience and milestones.</p></div>' + (tutor.me ? '<button type="button" class="btn ghost" data-achievement-manager>Manage achievements</button>' : '') + '</div><div id="publicMentorAchievements"><p class="muted">Loading achievements…</p></div></section>';
+  var manage = content.querySelector("[data-achievement-manager]");
+  if (manage) manage.onclick = openMentorAchievementManager;
+  loadMentorAchievementShowcase(tutor, document.getElementById("publicMentorAchievements"));
+}
 function renderTutorProfilePage() {
   var tutor = activeTutorProfile;
   var root = document.getElementById("tutorProfileContent");
   if (!tutor || !root) return;
   var locationText = [tutor.school, tutor.city, tutor.state, tutor.country].filter(Boolean).join(" · ");
-  root.innerHTML = '<button type="button" class="btn ghost profile-back" id="profileBack">← Back to mentors</button><div class="profile-cover" id="profileCover"></div><section class="profile-head"><div class="av" id="profileAvatar">' + (tutor.avatarUrl ? '<img src="' + esc(tutor.avatarUrl) + '" alt="">' : esc(ini(tutor.n))) + '</div><h2>' + esc(tutor.n) + (tutor.verified ? ' <span class="verify-badge">Verified</span>' : tutor.me ? ' <span class="verify-review-state">' + esc(tutor.verificationStatus || "Not verified") + '</span>' : '') + '</h2><div class="profile-meta">Class ' + esc(String(tutor.g || "").replace(/^Class\s*/i, "")) + ' · ' + esc(locationText) + '</div><p>' + esc(tutor.h) + '</p><div class="tags">' + tutor.s.map(function (subject) { return '<span class="tag">' + esc(subject) + '</span>'; }).join("") + '</div><div class="profile-social" id="profileSocialStats"><span>Loading followers…</span></div><button class="btn" id="profileBook">' + (tutor.me ? 'Edit mentor profile' : 'Book a session') + '</button>' + (tutor.me ? '<div class="profile-appearance"><label class="btn ghost">Change profile photo<input type="file" accept="image/jpeg,image/png,image/webp" data-profile-image="avatar"></label><label class="btn ghost">Change banner<input type="file" accept="image/jpeg,image/png,image/webp" data-profile-image="banner"></label></div>' : '') + '</section><div class="profile-tabs"><button class="btn ghost" data-profile-tab="about" aria-pressed="true">About</button><button class="btn ghost" data-profile-tab="answers" aria-pressed="false">Answers</button></div><div class="profile-content" id="profileContent"><h3>About</h3><p>' + esc(tutor.h || 'Peer tutor') + '</p><p class="muted">School: ' + esc(tutor.school || '—') + '<br>Location: ' + esc([tutor.city, tutor.state, tutor.country].filter(Boolean).join(', ') || '—') + '</p></div>';
+  root.innerHTML = '<button type="button" class="btn ghost profile-back" id="profileBack">← Back to mentors</button><div class="profile-cover" id="profileCover"></div><section class="profile-head"><div class="av" id="profileAvatar">' + (tutor.avatarUrl ? '<img src="' + esc(tutor.avatarUrl) + '" alt="">' : esc(ini(tutor.n))) + '</div><h2>' + esc(tutor.n) + (tutor.verified ? ' <span class="verify-badge">Verified</span>' : tutor.me ? ' <span class="verify-review-state">' + esc(tutor.verificationStatus || "Not verified") + '</span>' : '') + '</h2><div class="profile-meta">Class ' + esc(String(tutor.g || "").replace(/^Class\s*/i, "")) + ' · ' + esc(locationText) + '</div><p>' + esc(tutor.h) + '</p><div class="tags">' + tutor.s.map(function (subject) { return '<span class="tag">' + esc(subject) + '</span>'; }).join("") + '</div><div class="profile-social" id="profileSocialStats"><span>Loading followers…</span></div><button class="btn" id="profileBook">' + (tutor.me ? 'Edit mentor profile' : 'Book a session') + '</button>' + (tutor.me ? '<div class="profile-appearance"><label class="btn ghost">Change profile photo<input type="file" accept="image/jpeg,image/png,image/webp" data-profile-image="avatar"></label><label class="btn ghost">Change banner<input type="file" accept="image/jpeg,image/png,image/webp" data-profile-image="banner"></label></div>' : '') + '</section><div class="profile-tabs"><button class="btn ghost" data-profile-tab="about" aria-pressed="true">About</button><button class="btn ghost" data-profile-tab="answers" aria-pressed="false">Answers</button></div><div class="profile-content" id="profileContent"></div>';
+  renderTutorAbout(tutor, document.getElementById("profileContent"));
   var cover = document.getElementById("profileCover");
   if (tutor.bannerUrl) cover.style.backgroundImage = 'url("' + tutor.bannerUrl.replace(/["\\\\]/g, "") + '")';
   loadProfileSocial(tutor);
@@ -216,7 +244,7 @@ function renderTutorProfilePage() {
       root.querySelectorAll("[data-profile-tab]").forEach(function (tab) { tab.setAttribute("aria-pressed", String(tab === button)); });
       var content = document.getElementById("profileContent");
       if (button.dataset.profileTab === "about") {
-        content.innerHTML = '<h3>About</h3><p>' + esc(tutor.h || 'Peer Connect mentor') + '</p><p class="muted">School: ' + esc(tutor.school || '—') + '<br>Location: ' + esc([tutor.city, tutor.state, tutor.country].filter(Boolean).join(', ') || '—') + '</p>';
+        renderTutorAbout(tutor, content);
         return;
       }
       content.innerHTML = '<p class="muted">Loading answers…</p>';
@@ -877,6 +905,12 @@ var allSubs = [
   "Accountancy",
   "Economics",
 ];
+var allGuidanceAreas = [
+  "Maths", "Physics", "Chemistry", "Biology", "English", "Computer Science", "History",
+  "JEE", "NEET", "Olympiads", "Other exams", "Debate", "Art", "Theater", "Music",
+  "Sports", "Chess", "Robotics", "Writing", "Public speaking", "Study skills",
+  "Time management", "College and career guidance",
+];
 async function openTutor() {
   dlg.classList.remove("profile-dialog");
   if (!user) {
@@ -889,7 +923,7 @@ async function openTutor() {
     return;
   }
   var existing = await supabaseClient.from("tutor_profiles")
-    .select("user_id, headline, subjects")
+    .select("user_id, headline, subjects, is_available")
     .eq("user_id", user.id)
     .maybeSingle();
   if (existing.data) {
@@ -900,34 +934,36 @@ async function openTutor() {
     return;
   }
   var pick = existing.data ? (existing.data.subjects || []).slice() : [];
+  var guidanceChoices = allGuidanceAreas.slice();
+  pick.forEach(function (area) { if (guidanceChoices.indexOf(area) < 0) guidanceChoices.push(area); });
   dbody.innerHTML =
-    '<h3 id="dt">' + (existing.data ? "Edit your mentor profile" : "Set up your mentor profile") + '</h3><p style="color:var(--muted);margin:6px 0 0">Your class is saved as Class ' + user.grade + '.</p>' +
+    '<h3 id="dt">' + (existing.data ? "Edit your mentor profile" : "Set up your mentor profile") + '</h3><p style="color:var(--muted);margin:6px 0 0">Your class is saved as Class ' + esc(String(user.grade || "—")) + '.</p>' +
     '<label for="tn">Name</label><input id="tn" placeholder="Full name" autocomplete="name" value="' +
     (user ? esc(user.n) : "") +
     '">' +
-    '<label>Subjects you can teach (pick up to 3)</label><div class="sp" id="sp">' +
-    allSubs
+    '<label>Areas where you can guide others <span class="muted">(choose up to 8)</span></label><p class="muted">Pick subjects, exams, Olympiads, arts, sports, or any other area where you can share helpful experience.</p><div class="sp" id="sp">' +
+    guidanceChoices
       .map(function (s) {
         return (
           '<button type="button" class="chip" aria-pressed="false" data-sub="' +
-          s +
+          esc(s) +
           '">' +
-          s +
+          esc(s) +
           "</button>"
         );
       })
       .join("") +
-    "</div>" +
-    '<label for="th">One line about what you teach best</label><input id="th" maxlength="70" placeholder="For example: Algebra and trigonometry, 95% in Class 10" value="' + esc(existing.data ? existing.data.headline || "" : "") + '">' +
+    '</div><div class="guidance-custom"><label for="customGuidance">Add another area</label><div><input id="customGuidance" maxlength="60" placeholder="For example: guitar, public speaking, NTSE"><button type="button" class="btn ghost" id="addGuidance">Add area</button></div></div>' +
+    '<label for="th">Your experience and how you can help</label><textarea id="th" maxlength="240" rows="3" placeholder="For example: I can share how I built confidence for school debates and prepared for competitions.">' + esc(existing.data ? existing.data.headline || "" : "") + '</textarea>' +
     '<div class="err" id="err" role="alert"></div>' +
-    '<div class="row"><button class="btn ghost" id="cx">Cancel</button><button class="btn" id="ok">Create profile</button></div>' +
-    '<div class="note">Mentor profiles stay out of search until school ID and fee receipt verification is approved. All classes can apply.</div>';
+    '<div class="row"><button class="btn ghost" id="cx">Cancel</button><button class="btn" id="ok">' + (existing.data ? "Save profile" : "Create profile") + '</button></div>' +
+    '<div class="note">Your profile appears in mentor search after school verification. Bio and guidance-area edits do not restart review; changes to your verified name, class, or school do.</div>';
   dlg.showModal();
   document.getElementById("cx").onclick = function () {
     dlg.close();
   };
   pick.forEach(function (s) {
-    var selected = document.querySelector('#sp [data-sub="' + s + '"]');
+    var selected = Array.from(document.querySelectorAll("#sp [data-sub]")).find(function (button) { return button.dataset.sub === s; });
     if (selected) selected.setAttribute("aria-pressed", "true");
   });
   document.getElementById("sp").onclick = function (e) {
@@ -938,10 +974,22 @@ async function openTutor() {
     if (k > -1) {
       pick.splice(k, 1);
       b.setAttribute("aria-pressed", "false");
-    } else if (pick.length < 3) {
+    } else if (pick.length < 8) {
       pick.push(s);
       b.setAttribute("aria-pressed", "true");
+    } else {
+      document.getElementById("err").textContent = "Choose up to 8 guidance areas.";
     }
+  };
+  document.getElementById("addGuidance").onclick = function () {
+    var input = document.getElementById("customGuidance"), area = input.value.trim(), error = document.getElementById("err");
+    if (!area) return;
+    if (pick.some(function (item) { return item.toLowerCase() === area.toLowerCase(); })) { error.textContent = "That guidance area is already added."; return; }
+    if (pick.length >= 8) { error.textContent = "Choose up to 8 guidance areas."; return; }
+    pick.push(area);
+    guidanceChoices.push(area);
+    var chip = document.createElement("button"); chip.type = "button"; chip.className = "chip"; chip.dataset.sub = area; chip.setAttribute("aria-pressed", "true"); chip.textContent = area;
+    document.getElementById("sp").appendChild(chip); input.value = ""; error.textContent = "";
   };
   document.getElementById("ok").onclick = async function () {
     var n = document.getElementById("tn").value.trim(),
@@ -953,11 +1001,11 @@ async function openTutor() {
       return;
     }
     if (!pick.length) {
-      er.textContent = "Pick at least one subject.";
+      er.textContent = "Choose at least one area where you can guide others.";
       return;
     }
     if (!h) {
-      er.textContent = "Add a short line about what you teach.";
+      er.textContent = "Add a short note about your experience and how you can help.";
       return;
     }
     var profileResult = await supabaseClient
@@ -974,7 +1022,7 @@ async function openTutor() {
       subjects: pick,
       skills: pick,
       experience: h,
-      is_available: true,
+      is_available: existing.data ? existing.data.is_available : true,
     });
     if (tutorResult.error) {
       er.textContent = authErrorText(tutorResult.error);
@@ -992,6 +1040,83 @@ async function openTutor() {
 }
 document.getElementById("btnTutor").addEventListener("click", openTutor);
 document.getElementById("btnTutor2").addEventListener("click", openTutor);
+
+function achievementStatusLabel(status) {
+  return status === "approved" ? "Approved for profile" : status === "rejected" ? "Needs changes" : "Waiting for review";
+}
+async function loadOwnMentorAchievements(target) {
+  if (!target || !user) return;
+  var result = await supabaseClient.from("mentor_achievements")
+    .select("id,category,title,issuer,achievement_year,public_summary,public_evidence_path,status,evidence_path")
+    .eq("user_id", user.id).order("created_at", { ascending: false });
+  if (result.error) { target.innerHTML = '<p class="muted">Achievement tools need the mentor achievements SQL migration.</p>'; return; }
+  var rows = result.data || [];
+  target.innerHTML = rows.length ? rows.map(function (row) {
+    return '<article class="mentor-achievement-item"><div><b>' + esc(row.title) + '</b><span class="achievement-status">' + esc(achievementStatusLabel(row.status)) + '</span><p class="muted">' + esc(row.category) + (row.issuer ? ' · ' + esc(row.issuer) : '') + (row.achievement_year ? ' · ' + esc(String(row.achievement_year)) : '') + '</p></div><button type="button" class="btn ghost" data-delete-achievement="' + esc(row.id) + '" data-evidence-path="' + esc(row.evidence_path) + '" data-public-path="' + esc(row.public_evidence_path || '') + '">Remove</button></article>';
+  }).join("") : '<p class="muted">No achievements added yet.</p>';
+  target.onclick = async function (event) {
+    var button = event.target.closest("[data-delete-achievement]");
+    if (!button || !window.confirm("Remove this achievement and its uploaded files?")) return;
+    button.disabled = true;
+    var paths = [button.dataset.evidencePath, button.dataset.publicPath].filter(Boolean);
+    var removed = paths.length ? await supabaseClient.storage.from("mentor-achievements").remove(paths) : { error: null };
+    if (removed.error) { window.alert(authErrorText(removed.error)); button.disabled = false; return; }
+    var deleted = await supabaseClient.from("mentor_achievements").delete().eq("id", button.dataset.deleteAchievement).eq("user_id", user.id);
+    if (deleted.error) window.alert(authErrorText(deleted.error));
+    await loadOwnMentorAchievements(target);
+  };
+}
+function openMentorAchievementManager() {
+  if (!canMentor(user)) return;
+  dlg.classList.remove("auth-screen", "profile-dialog");
+  dbody.innerHTML = '<h3>Achievements and credentials</h3><p class="muted">Share exam results, certificates, medals, or other milestones. Your original proof stays private. Learners see only details approved by a reviewer.</p><p class="note">A public file is optional. Upload only a copy with your school ID number, roll number, address, date of birth, QR codes, signatures, and personal contact details hidden. A reviewer must approve it before learners can open it.</p><div id="mentorAchievementManager"><p class="muted">Loading your achievements…</p></div><div class="row"><button type="button" class="btn ghost" id="closeAchievementManager">Close</button><button type="button" class="btn" id="startAchievementForm">Add achievement</button></div>';
+  if (!dlg.open) dlg.showModal();
+  document.getElementById("closeAchievementManager").onclick = function () { dlg.close(); };
+  document.getElementById("startAchievementForm").onclick = openMentorAchievementForm;
+  loadOwnMentorAchievements(document.getElementById("mentorAchievementManager"));
+}
+function openMentorAchievementForm() {
+  if (!canMentor(user)) return;
+  var categories = ["Academic result", "Exam or Olympiad", "Debate and public speaking", "Art and performance", "Sports", "Other"],
+    wasOpen = dlg.open;
+  dlg.classList.remove("auth-screen", "profile-dialog");
+  dbody.innerHTML = '<h3>Add an achievement</h3><p class="muted">Submit supporting proof privately. Only an approved summary and optional redacted copy can be shown on your profile.</p><label for="achievementCategory">Category</label><select id="achievementCategory">' + categories.map(function (category) { return '<option>' + esc(category) + '</option>'; }).join("") + '</select><label for="achievementTitle">Achievement or result</label><input id="achievementTitle" maxlength="120" placeholder="For example: 92% in Class 10 board exams"><label for="achievementIssuer">Awarded by <span class="muted">(optional)</span></label><input id="achievementIssuer" maxlength="120" placeholder="School, board, or competition"><label for="achievementYear">Year <span class="muted">(optional)</span></label><input id="achievementYear" type="number" min="1900" max="2100" placeholder="2026"><label for="achievementSummary">What should learners know?</label><textarea id="achievementSummary" rows="3" maxlength="500" placeholder="Briefly describe what you achieved or learned."></textarea><div class="verify-doc-fields"><label>Private proof <span class="muted">(required; only you and reviewers can access this)</span><input id="achievementEvidence" type="file" accept="image/jpeg,image/png,image/webp,application/pdf"></label><label>Redacted copy for learners <span class="muted">(optional; reviewed before sharing)</span><input id="achievementPublicCopy" type="file" accept="image/jpeg,image/png,image/webp,application/pdf"></label></div><p class="note">JPG, PNG, WebP, or PDF, up to 5 MB per file. Never upload identity documents or copies that show private numbers, barcodes, QR codes, signatures, home details, or contact information.</p><div class="err" id="achievementError" role="alert"></div><div class="row"><button type="button" class="btn ghost" id="cancelAchievementForm">Cancel</button><button type="button" class="btn" id="submitAchievement">Send for review</button></div>';
+  if (!wasOpen && !dlg.open) dlg.showModal();
+  document.getElementById("cancelAchievementForm").onclick = function () { openMentorAchievementManager(); };
+  document.getElementById("submitAchievement").onclick = async function () {
+    var error = document.getElementById("achievementError"), button = document.getElementById("submitAchievement"),
+      title = document.getElementById("achievementTitle").value.trim(), summary = document.getElementById("achievementSummary").value.trim(),
+      evidence = document.getElementById("achievementEvidence").files[0], publicCopy = document.getElementById("achievementPublicCopy").files[0],
+      allowed = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
+    if (!title || summary.length < 10 || !evidence) { error.textContent = "Add a title, a short summary, and private proof."; return; }
+    if ([evidence, publicCopy].filter(Boolean).some(function (file) { return allowed.indexOf(file.type) < 0 || file.size > 5 * 1024 * 1024; })) { error.textContent = "Each file must be a JPG, PNG, WebP, or PDF under 5 MB."; return; }
+    if (!window.crypto || !window.crypto.randomUUID) { error.textContent = "Update your browser before submitting."; return; }
+    var id = window.crypto.randomUUID(), yearValue = document.getElementById("achievementYear").value,
+      extension = function (file) { return file.name.split(".").pop().toLowerCase().replace(/[^a-z0-9]/g, "") || "bin"; },
+      evidencePath = user.id + "/" + id + "/evidence/" + window.crypto.randomUUID() + "." + extension(evidence),
+      publicPath = publicCopy ? user.id + "/" + id + "/public/" + window.crypto.randomUUID() + "." + extension(publicCopy) : null;
+    button.disabled = true; button.textContent = "Uploading privately…"; error.textContent = "";
+    var inserted = await supabaseClient.from("mentor_achievements").insert({
+      id: id, user_id: user.id, category: document.getElementById("achievementCategory").value,
+      title: title, issuer: document.getElementById("achievementIssuer").value.trim() || null,
+      achievement_year: yearValue ? Number(yearValue) : null, public_summary: summary,
+      evidence_path: evidencePath, public_evidence_path: publicPath, status: "pending",
+    });
+    if (inserted.error) { error.textContent = authErrorText(inserted.error) + " — run the mentor achievements SQL migration first."; button.disabled = false; button.textContent = "Send for review"; return; }
+    var uploadedPaths = [];
+    var files = [{ file: evidence, path: evidencePath }]; if (publicCopy) files.push({ file: publicCopy, path: publicPath });
+    for (var i = 0; i < files.length; i++) {
+      var upload = await supabaseClient.storage.from("mentor-achievements").upload(files[i].path, files[i].file, { contentType: files[i].file.type, upsert: false });
+      if (upload.error) {
+        if (uploadedPaths.length) await supabaseClient.storage.from("mentor-achievements").remove(uploadedPaths);
+        await supabaseClient.from("mentor_achievements").delete().eq("id", id).eq("user_id", user.id);
+        error.textContent = authErrorText(upload.error); button.disabled = false; button.textContent = "Send for review"; return;
+      }
+      uploadedPaths.push(files[i].path);
+    }
+    openMentorAchievementManager();
+  };
+}
 
 function paintRoleUI() {
   var isTutor = canMentor(user);
@@ -1374,8 +1499,8 @@ function tutorVerificationPanel(status) {
     return '<section class="box verify-status"><b><span class="verify-badge">Verified</span> Your mentor profile is approved</b><p class="muted">Your profile can appear in mentor search while availability is on.</p></section>';
   }
   if (status && status.status === "pending") return '<section class="box verify-status"><b>Verification pending</b><p class="muted">Your school ID and fee receipt are private. A reviewer will check them before your mentor profile becomes visible.</p></section>';
-  if (status && status.status === "rejected") return '<section class="box verify-status"><b>Verification needs another review</b><p class="muted">Resubmit both documents if a reviewer declined them, or if your verified name, class, school, or subjects changed.</p><button class="btn" data-start-verification>Submit documents again</button></section>';
-  return '<section class="box verify-status"><b>Verify your mentor profile</b><p class="muted">Mentors from every class must submit a school ID and fee receipt. A trusted reviewer checks your class, school, and subjects before approving your profile. Files stay private and are removed after review.</p><button class="btn" data-start-verification>Submit for review</button></section>';
+  if (status && status.status === "rejected") return '<section class="box verify-status"><b>Verification needs another review</b><p class="muted">Resubmit both documents if a reviewer declined them, or if your verified name, class, or school changed. Editing your bio or guidance areas does not restart verification.</p><button class="btn" data-start-verification>Submit documents again</button></section>';
+  return '<section class="box verify-status"><b>Verify your mentor profile</b><p class="muted">Mentors from every class submit a school ID and fee receipt. A trusted reviewer checks your identity, class, and school before approving your profile. Files stay private and are removed after review.</p><button class="btn" data-start-verification>Submit for review</button></section>';
 }
 async function drawTutorDashboard() {
   var body = document.getElementById("tutorDashboardBody");
@@ -1404,8 +1529,10 @@ async function drawTutorDashboard() {
   }).join("") : '<p class="muted">No booking requests to review.</p>';
   body.innerHTML = '<div class="dash-stats"><div class="dash-stat"><b>' + pendingSessions.length + '</b><span>Bookings to review</span></div><div class="dash-stat"><b>' + upcomingSessions.length + '</b><span>Upcoming sessions</span></div><div class="dash-stat"><b>' + (profile && profile.is_available ? "Available" : "Paused") + '</b><span>Profile visibility</span></div></div>' +
     tutorVerificationPanel(status) +
-    '<div class="dash-grid"><section class="box"><div class="dash-heading"><div><b>Your mentor profile</b><p class="muted">' + esc(profile ? profile.headline || "Add a headline" : "Create your profile so learners can find you.") + '</p></div><button class="btn ghost" data-edit-tutor>Edit profile</button></div><p class="muted">Subjects: ' + esc(profile && profile.subjects ? profile.subjects.join(", ") : "Not set") + '<br>School: ' + esc(user.location && user.location.school || "—") + '<br>Location: ' + esc(user.location ? [user.location.city,user.location.state,user.location.country].join(", ") : "—") + '</p><label class="availability"><input type="checkbox" data-available ' + (profile && profile.is_available ? "checked" : "") + ' ' + (!profile || !status || status.status !== "verified" ? "disabled" : "") + '> Show my profile in mentor search</label></section></div>' +
+    '<div class="dash-grid"><section class="box"><div class="dash-heading"><div><b>Your mentor profile</b><p class="muted">' + esc(profile ? profile.headline || "Add a guidance note" : "Create your profile so learners can find you.") + '</p></div><button class="btn ghost" data-edit-tutor>Edit profile</button></div><p class="muted">Guidance areas: ' + esc(profile && profile.subjects ? profile.subjects.join(", ") : "Not set") + '<br>School: ' + esc(user.location && user.location.school || "—") + '<br>Location: ' + esc(user.location ? [user.location.city,user.location.state,user.location.country].join(", ") : "—") + '</p><label class="availability"><input type="checkbox" data-available ' + (profile && profile.is_available ? "checked" : "") + ' ' + (!profile || !status || status.status !== "verified" ? "disabled" : "") + '> Show my profile in mentor search</label></section></div>' +
     '<section class="box request-box"><div class="dash-heading"><div><b>Booking requests</b><p class="muted">Accept or decline requests for a scheduled learning session.</p></div></div>' + bookingRows + '</section>';
+  var mentorProfilePanel = body.querySelector(".dash-grid .box");
+  if (mentorProfilePanel) mentorProfilePanel.insertAdjacentHTML("beforeend", '<div class="mentor-achievement-dashboard"><p class="muted">Add reviewed exam results, certificates, medals, and other milestones to your public profile.</p><button type="button" class="btn ghost" data-manage-achievements>Manage achievements</button></div>');
 }
 document.getElementById("tutorDashboardBody").addEventListener("click", async function (e) {
   var sessionAction = e.target.closest("[data-session-action]");
@@ -1414,7 +1541,8 @@ document.getElementById("tutorDashboardBody").addEventListener("click", async fu
     var result = await supabaseClient.from("peer_sessions").update({ status: sessionAction.dataset.sessionAction }).eq("id", sessionAction.dataset.sessionId).eq("mentor_id", user.id);
     if (result.error) window.alert(authErrorText(result.error));
     await drawTutorDashboard();
-  } else if (e.target.closest("[data-edit-tutor]")) openTutor();
+  } else if (e.target.closest("[data-manage-achievements]")) openMentorAchievementManager();
+  else if (e.target.closest("[data-edit-tutor]")) openTutor();
   else if (e.target.closest("[data-start-verification]")) openTutorVerificationForm();
 });
 document.getElementById("tutorDashboardBody").addEventListener("change", async function (e) {
@@ -1477,7 +1605,7 @@ async function drawVerificationAdmin() {
   body.innerHTML = '<div class="box">Loading review queue…</div>';
   var result = await supabaseClient.from("tutor_verification_requests").select("id, user_id, submitted_at").eq("status", "pending").order("submitted_at", { ascending: true });
   if (result.error) { body.innerHTML = '<div class="box err">' + esc(authErrorText(result.error)) + '</div>'; return; }
-  if (!result.data || !result.data.length) { body.innerHTML = '<div class="box">No tutor verification requests waiting.</div>'; return; }
+  if (!result.data || !result.data.length) { body.innerHTML = '<div class="box">No tutor verification requests waiting.</div>'; await drawAchievementReviewQueue(body); return; }
   var ids = result.data.map(function (r) { return r.user_id; }), reqIds = result.data.map(function (r) { return r.id; });
   var extra = await Promise.all([
     supabaseClient.from("profiles").select("id, display_name, grade").in("id", ids),
@@ -1500,11 +1628,55 @@ async function drawVerificationAdmin() {
       links.push('<div class="admin-doc"><span>' + (items[k].document_type === "school_id" ? "School ID card" : "Fee receipt") + '</span>' + (signed.error ? '<span class="muted">Preview unavailable</span>' : '<a class="btn ghost" target="_blank" rel="noopener" href="' + esc(signed.data.signedUrl) + '">Open private file</a>') + '</div>');
     }
     var tp = tutorProfiles[row.user_id] || {}, hasId = items.some(function (d) { return d.document_type === "school_id"; }), hasReceipt = items.some(function (d) { return d.document_type === "fee_receipt"; });
-    cards.push('<article class="box"><h3>' + esc(p.display_name || "Learner") + ' · Class ' + esc(String(p.grade || "—")) + '</h3><p class="muted">' + esc([l.school,l.city,l.state,l.country].filter(Boolean).join(" · ") || "Location not set") + '<br>Subjects: ' + esc((tp.subjects || []).join(", ") || "Not set") + '<br>About: ' + esc(tp.headline || "Not set") + '<br>Submitted ' + esc(new Date(row.submitted_at).toLocaleString()) + '</p>' + (links.join("") || '<p class="err">No documents attached.</p>') + '<label>Reviewer note (optional)<input data-review-note="' + esc(row.id) + '" maxlength="500" placeholder="Private note; not shown on the mentor profile"></label><div class="row"><button class="btn" data-review="verified" data-review-id="' + esc(row.id) + '" data-user-id="' + esc(row.user_id) + '" ' + (!(hasId && hasReceipt && Number(p.grade) >= 9 && Number(p.grade) <= 12 && allDocsAvailable) ? 'disabled title="Both documents must be available and class must be 9–12"' : '') + '>Approve and verify</button><button class="btn ghost" data-review="rejected" data-review-id="' + esc(row.id) + '" data-user-id="' + esc(row.user_id) + '">Reject</button></div></article>');
+    cards.push('<article class="box"><h3>' + esc(p.display_name || "Learner") + ' · Class ' + esc(String(p.grade || "—")) + '</h3><p class="muted">' + esc([l.school,l.city,l.state,l.country].filter(Boolean).join(" · ") || "Location not set") + '<br>Guidance areas: ' + esc((tp.subjects || []).join(", ") || "Not set") + '<br>Guidance note: ' + esc(tp.headline || "Not set") + '<br>Submitted ' + esc(new Date(row.submitted_at).toLocaleString()) + '</p>' + (links.join("") || '<p class="err">No documents attached.</p>') + '<label>Reviewer note (optional)<input data-review-note="' + esc(row.id) + '" maxlength="500" placeholder="Private note; not shown on the mentor profile"></label><div class="row"><button class="btn" data-review="verified" data-review-id="' + esc(row.id) + '" data-user-id="' + esc(row.user_id) + '" ' + (!(hasId && hasReceipt && Number(p.grade) >= 9 && Number(p.grade) <= 12 && allDocsAvailable) ? 'disabled title="Both documents must be available and class must be 9–12"' : '') + '>Approve and verify</button><button class="btn ghost" data-review="rejected" data-review-id="' + esc(row.id) + '" data-user-id="' + esc(row.user_id) + '">Reject</button></div></article>');
   }
   body.innerHTML = cards.join("");
+  await drawAchievementReviewQueue(body);
+}
+async function drawAchievementReviewQueue(body) {
+  var result = await supabaseClient.from("mentor_achievements")
+    .select("id,user_id,category,title,issuer,achievement_year,public_summary,evidence_path,public_evidence_path,created_at")
+    .eq("status", "pending").order("created_at", { ascending: true });
+  var section = document.createElement("section"); section.className = "achievement-review-queue";
+  if (result.error) { section.innerHTML = '<h2>Achievement review</h2><p class="muted">Run the mentor guidance and achievements SQL migration to enable this review queue.</p>'; body.appendChild(section); return; }
+  section.innerHTML = '<h2>Achievement review</h2><p class="muted">Review the private evidence. Only approve an optional public file if it has no sensitive details.</p>';
+  if (!result.data || !result.data.length) { section.insertAdjacentHTML("beforeend", '<div class="box">No achievement submissions waiting.</div>'); body.appendChild(section); return; }
+  var ids = result.data.map(function (row) { return row.user_id; });
+  var profileResult = await supabaseClient.from("profiles").select("id,display_name,grade").in("id", ids), profiles = {};
+  (profileResult.data || []).forEach(function (profile) { profiles[profile.id] = profile; });
+  for (var i = 0; i < result.data.length; i++) {
+    var item = result.data[i], profile = profiles[item.user_id] || {}, privateLink = await supabaseClient.storage.from("mentor-achievements").createSignedUrl(item.evidence_path, 300), publicLink = item.public_evidence_path ? await supabaseClient.storage.from("mentor-achievements").createSignedUrl(item.public_evidence_path, 300) : null;
+    var links = '<div class="admin-doc"><span>Private supporting proof</span>' + (privateLink.error ? '<span class="muted">Preview unavailable</span>' : '<a class="btn ghost" target="_blank" rel="noopener" href="' + esc(privateLink.data.signedUrl) + '">Review private proof</a>') + '</div>';
+    if (item.public_evidence_path) links += '<div class="admin-doc"><span>Proposed public copy — check redaction</span>' + (!publicLink || publicLink.error ? '<span class="muted">Preview unavailable</span>' : '<a class="btn ghost" target="_blank" rel="noopener" href="' + esc(publicLink.data.signedUrl) + '">Review proposed copy</a>') + '</div>';
+    section.insertAdjacentHTML("beforeend", '<article class="box achievement-review-card"><h3>' + esc(profile.display_name || "Mentor") + ' · Class ' + esc(String(profile.grade || "—")) + '</h3><p><b>' + esc(item.title) + '</b><br>' + esc([item.category, item.issuer, item.achievement_year].filter(Boolean).join(" · ")) + '</p><p class="muted">' + esc(item.public_summary) + '</p>' + links + '<div class="row"><button type="button" class="btn" data-achievement-review="approved" data-achievement-id="' + esc(item.id) + '">Approve for profile</button><button type="button" class="btn ghost" data-achievement-review="rejected" data-achievement-id="' + esc(item.id) + '">Decline</button></div></article>');
+  }
+  body.appendChild(section);
 }
 document.getElementById("verificationAdminBody").addEventListener("click", async function (event) {
+  var achievementButton = event.target.closest("[data-achievement-review]");
+  if (achievementButton) {
+    if (!isVerificationAdmin) return;
+    achievementButton.disabled = true;
+    var achievementId = achievementButton.dataset.achievementId;
+    var achievementRow = await supabaseClient.from("mentor_achievements").select("evidence_path,public_evidence_path").eq("id", achievementId).eq("status", "pending").maybeSingle();
+    if (achievementRow.error || !achievementRow.data) { window.alert(achievementRow.error ? authErrorText(achievementRow.error) : "This submission has already been reviewed."); await drawVerificationAdmin(); return; }
+    var achievementDecision = achievementButton.dataset.achievementReview;
+    var achievementResult = await supabaseClient.from("mentor_achievements").update({ status: achievementDecision, reviewed_at: new Date().toISOString(), reviewed_by: user.id }).eq("id", achievementId).eq("status", "pending");
+    if (achievementResult.error) { window.alert(authErrorText(achievementResult.error)); achievementButton.disabled = false; return; }
+    var proofPaths = [achievementRow.data.evidence_path];
+    if (achievementDecision === "rejected") proofPaths.push(achievementRow.data.public_evidence_path);
+    proofPaths = proofPaths.filter(Boolean);
+    var proofRemoval = proofPaths.length ? await supabaseClient.storage.from("mentor-achievements").remove(proofPaths) : { error: null };
+    if (proofRemoval.error) window.alert("Decision saved, but a private file could not be deleted. Only you and trusted reviewers can still open it.");
+    else {
+      var clearedPaths = { evidence_path: null };
+      if (achievementDecision === "rejected") clearedPaths.public_evidence_path = null;
+      var clearResult = await supabaseClient.from("mentor_achievements").update(clearedPaths).eq("id", achievementId);
+      if (clearResult.error) window.alert("Decision saved and files removed, but the file record could not be cleared: " + authErrorText(clearResult.error));
+    }
+    await drawVerificationAdmin();
+    return;
+  }
   var button = event.target.closest("[data-review]");
   if (!button || !isVerificationAdmin) return;
   button.disabled = true;
