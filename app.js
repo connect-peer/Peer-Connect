@@ -3,10 +3,10 @@
  * ------------------------------------------------------------
  * All behavior lives in this file. There is no framework and no build step.
  * Supabase handles Auth, profiles, verified tutors, private verification files,
- * connections, doubts, and answers.
+ * bookings, doubts, and answers.
  *
  * Map of this file (search for these names):
- *   STATE        tutors, posts, sent, user, mine, fSub, fSort, openR
+ *   STATE        tutors, posts, user, mine, fSub, fSort, openR
  *   TUTORS PAGE  drawChips(), draw()
  *   PRICING      Student/tutor free; optional one-time tutor Blue Tick is planned
  *   SIGN IN      paintSign(), openSign()    (Supabase email and Google Auth)
@@ -33,11 +33,9 @@ var subjects = ["All"].concat(
 );
 var active = "All",
   query = "",
-  sent = {},
   tutorState = "",
   tutorCity = "";
 var activeTutorProfile = null;
-var acceptedScheduleMentors = {};
 var pendingBookingMentorId = "";
 function canMentor(account) { return !!account && ["mentor", "both", "tutor"].indexOf(account.role) >= 0; }
 function canLearn(account) { return !!account && ["learner", "both", "student"].indexOf(account.role) >= 0; }
@@ -92,12 +90,11 @@ function draw() {
   }
   grid.innerHTML = list
     .map(function (t) {
-      var i = tutors.indexOf(t),
-        done = sent[t.user_id];
+      var i = tutors.indexOf(t);
       return (
         '<article class="card" data-profile-index="' + i + '" tabindex="0" aria-label="View ' + esc(t.n) + ' mentor profile"><div class="cover mentor-card-cover" style="--c:' +
         t.c +
-        '"><span class="mentor-card-kicker">' + (acceptedScheduleMentors[t.user_id] ? 'Booking unlocked' : 'Peer mentorship') + '</span></div><div class="body">' +
+        '"><span class="mentor-card-kicker">Verified mentor</span></div><div class="body">' +
         '<div class="av">' +
         (t.avatarUrl ? '<img src="' + esc(t.avatarUrl) + '" alt="">' : ini(t.n)) +
         "</div>" +
@@ -118,9 +115,7 @@ function draw() {
         "</div>" +
         (t.me
           ? '<button class="btn ghost" data-edit-tutor-card>Edit profile</button>'
-          : (acceptedScheduleMentors[t.user_id]
-            ? '<button class="btn" data-book-mentor="' + esc(t.user_id) + '">Book now</button>'
-            : '<button class="btn' + (done ? " ghost" : "") + '" data-i="' + i + '"' + (done ? " disabled" : "") + ">" + (done ? "Request sent" : "Connect") + "</button>")) +
+          : '<button class="btn" data-book-mentor="' + esc(t.user_id) + '">Book a session</button>') +
         "</div></article>"
       );
     })
@@ -166,37 +161,14 @@ grid.addEventListener("click", async function (e) {
   var book = e.target.closest("[data-book-mentor]");
   if (book) {
     e.stopPropagation();
+    if (!user) { openSign(); return; }
+    if (!canLearn(user)) { document.getElementById("count").textContent = "Choose Learner or Both in your profile to book a mentor."; return; }
     pendingBookingMentorId = book.dataset.bookMentor;
     location.hash = "sessions";
     return;
   }
-  var b = e.target.closest("button[data-i]");
-  if (!b) {
-    var card = e.target.closest("[data-profile-index]");
-    if (card) showTutorProfile(tutors[Number(card.dataset.profileIndex)]);
-    return;
-  }
-  if (b.disabled) return;
-  if (!user) {
-    openSign();
-    return;
-  }
-  if (!canLearn(user)) {
-    document.getElementById("count").textContent =
-      "Choose Learner or Both to send guidance requests.";
-    return;
-  }
-  var tutor = tutors[Number(b.dataset.i)];
-  var result = await supabaseClient.from("connections").insert({
-    requester_id: user.id,
-    recipient_id: tutor.user_id,
-  });
-  if (result.error) {
-    document.getElementById("count").textContent = authErrorText(result.error);
-    return;
-  }
-  sent[tutor.user_id] = true;
-  draw();
+  var card = e.target.closest("[data-profile-index]");
+  if (card) showTutorProfile(tutors[Number(card.dataset.profileIndex)]);
 });
 grid.addEventListener("keydown", function (e) {
   var card = e.target.closest("[data-profile-index]");
@@ -215,7 +187,7 @@ function renderTutorProfilePage() {
   var root = document.getElementById("tutorProfileContent");
   if (!tutor || !root) return;
   var locationText = [tutor.school, tutor.city, tutor.state, tutor.country].filter(Boolean).join(" · ");
-  root.innerHTML = '<button type="button" class="btn ghost profile-back" id="profileBack">← Back to mentors</button><div class="profile-cover" id="profileCover"></div><section class="profile-head"><div class="av" id="profileAvatar">' + (tutor.avatarUrl ? '<img src="' + esc(tutor.avatarUrl) + '" alt="">' : esc(ini(tutor.n))) + '</div><h2>' + esc(tutor.n) + (tutor.verified ? ' <span class="verify-badge">Verified</span>' : tutor.me ? ' <span class="verify-review-state">' + esc(tutor.verificationStatus || "Not verified") + '</span>' : '') + '</h2><div class="profile-meta">Class ' + esc(String(tutor.g || "").replace(/^Class\s*/i, "")) + ' · ' + esc(locationText) + '</div><p>' + esc(tutor.h) + '</p><div class="tags">' + tutor.s.map(function (subject) { return '<span class="tag">' + esc(subject) + '</span>'; }).join("") + '</div><div class="profile-social" id="profileSocialStats"><span>Loading followers…</span></div><button class="btn" id="profileConnect" ' + ((sent[tutor.user_id] && !tutor.me) ? 'disabled' : '') + '>' + (tutor.me ? 'Edit mentor profile' : sent[tutor.user_id] ? 'Request sent' : 'Connect') + '</button>' + (tutor.me ? '<div class="profile-appearance"><label class="btn ghost">Change profile photo<input type="file" accept="image/jpeg,image/png,image/webp" data-profile-image="avatar"></label><label class="btn ghost">Change banner<input type="file" accept="image/jpeg,image/png,image/webp" data-profile-image="banner"></label></div>' : '') + '</section><div class="profile-tabs"><button class="btn ghost" data-profile-tab="about" aria-pressed="true">About</button><button class="btn ghost" data-profile-tab="answers" aria-pressed="false">Answers</button></div><div class="profile-content" id="profileContent"><h3>About</h3><p>' + esc(tutor.h || 'Peer Connect mentor') + '</p><p class="muted">School: ' + esc(tutor.school || '—') + '<br>Location: ' + esc([tutor.city, tutor.state, tutor.country].filter(Boolean).join(', ') || '—') + '</p></div>';
+  root.innerHTML = '<button type="button" class="btn ghost profile-back" id="profileBack">← Back to mentors</button><div class="profile-cover" id="profileCover"></div><section class="profile-head"><div class="av" id="profileAvatar">' + (tutor.avatarUrl ? '<img src="' + esc(tutor.avatarUrl) + '" alt="">' : esc(ini(tutor.n))) + '</div><h2>' + esc(tutor.n) + (tutor.verified ? ' <span class="verify-badge">Verified</span>' : tutor.me ? ' <span class="verify-review-state">' + esc(tutor.verificationStatus || "Not verified") + '</span>' : '') + '</h2><div class="profile-meta">Class ' + esc(String(tutor.g || "").replace(/^Class\s*/i, "")) + ' · ' + esc(locationText) + '</div><p>' + esc(tutor.h) + '</p><div class="tags">' + tutor.s.map(function (subject) { return '<span class="tag">' + esc(subject) + '</span>'; }).join("") + '</div><div class="profile-social" id="profileSocialStats"><span>Loading followers…</span></div><button class="btn" id="profileBook">' + (tutor.me ? 'Edit mentor profile' : 'Book a session') + '</button>' + (tutor.me ? '<div class="profile-appearance"><label class="btn ghost">Change profile photo<input type="file" accept="image/jpeg,image/png,image/webp" data-profile-image="avatar"></label><label class="btn ghost">Change banner<input type="file" accept="image/jpeg,image/png,image/webp" data-profile-image="banner"></label></div>' : '') + '</section><div class="profile-tabs"><button class="btn ghost" data-profile-tab="about" aria-pressed="true">About</button><button class="btn ghost" data-profile-tab="answers" aria-pressed="false">Answers</button></div><div class="profile-content" id="profileContent"><h3>About</h3><p>' + esc(tutor.h || 'Peer tutor') + '</p><p class="muted">School: ' + esc(tutor.school || '—') + '<br>Location: ' + esc([tutor.city, tutor.state, tutor.country].filter(Boolean).join(', ') || '—') + '</p></div>';
   var cover = document.getElementById("profileCover");
   if (tutor.bannerUrl) cover.style.backgroundImage = 'url("' + tutor.bannerUrl.replace(/["\\\\]/g, "") + '")';
   loadProfileSocial(tutor);
@@ -223,16 +195,12 @@ function renderTutorProfilePage() {
     input.onchange = async function () { if (input.files[0]) await uploadProfileImage(input.files[0], input.dataset.profileImage); };
   });
   document.getElementById("profileBack").onclick = function () { location.hash = "tutors"; };
-  document.getElementById("profileConnect").onclick = async function () {
+  document.getElementById("profileBook").onclick = async function () {
     if (tutor.me) { openTutor(); return; }
     if (!user) { openSign(); return; }
-    if (!canLearn(user)) { document.getElementById("profileContent").textContent = "Learner accounts can send connection requests."; return; }
-    var result = await supabaseClient.from("connections").insert({ requester_id: user.id, recipient_id: tutor.user_id });
-    if (result.error) { document.getElementById("profileContent").textContent = authErrorText(result.error); return; }
-    sent[tutor.user_id] = true;
-    this.disabled = true;
-    this.textContent = "Request sent";
-    draw();
+    if (!canLearn(user)) { document.getElementById("profileContent").textContent = "Choose Learner or Both in your profile to book a session."; return; }
+    pendingBookingMentorId = tutor.user_id;
+    location.hash = "sessions";
   };
   var socialRoot = document.getElementById("profileSocialStats");
   socialRoot.onclick = async function (event) {
@@ -300,17 +268,6 @@ async function loadTutorDirectory() {
     document.getElementById("count").textContent = authErrorText(result.error);
     return;
   }
-  acceptedScheduleMentors = {};
-  if (canLearn(user)) {
-    var acceptedResult = await supabaseClient.from("connections")
-      .select("id,requester_id,recipient_id")
-      .eq("status", "accepted")
-      .or("requester_id.eq." + user.id + ",recipient_id.eq." + user.id);
-    if (!acceptedResult.error) (acceptedResult.data || []).forEach(function (connection) {
-      var mentorId = connection.requester_id === user.id ? connection.recipient_id : connection.requester_id;
-      acceptedScheduleMentors[mentorId] = connection.id;
-    });
-  }
   tutors = (result.data || []).map(function (row) {
     return {
       user_id: row.user_id,
@@ -372,19 +329,6 @@ async function loadTutorDirectory() {
   draw();
 }
 
-async function loadStudentConnections() {
-  if (!supabaseClient || !canLearn(user)) return;
-  var result = await supabaseClient.from("connections")
-    .select("recipient_id, status")
-    .eq("requester_id", user.id);
-  if (!result.error) {
-    sent = {};
-    (result.data || []).forEach(function (row) {
-      if (row.status === "pending" || row.status === "accepted") sent[row.recipient_id] = true;
-    });
-    draw();
-  }
-}
 drawChips();
 draw();
 
@@ -502,7 +446,6 @@ async function syncAuthUser(authUser) {
   paintRoleUI();
   if ((!user.role || !user.grade || missingProfileLocation(user.location)) && !onboardingOpen) openOnboarding(false);
   if (user.role) loadTutorDirectory();
-  if (canLearn(user)) loadStudentConnections();
   if (curRoute === "dashboard" && canMentor(user)) drawTutorDashboard();
   if (typeof drawMe === "function" && curRoute === "me") drawMe();
   route();
@@ -640,7 +583,7 @@ function showAuthForm(mode) {
     '<p>Meet learners who understand your classes, questions, and goals. Share what you know and get unstuck together.</p>' +
     '<div class="auth-feature-stack"><div class="auth-feature"><b>◎</b><span><strong>Find a mentor</strong> who knows your subject</span></div>' +
     '<div class="auth-feature"><b>↗</b><span><strong>Ask a doubt</strong> and learn from the community</span></div>' +
-    '<div class="auth-feature"><b>✓</b><span><strong>Build connections</strong> around learning</span></div></div></div>' +
+    '<div class="auth-feature"><b>✓</b><span><strong>Book a session</strong> with a verified mentor</span></div></div></div>' +
     '<div class="auth-brand-foot">A peer-learning community</div></aside>';
   if (!dlg.open) dlg.showModal();
   document.getElementById("switchAuth").onclick = function () {
@@ -868,7 +811,6 @@ function openOnboarding(changeRole) {
     dlg.close();
     dlg.classList.remove("setup-dialog");
     await loadTutorDirectory();
-    if (canLearn(user)) await loadStudentConnections();
     if (canMentor(user)) openTutor();
     else {
       location.hash = "home";
@@ -1081,8 +1023,7 @@ document.querySelectorAll('[data-nav="verification"]').forEach(function (link) {
   link.addEventListener("click", function () { window.setTimeout(drawVerificationAdmin, 0); });
 });
 
-var requestLocationState = "", requestLocationCity = "";
-var scheduleConnections = [], scheduleTypes = [], scheduleSlots = [], scheduleSlotsContext = null;
+var scheduleMentors = [], scheduleTypes = [], scheduleSlots = [], scheduleSlotsContext = null;
 var selectedScheduleSlotIndex = null;
 var activeChatSession = null, sessionChatPoll = null, sessionChatSignature = "", sessionChatSignedAt = 0, sessionChatBusy = false;
 function isoTodayIn(timezone) {
@@ -1125,11 +1066,11 @@ function paintSessionDateStrip() {
 }
 function renderBookingForm() {
   var root = document.getElementById("bookingForm"); if (!root) return;
-  if (!scheduleConnections.length) { root.innerHTML = '<div class="community-empty">No accepted mentor connections yet. Find a mentor, connect, and wait for them to accept before scheduling.</div><a class="btn ghost" href="#tutors">Find a mentor</a>'; return; }
-  var options = scheduleConnections.map(function (connection) { return '<option value="' + esc(connection.id) + '"' + (connection.mentorId === pendingBookingMentorId ? ' selected' : '') + '>' + esc(connection.name) + '</option>'; }).join("");
-  root.innerHTML = '<div class="schedule-form"><label>Mentor<select id="sessionConnection">' + options + '</select></label><input id="sessionType" type="hidden"><p class="session-policy-note">Company schedule · 30 minutes · Daily 8:00 AM–8:00 PM IST</p><label class="session-date-label">Choose a day<input id="sessionDate" type="date" min="' + isoTodayIn("Asia/Kolkata") + '" value="' + isoTodayIn("Asia/Kolkata") + '"></label><div id="sessionDateStrip" class="session-date-strip" aria-label="Choose a day"></div><p id="sessionBookingMessage" class="muted" role="status"></p></div><div id="sessionSlots" class="schedule-slots"><div class="community-empty">Finding company-set times…</div></div><div class="session-booking-footer"><span class="session-free-note">Peer Connect sessions are free</span><button class="btn" id="requestSession" type="button" hidden disabled>Request booking</button></div>';
+  if (!scheduleMentors.length) { root.innerHTML = '<div class="community-empty">No verified mentors are available for booking right now.</div><a class="btn ghost" href="#tutors">Browse mentors</a>'; return; }
+  var options = scheduleMentors.map(function (mentor) { return '<option value="' + esc(mentor.id) + '"' + (mentor.id === pendingBookingMentorId ? ' selected' : '') + '>' + esc(mentor.name) + '</option>'; }).join("");
+  root.innerHTML = '<div class="schedule-form"><label>Mentor<select id="sessionMentor">' + options + '</select></label><input id="sessionType" type="hidden"><p class="session-policy-note">Company schedule · 30 minutes · Daily 8:00 AM–8:00 PM IST</p><label class="session-date-label">Choose a day<input id="sessionDate" type="date" min="' + isoTodayIn("Asia/Kolkata") + '" value="' + isoTodayIn("Asia/Kolkata") + '"></label><div id="sessionDateStrip" class="session-date-strip" aria-label="Choose a day"></div><p id="sessionBookingMessage" class="muted" role="status"></p></div><div id="sessionSlots" class="schedule-slots"><div class="community-empty">Finding company-set times…</div></div><div class="session-booking-footer"><span class="session-free-note">Peer Connect sessions are free</span><button class="btn" id="requestSession" type="button" hidden disabled>Request booking</button></div>';
   paintSessionDateStrip();
-  document.getElementById("sessionConnection").onchange = loadSessionTypes;
+  document.getElementById("sessionMentor").onchange = loadSessionTypes;
   document.getElementById("sessionDate").onchange = function () { paintSessionDateStrip(); loadSessionSlots(); };
   document.getElementById("sessionDateStrip").onclick = function (event) {
     var day = event.target.closest("[data-session-date]"); if (!day) return;
@@ -1150,44 +1091,44 @@ function renderBookingForm() {
     }
     var request = event.target.closest("#requestSession");
     if (!request || selectedScheduleSlotIndex === null || !scheduleSlotsContext) return;
-    request.disabled = true; request.textContent = "Sending request…";
+    request.disabled = true; request.textContent = "Sending booking request…";
     var chosen = scheduleSlots[selectedScheduleSlotIndex];
-    var result = await supabaseClient.from("peer_sessions").insert({ connection_id: scheduleSlotsContext.connectionId, session_type_id: scheduleSlotsContext.typeId, learner_id: user.id, mentor_id: scheduleSlotsContext.mentorId, starts_at: chosen.starts_at, ends_at: chosen.ends_at, timezone: chosen.timezone, status: "pending" });
+    var result = await supabaseClient.from("peer_sessions").insert({ connection_id: null, session_type_id: scheduleSlotsContext.typeId, learner_id: user.id, mentor_id: scheduleSlotsContext.mentorId, starts_at: chosen.starts_at, ends_at: chosen.ends_at, timezone: chosen.timezone, status: "pending" });
     var status = document.getElementById("sessionBookingMessage");
     if (result.error) { if (status) status.textContent = authErrorText(result.error); request.disabled = false; request.textContent = "Request booking"; }
-    else { selectedScheduleSlotIndex = null; if (status) status.textContent = "Request sent. The mentor must confirm it before it is booked."; await loadSessionSlots(); await loadPeerSessionList(); }
+    else { selectedScheduleSlotIndex = null; if (status) status.textContent = "Booking request sent. The mentor must confirm it before the chat session is booked."; await loadSessionSlots(); await loadPeerSessionList(); }
   };
   loadSessionTypes();
 }
-function selectedScheduleConnection() {
-  var select = document.getElementById("sessionConnection");
-  return select && scheduleConnections.find(function (connection) { return connection.id === select.value; });
+function selectedScheduleMentor() {
+  var select = document.getElementById("sessionMentor");
+  return select && scheduleMentors.find(function (mentor) { return mentor.id === select.value; });
 }
 async function loadSessionTypes() {
-  var connection = selectedScheduleConnection(), select = document.getElementById("sessionType");
-  if (!connection || !select) return;
+  var mentor = selectedScheduleMentor(), select = document.getElementById("sessionType");
+  if (!mentor || !select) return;
   scheduleTypes = [];
   scheduleSlots = [];
   selectedScheduleSlotIndex = null;
   select.value = "";
-  var result = await supabaseClient.from("peer_session_types").select("id,duration_minutes,timezone,is_platform_session").eq("mentor_id", connection.mentorId).eq("is_platform_session", true).eq("is_active", true).maybeSingle();
+  var result = await supabaseClient.from("peer_session_types").select("id,duration_minutes,timezone,is_platform_session").eq("mentor_id", mentor.id).eq("is_platform_session", true).eq("is_active", true).maybeSingle();
   if (result.error || !result.data) { var msg=document.getElementById("sessionBookingMessage"); if(msg)msg.textContent=result.error ? authErrorText(result.error) : "Company booking setup is not ready for this mentor."; document.getElementById("sessionSlots").innerHTML='<div class="community-empty">Booking setup is unavailable right now.</div>'; return; }
   scheduleTypes = [result.data];
   select.value = result.data.id;
   loadSessionSlots();
 }
 async function loadSessionSlots() {
-  var connection = selectedScheduleConnection(), typeSelect = document.getElementById("sessionType"), dateInput = document.getElementById("sessionDate"), slotsRoot = document.getElementById("sessionSlots");
+  var mentor = selectedScheduleMentor(), typeSelect = document.getElementById("sessionType"), dateInput = document.getElementById("sessionDate"), slotsRoot = document.getElementById("sessionSlots");
   selectedScheduleSlotIndex = null;
   var requestButton = document.getElementById("requestSession"); if (requestButton) { requestButton.hidden = true; requestButton.disabled = true; }
-  if (!connection || !typeSelect || !dateInput || !slotsRoot || !typeSelect.value) { if(slotsRoot)slotsRoot.innerHTML='<div class="community-empty">Company-set times will appear here.</div>'; return; }
+  if (!mentor || !typeSelect || !dateInput || !slotsRoot || !typeSelect.value) { if(slotsRoot)slotsRoot.innerHTML='<div class="community-empty">Company-set times will appear here.</div>'; return; }
   var type = scheduleTypes.find(function (item) { return item.id === typeSelect.value; });
   if (!type) return;
   slotsRoot.innerHTML = '<div class="muted">Finding open times…</div>';
-  var result = await supabaseClient.rpc("get_peer_session_slots", { p_mentor_id: connection.mentorId, p_session_type_id: type.id, p_from: dateInput.value, p_days: 1 });
+  var result = await supabaseClient.rpc("get_peer_session_slots", { p_mentor_id: mentor.id, p_session_type_id: type.id, p_from: dateInput.value, p_days: 1 });
   if (result.error) { slotsRoot.innerHTML = '<div class="community-empty">' + esc(authErrorText(result.error)) + '</div>'; return; }
   scheduleSlots = result.data || [];
-  scheduleSlotsContext = { connectionId: connection.id, mentorId: connection.mentorId, typeId: type.id };
+  scheduleSlotsContext = { mentorId: mentor.id, typeId: type.id };
   slotsRoot.innerHTML = scheduleSlots.length ? scheduleSlots.map(function (slot, index) { return '<button class="schedule-slot" type="button" data-session-slot="' + index + '">' + esc(sessionClock(slot.starts_at, slot.timezone)) + '</button>'; }).join("") : '<div class="community-empty">No open times on this day. Pick another date or check back later.</div>';
 }
 async function loadPeerSessionList() {
@@ -1195,7 +1136,7 @@ async function loadPeerSessionList() {
   var result = await supabaseClient.from("peer_sessions").select("id,connection_id,session_type_id,learner_id,mentor_id,starts_at,ends_at,timezone,status,learner_note,mentor_note,learner:profiles!peer_sessions_learner_id_fkey(display_name),mentor:profiles!peer_sessions_mentor_id_fkey(display_name)").order("starts_at", { ascending: true }).limit(100);
   if (result.error) { root.innerHTML = '<div class="community-empty">Could not load sessions: ' + esc(authErrorText(result.error)) + '</div>'; return; }
   var rows = result.data || [];
-  if (!rows.length) { root.innerHTML = '<div class="community-empty">No sessions yet. Accepted connections can schedule here.</div>'; return; }
+  if (!rows.length) { root.innerHTML = '<div class="community-empty">No booked sessions yet. Choose a verified mentor to request a time.</div>'; return; }
   var now = Date.now(); rows.sort(function(a,b){return new Date(a.starts_at)-new Date(b.starts_at);});
   // Keep a confirmed session in the visible Upcoming list for its full duration.
   // Otherwise a session already underway gets tucked into the collapsed history,
@@ -1229,12 +1170,12 @@ async function loadPeerSessionsPage() {
   var booking = document.getElementById("bookingForm");
   if (!user) { if(booking)booking.innerHTML='<div class="community-empty">Sign in to view sessions.</div><button type="button" class="btn" data-schedule-signin>Sign in</button>'; return; }
   if (!canLearn(user)) { if(booking)booking.innerHTML='<div class="community-empty">Mentor accounts manage availability and session requests from the mentor dashboard.</div><a class="btn ghost" href="#dashboard">Open mentor dashboard</a>'; await loadPeerSessionList(); return; }
-  if (booking) booking.innerHTML='<div class="community-empty">Loading accepted connections…</div>';
-  var result = await supabaseClient.from("connections").select("id,requester_id,recipient_id,status,requester:profiles!connections_requester_id_fkey(display_name,role),recipient:profiles!connections_recipient_id_fkey(display_name,role)").eq("status","accepted").or("requester_id.eq."+user.id+",recipient_id.eq."+user.id);
+  if (booking) booking.innerHTML='<div class="community-empty">Loading verified mentors…</div>';
+  var result = await supabaseClient.rpc("get_verified_tutor_directory", { p_state: null, p_city: null });
   if (result.error) { if(booking)booking.innerHTML='<div class="community-empty">'+esc(authErrorText(result.error))+'</div>'; await loadPeerSessionList(); return; }
-  scheduleConnections = (result.data||[]).map(function(row){ var otherId=row.requester_id===user.id?row.recipient_id:row.requester_id; var other=relationRow(row.requester_id===otherId?row.requester:row.recipient); return {id:row.id,mentorId:otherId,name:other.display_name||"Accepted peer"}; }).filter(function(connection){return connection.mentorId!==user.id;});
-  acceptedScheduleMentors = {};
-  scheduleConnections.forEach(function (connection) { acceptedScheduleMentors[connection.mentorId] = connection.id; });
+  scheduleMentors = (result.data||[]).map(function(row){ return {id:row.user_id,name:row.display_name||"Verified mentor"}; }).filter(function(mentor){return mentor.id!==user.id;});
+  if (pendingBookingMentorId && !scheduleMentors.some(function(mentor){return mentor.id===pendingBookingMentorId;})) pendingBookingMentorId = "";
+  if (!pendingBookingMentorId && scheduleMentors.length) pendingBookingMentorId = scheduleMentors[0].id;
   draw();
   if (booking) renderBookingForm();
   await loadPeerSessionList();
@@ -1376,34 +1317,32 @@ async function drawTutorDashboard() {
   var results = await Promise.all([
     supabaseClient.from("tutor_profiles").select("headline, subjects, is_available").eq("user_id", user.id).maybeSingle(),
     supabaseClient.from("tutor_verification_requests").select("id, status, submitted_at").eq("user_id", user.id).order("submitted_at", { ascending: false }).limit(1),
-    supabaseClient.rpc("get_tutor_student_requests", { p_state: null, p_city: null }),
+    supabaseClient.from("peer_sessions").select("id,learner_id,starts_at,ends_at,timezone,status,learner:profiles!peer_sessions_learner_id_fkey(display_name)").eq("mentor_id", user.id).order("starts_at", { ascending: true }).limit(100),
   ]);
   if (results[0].error || results[1].error || results[2].error) {
     body.innerHTML = '<div class="box err">' + esc(authErrorText(results[0].error || results[1].error || results[2].error)) + '</div>';
     return;
   }
-  var profile = results[0].data, status = (results[1].data || [])[0] || null, requests = results[2].data || [];
-  var pending = requests.filter(function (r) { return r.status === "pending"; }).length;
-  var accepted = requests.filter(function (r) { return r.status === "accepted"; }).length;
-  var states = Array.from(new Set(requests.map(function (r) { return r.state; }).filter(Boolean))).sort();
-  var cities = Array.from(new Set(requests.filter(function (r) { return !requestLocationState || r.state === requestLocationState; }).map(function (r) { return r.city; }).filter(Boolean))).sort();
-  if (states.indexOf(requestLocationState) < 0) requestLocationState = "";
-  if (cities.indexOf(requestLocationCity) < 0) requestLocationCity = "";
-  var filteredRequests = requests.filter(function (r) { return (!requestLocationState || r.state === requestLocationState) && (!requestLocationCity || r.city === requestLocationCity); });
-  body.innerHTML = '<div class="dash-stats"><div class="dash-stat"><b>' + pending + '</b><span>Requests to review</span></div><div class="dash-stat"><b>' + accepted + '</b><span>Connections</span></div><div class="dash-stat"><b>' + (profile && profile.is_available ? "Available" : "Paused") + '</b><span>Profile visibility</span></div></div>' +
+  var profile = results[0].data, status = (results[1].data || [])[0] || null, sessions = results[2].data || [];
+  var now = Date.now();
+  var pendingSessions = sessions.filter(function (s) { return s.status === "pending"; });
+  var upcomingSessions = sessions.filter(function (s) { return s.status === "confirmed" && new Date(s.ends_at).getTime() >= now; });
+  var bookingRows = pendingSessions.length ? pendingSessions.map(function (s) {
+    var learner = relationRow(s.learner);
+    return '<article class="request-row"><div><b>' + esc(learner.display_name || "Learner") + '</b><p class="muted">30-minute session · ' + esc(sessionTime(s.starts_at, s.timezone)) + '</p></div><div class="row"><button class="btn" data-session-action="confirmed" data-session-id="' + esc(s.id) + '">Accept</button><button class="btn ghost" data-session-action="declined" data-session-id="' + esc(s.id) + '">Decline</button></div></article>';
+  }).join("") : '<p class="muted">No booking requests to review.</p>';
+  body.innerHTML = '<div class="dash-stats"><div class="dash-stat"><b>' + pendingSessions.length + '</b><span>Bookings to review</span></div><div class="dash-stat"><b>' + upcomingSessions.length + '</b><span>Upcoming sessions</span></div><div class="dash-stat"><b>' + (profile && profile.is_available ? "Available" : "Paused") + '</b><span>Profile visibility</span></div></div>' +
     tutorVerificationPanel(status) +
-    '<div class="dash-grid"><section class="box"><div class="dash-heading"><div><b>Your mentor profile</b><p class="muted">' + esc(profile ? profile.headline || "Add a headline" : "Create your profile so learners can find you.") + '</p></div><button class="btn ghost" data-edit-tutor>Edit profile</button></div><p class="muted">Subjects: ' + esc(profile && profile.subjects ? profile.subjects.join(", ") : "Not set") + '<br>School: ' + esc(user.location && user.location.school || "—") + '<br>Location: ' + esc(user.location ? [user.location.city,user.location.state,user.location.country].join(", ") : "—") + '</p><label class="availability"><input type="checkbox" data-available ' + (profile && profile.is_available ? "checked" : "") + ' ' + (!profile || !status || status.status !== "verified" ? "disabled" : "") + '> Show my profile in mentor search</label></section><section class="box"><b>Privacy</b><p class="muted">Your school and location appear on your mentor profile only after verification. Learner locations are shared with the mentor receiving their request.</p></section></div>' +
-    '<section class="box request-box"><div class="dash-heading"><div><b>Student requests</b><p class="muted">Accept requests from classmates you can help.</p></div></div><div class="location-filters"><select id="requestStateFilter"><option value="">All states</option>' + states.map(function (s) { return '<option' + (s === requestLocationState ? ' selected' : '') + '>' + esc(s) + '</option>'; }).join("") + '</select><select id="requestCityFilter"><option value="">All cities</option>' + cities.map(function (s) { return '<option' + (s === requestLocationCity ? ' selected' : '') + '>' + esc(s) + '</option>'; }).join("") + '</select></div>' + (filteredRequests.length ? filteredRequests.map(function (r) { return '<article class="request-row"><div><b>' + esc(r.display_name || "Student") + '</b><p class="muted">Class ' + esc(String(r.grade || "—")) + ' · ' + esc([r.school,r.city,r.state,r.country].filter(Boolean).join(", ") || "Location not added") + ' · ' + esc(r.status) + '</p></div>' + (r.status === "pending" ? '<div class="row"><button class="btn" data-request-action="accepted" data-request-id="' + esc(r.connection_id) + '">Accept</button><button class="btn ghost" data-request-action="rejected" data-request-id="' + esc(r.connection_id) + '">Decline</button></div>' : '') + '</article>'; }).join("") : '<p class="muted">No student requests match those filters.</p>') + '</section>';
+    '<div class="dash-grid"><section class="box"><div class="dash-heading"><div><b>Your mentor profile</b><p class="muted">' + esc(profile ? profile.headline || "Add a headline" : "Create your profile so learners can find you.") + '</p></div><button class="btn ghost" data-edit-tutor>Edit profile</button></div><p class="muted">Subjects: ' + esc(profile && profile.subjects ? profile.subjects.join(", ") : "Not set") + '<br>School: ' + esc(user.location && user.location.school || "—") + '<br>Location: ' + esc(user.location ? [user.location.city,user.location.state,user.location.country].join(", ") : "—") + '</p><label class="availability"><input type="checkbox" data-available ' + (profile && profile.is_available ? "checked" : "") + ' ' + (!profile || !status || status.status !== "verified" ? "disabled" : "") + '> Show my profile in mentor search</label></section><section class="box"><b>Session privacy</b><p class="muted">Learners request a 30-minute session directly. Chat unlocks only after you accept and only for that booked time.</p><a class="btn ghost" href="#sessions">View sessions</a></section></div>' +
+    '<section class="box request-box"><div class="dash-heading"><div><b>Booking requests</b><p class="muted">Accept or decline requests for a scheduled learning session.</p></div></div>' + bookingRows + '</section>';
   body.insertAdjacentHTML("beforeend", status && status.status === "verified" ? scheduleManagerMarkup() : '<section class="box schedule-manage"><h2>Scheduling</h2><p class="muted">Finish mentor verification before blocking unavailable times. Peer Connect sets the daily 30-minute booking slots.</p></section>');
   if (status && status.status === "verified") loadMentorScheduleControls();
-  document.getElementById("requestStateFilter").onchange = function (event) { requestLocationState = event.target.value; requestLocationCity = ""; drawTutorDashboard(); };
-  document.getElementById("requestCityFilter").onchange = function (event) { requestLocationCity = event.target.value; drawTutorDashboard(); };
 }
 document.getElementById("tutorDashboardBody").addEventListener("click", async function (e) {
-  var action = e.target.closest("[data-request-action]");
-  if (action) {
-    action.disabled = true;
-    var result = await supabaseClient.from("connections").update({ status: action.dataset.requestAction }).eq("id", action.dataset.requestId).eq("recipient_id", user.id);
+  var sessionAction = e.target.closest("[data-session-action]");
+  if (sessionAction) {
+    sessionAction.disabled = true;
+    var result = await supabaseClient.from("peer_sessions").update({ status: sessionAction.dataset.sessionAction }).eq("id", sessionAction.dataset.sessionId).eq("mentor_id", user.id);
     if (result.error) window.alert(authErrorText(result.error));
     await drawTutorDashboard();
   } else if (e.target.closest("[data-edit-tutor]")) openTutor();
@@ -1970,8 +1909,8 @@ function drawMe() {
   var h = "";
   var mu = 'style="margin:6px 0 12px;color:var(--muted)"';
   h += '<div class="box"><b>Account</b><p ' + mu + '>' + (user ? esc(user.n) + " · " + esc(user.e) + "<br>" + accountTypeLabel(user.role) + " · Class " + esc(String(user.grade || "")) + '<br>' + esc(user.location ? [user.location.school,user.location.city,user.location.state,user.location.country].join(" · ") : "Location not set") : "You are not signed in.") + '</p>' + (user ? '<button class="btn ghost" data-edit-details>Edit profile details</button><div class="profile-appearance"><label class="btn ghost">Change profile photo<input type="file" accept="image/jpeg,image/png,image/webp" data-profile-image="avatar"></label><label class="btn ghost">Change banner<input type="file" accept="image/jpeg,image/png,image/webp" data-profile-image="banner"></label></div><div class="profile-social" id="myFollowStats">Loading followers…</div>' : '<button class="btn" data-go="signin">Sign up / Sign in</button>') + '</div>';
-  h += '<div class="box"><b>Connections</b><p ' + mu + '>Connect with mentors and peers. Guidance tools are available to every learner.</p><a class="btn ghost" href="#tutors">Find a mentor</a></div>';
-  h += '<div class="box"><b>Mentor profile</b><p ' + mu + '>' + (canMentor(user) ? 'Your mentor tools and incoming requests are on your <a href="#dashboard">dashboard</a>.' : 'Want to guide learners in lower classes? Choose Mentor or Both in your profile.') + '</p>' + (canMentor(user) ? '<a class="btn" href="#dashboard">Mentor dashboard</a>' : '') + '</div>';
+  h += '<div class="box"><b>Sessions</b><p ' + mu + '>Book verified mentors directly and manage confirmed session chats.</p><a class="btn ghost" href="#sessions">View sessions</a> <a class="btn ghost" href="#tutors">Find a mentor</a></div>';
+  h += '<div class="box"><b>Mentor profile</b><p ' + mu + '>' + (canMentor(user) ? 'Your mentor tools and booking requests are on your <a href="#dashboard">dashboard</a>.' : 'Want to guide learners in lower classes? Choose Mentor or Both in your profile.') + '</p>' + (canMentor(user) ? '<a class="btn" href="#dashboard">Mentor dashboard</a>' : '') + '</div>';
   var w = who();
   var mp = posts.filter(function (p) { return p.n === w.n; });
   h += '<div class="box"><b>Your doubts (' + mp.length + ')</b>' + (mp.length ? '<ul style="margin:8px 0 0;padding-left:20px">' + mp.map(function (p) { return "<li>" + esc(p.t) + "</li>"; }).join("") + '</ul>' : '<p ' + mu + '>You have not asked a doubt yet.</p><a class="btn ghost" href="#doubts">Ask a doubt</a>') + '</div>';
