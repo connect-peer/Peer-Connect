@@ -1025,7 +1025,7 @@ document.querySelectorAll('[data-nav="verification"]').forEach(function (link) {
 
 var scheduleMentors = [], scheduleTypes = [], scheduleSlots = [], scheduleSlotsContext = null;
 var selectedScheduleSlotIndex = null;
-var activeChatSession = null, sessionChatPoll = null, sessionChatSignature = "", sessionChatSignedAt = 0, sessionChatBusy = false;
+var activeChatSession = null, sessionChatPoll = null, sessionChatClock = null, sessionChatSignature = "", sessionChatSignedAt = 0, sessionChatBusy = false;
 function isoTodayIn(timezone) {
   var parts = new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
   var values = {}; parts.forEach(function (part) { values[part.type] = part.value; });
@@ -1162,7 +1162,6 @@ async function loadPeerSessionList() {
     var isMentor = row.mentor_id === user.id, actions = "", chatControl = "", now = Date.now();
     if (isMentor && row.status === "pending") actions = '<button class="btn" data-session-action="confirmed" data-session-id="'+esc(row.id)+'">Confirm</button><button class="btn ghost" data-session-action="declined" data-session-id="'+esc(row.id)+'">Decline</button>';
     if (isMentor && row.status === "confirmed") actions = '<button class="btn" data-session-action="completed" data-session-id="'+esc(row.id)+'">Mark completed</button><button class="btn ghost" data-session-action="no_show" data-session-id="'+esc(row.id)+'">Mark no-show</button>';
-    if (["pending","confirmed"].includes(row.status)) actions += '<button class="btn ghost" data-session-action="cancelled" data-session-id="'+esc(row.id)+'">Cancel</button>';
     var starts = new Date(row.starts_at).getTime(), ends = new Date(row.ends_at).getTime();
     if (row.status === "confirmed") {
       if (now >= ends) chatControl = '<button class="btn ghost" data-session-chat="'+esc(row.id)+'">View chat history</button>';
@@ -1211,22 +1210,48 @@ function sessionChatCanSend(session) {
   var now = Date.now();
   return !!(user && session && session.status === "confirmed" && (session.learner_id === user.id || session.mentor_id === user.id) && now >= new Date(session.starts_at).getTime() && now < new Date(session.ends_at).getTime());
 }
+function sessionCountdown(milliseconds) {
+  var total = Math.max(0, Math.floor(milliseconds / 1000));
+  var days = Math.floor(total / 86400), hours = Math.floor((total % 86400) / 3600), minutes = Math.floor((total % 3600) / 60), seconds = total % 60;
+  if (days) return days + "d " + hours + "h " + minutes + "m";
+  return (hours ? String(hours).padStart(2, "0") + ":" : "") + String(minutes).padStart(2, "0") + ":" + String(seconds).padStart(2, "0");
+}
 function updateSessionChatComposer() {
-  var state = document.getElementById("sessionChatState"), text = document.getElementById("sessionChatText"), file = document.getElementById("sessionChatFile"), send = document.getElementById("sessionChatSend");
+  var state = document.getElementById("sessionChatState"), text = document.getElementById("sessionChatText"), file = document.getElementById("sessionChatFile"), send = document.getElementById("sessionChatSend"), participant = document.getElementById("sessionChatParticipant"), timer = document.getElementById("sessionChatTimeRemaining"), cancel = document.getElementById("sessionChatCancel");
   if (!state || !activeChatSession) return;
   var now = Date.now(), start = new Date(activeChatSession.starts_at).getTime(), end = new Date(activeChatSession.ends_at).getTime(), writable = sessionChatCanSend(activeChatSession);
-  state.textContent = writable ? "Your booked chat is open. Keep it focused on learning; don’t share private contact or home details." : (now < start && activeChatSession.status === "confirmed" ? "This chat opens at " + sessionTime(activeChatSession.starts_at, activeChatSession.timezone) + "." : (activeChatSession.status === "pending" ? "Chat unlocks after the mentor confirms the booking." : (activeChatSession.status === "confirmed" && now < end ? "This chat is temporarily unavailable." : "This session has ended. You can read its history, but can’t send more messages.")));
+  var isMentor = activeChatSession.mentor_id === user.id, peer = relationRow(isMentor ? activeChatSession.learner : activeChatSession.mentor);
+  var peerGrade = isMentor && peer.grade ? "Class " + String(peer.grade).replace(/^Class\s*/i, "") : "";
+  if (participant) participant.innerHTML = '<span class="community-kicker">' + (isMentor ? "LEARNER" : "MENTOR") + '</span><b>' + esc(peer.display_name || (isMentor ? "Learner" : "Mentor")) + '</b>' + (peerGrade ? '<span>' + esc(peerGrade) + '</span>' : '');
+  if (timer) {
+    if (["cancelled", "declined"].includes(activeChatSession.status)) timer.textContent = "Session cancelled";
+    else if (["completed", "no_show"].includes(activeChatSession.status) || now >= end) timer.textContent = "Session ended";
+    else if (activeChatSession.status === "pending") timer.textContent = "Awaiting mentor confirmation";
+    else if (now < start) timer.textContent = "Starts in " + sessionCountdown(start - now);
+    else timer.textContent = "Time remaining " + sessionCountdown(end - now);
+  }
+  if (["cancelled", "declined"].includes(activeChatSession.status)) state.textContent = "This session was cancelled. The chat is read-only.";
+  else if (activeChatSession.status === "completed" || activeChatSession.status === "no_show") state.textContent = "This session has ended. You can read its history, but can’t send more messages.";
+  else state.textContent = writable ? "Your booked chat is open. Keep it focused on learning; don’t share private contact or home details." : (now < start && activeChatSession.status === "confirmed" ? "This chat opens at " + sessionTime(activeChatSession.starts_at, activeChatSession.timezone) + "." : (activeChatSession.status === "pending" ? "Chat unlocks after the mentor confirms the booking." : (activeChatSession.status === "confirmed" && now < end ? "This chat is temporarily unavailable." : "This session has ended. You can read its history, but can’t send more messages.")));
   if (text) text.disabled = !writable || sessionChatBusy;
   if (file) file.disabled = !writable || sessionChatBusy;
   if (send) send.disabled = !writable || sessionChatBusy;
+  if (cancel) { cancel.hidden = !["pending", "confirmed"].includes(activeChatSession.status) || now >= end; cancel.disabled = sessionChatBusy; }
   var close = document.getElementById("sessionChatClose"); if (close) close.disabled = sessionChatBusy;
 }
 function sessionChatTime(value) {
   return new Intl.DateTimeFormat(undefined, { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }
+async function refreshSessionChatState() {
+  if (!activeChatSession || !user || !supabaseClient) return;
+  var current = activeChatSession, result = await supabaseClient.from("peer_sessions").select("status,starts_at,ends_at,timezone").eq("id", current.id).maybeSingle();
+  if (result.error || !result.data || !activeChatSession || activeChatSession.id !== current.id) return;
+  Object.assign(activeChatSession, result.data);
+  updateSessionChatComposer();
+}
 async function openSessionChat(sessionId) {
   if (!user || !supabaseClient) return;
-  var result = await supabaseClient.from("peer_sessions").select("id,learner_id,mentor_id,starts_at,ends_at,timezone,status,learner:profiles!peer_sessions_learner_id_fkey(display_name),mentor:profiles!peer_sessions_mentor_id_fkey(display_name)").eq("id", sessionId).maybeSingle();
+  var result = await supabaseClient.from("peer_sessions").select("id,learner_id,mentor_id,starts_at,ends_at,timezone,status,learner:profiles!peer_sessions_learner_id_fkey(display_name,grade),mentor:profiles!peer_sessions_mentor_id_fkey(display_name,grade)").eq("id", sessionId).maybeSingle();
   if (result.error || !result.data) { window.alert(result.error ? authErrorText(result.error) : "This session could not be found."); return; }
   var row = result.data;
   if (row.learner_id !== user.id && row.mentor_id !== user.id) { window.alert("Only the people in this session can open its chat."); return; }
@@ -1239,7 +1264,9 @@ async function openSessionChat(sessionId) {
   if (!dialog.open) dialog.showModal();
   await loadSessionChatMessages();
   if (sessionChatPoll) clearInterval(sessionChatPoll);
-  sessionChatPoll = setInterval(function () { loadSessionChatMessages(); updateSessionChatComposer(); }, 3000);
+  if (sessionChatClock) clearInterval(sessionChatClock);
+  sessionChatPoll = setInterval(function () { loadSessionChatMessages(); refreshSessionChatState(); }, 3000);
+  sessionChatClock = setInterval(updateSessionChatComposer, 1000);
 }
 async function loadSessionChatMessages() {
   if (!activeChatSession || !user || !supabaseClient) return;
@@ -1272,10 +1299,25 @@ async function loadSessionChatMessages() {
 }
 document.getElementById("sessionChatDialog").addEventListener("close", function () {
   if (sessionChatPoll) clearInterval(sessionChatPoll);
-  sessionChatPoll = null; activeChatSession = null; sessionChatSignature = "";
+  if (sessionChatClock) clearInterval(sessionChatClock);
+  sessionChatPoll = null; sessionChatClock = null; activeChatSession = null; sessionChatSignature = "";
 });
 document.getElementById("sessionChatDialog").addEventListener("cancel", function (event) { if (sessionChatBusy) event.preventDefault(); });
 document.getElementById("sessionChatClose").addEventListener("click", function () { document.getElementById("sessionChatDialog").close(); });
+document.getElementById("sessionChatCancel").addEventListener("click", async function () {
+  if (!activeChatSession || !user || sessionChatBusy || !["pending", "confirmed"].includes(activeChatSession.status)) return;
+  if (!window.confirm("Cancel this booked session? The chat will become read-only for both people.")) return;
+  var button = this, sessionId = activeChatSession.id;
+  sessionChatBusy = true;
+  updateSessionChatComposer();
+  var result = await supabaseClient.from("peer_sessions").update({ status: "cancelled" }).eq("id", sessionId).or("learner_id.eq." + user.id + ",mentor_id.eq." + user.id);
+  if (result.error) { document.getElementById("sessionChatStatus").textContent = authErrorText(result.error); sessionChatBusy = false; updateSessionChatComposer(); return; }
+  activeChatSession.status = "cancelled";
+  document.getElementById("sessionChatStatus").textContent = "Session cancelled. The chat is now read-only.";
+  sessionChatBusy = false;
+  updateSessionChatComposer();
+  await loadPeerSessionList();
+});
 document.getElementById("sessionChatForm").addEventListener("submit", async function (event) {
   event.preventDefault();
   if (!activeChatSession || !sessionChatCanSend(activeChatSession) || sessionChatBusy) return;
