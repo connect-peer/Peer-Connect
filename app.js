@@ -1197,7 +1197,13 @@ async function loadPeerSessionList() {
   var rows = result.data || [];
   if (!rows.length) { root.innerHTML = '<div class="community-empty">No sessions yet. Accepted connections can schedule here.</div>'; return; }
   var now = Date.now(); rows.sort(function(a,b){return new Date(a.starts_at)-new Date(b.starts_at);});
-  var upcoming = rows.filter(function(row){return new Date(row.starts_at).getTime()>=now && ["pending","confirmed"].includes(row.status);});
+  // Keep a confirmed session in the visible Upcoming list for its full duration.
+  // Otherwise a session already underway gets tucked into the collapsed history,
+  // hiding its chat button exactly when the participants need it.
+  var upcoming = rows.filter(function(row){
+    if (row.status === "confirmed") return new Date(row.ends_at).getTime() >= now;
+    return row.status === "pending" && new Date(row.starts_at).getTime() >= now;
+  });
   var previous = rows.filter(function(row){return !upcoming.includes(row);}).reverse();
   function rowHtml(row) {
     var learner=relationRow(row.learner), mentor=relationRow(row.mentor);
@@ -1209,7 +1215,7 @@ async function loadPeerSessionList() {
     if (row.status === "confirmed") {
       if (now >= ends) chatControl = '<button class="btn ghost" data-session-chat="'+esc(row.id)+'">View chat history</button>';
       else if (now >= starts) chatControl = '<button class="btn" data-session-chat="'+esc(row.id)+'">Open session chat</button>';
-      else chatControl = '<span class="session-chat-locked">Chat opens '+esc(sessionTime(row.starts_at,row.timezone))+'</span>';
+      else chatControl = '<button class="btn ghost session-chat-locked" type="button" disabled title="The booked chat opens when the session starts">Chat opens '+esc(sessionTime(row.starts_at,row.timezone))+'</button>';
     } else if (["completed","no_show","cancelled"].includes(row.status) && starts <= now) {
       chatControl = '<button class="btn ghost" data-session-chat="'+esc(row.id)+'">View chat history</button>';
     } else if (row.status === "pending") {
