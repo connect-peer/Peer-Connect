@@ -94,7 +94,7 @@ function draw() {
       return (
         '<article class="card" data-profile-index="' + i + '" tabindex="0" aria-label="View ' + esc(t.n) + ' mentor profile"><div class="cover mentor-card-cover" style="--c:' +
         t.c +
-        '"><span class="mentor-card-kicker">Verified mentor</span></div><div class="body">' +
+        '">' + (t.bannerUrl ? '<img class="mentor-banner-img" src="' + esc(t.bannerUrl) + '" alt="" loading="lazy">' : '') + '<span class="mentor-card-kicker">Verified mentor</span></div><div class="body">' +
         '<div class="av">' +
         (t.avatarUrl ? '<img src="' + esc(t.avatarUrl) + '" alt="">' : ini(t.n)) +
         "</div>" +
@@ -257,6 +257,8 @@ async function uploadProfileImage(file, kind) {
     renderTutorProfilePage();
   }
   if (curRoute === "me") drawMe();
+  var ownTutor = tutors.find(function (tutor) { return tutor.user_id === user.id; });
+  if (ownTutor) { if (kind === "avatar") ownTutor.avatarUrl = url; else ownTutor.bannerUrl = url; draw(); }
 }
 
 async function loadTutorDirectory() {
@@ -1176,15 +1178,21 @@ async function loadPeerSessionList() {
   root.innerHTML = '<h3>Upcoming</h3>'+(upcoming.length?upcoming.map(rowHtml).join(""):'<p class="muted">No upcoming sessions.</p>')+'<details><summary>Past and cancelled · '+previous.length+'</summary>'+(previous.length?previous.map(rowHtml).join(""):'<p class="muted">Nothing here yet.</p>')+'</details>';
 }
 async function loadPeerSessionsPage() {
-  var note = document.getElementById("sessionPageNote"), layout = document.querySelector(".sessions-only-layout"), bookingHelp = document.getElementById("sessionBookingHelp");
-  var mentorOnly = !!user && canMentor(user) && !canLearn(user);
-  if (layout) layout.classList.toggle("mentor-view", mentorOnly);
-  if (bookingHelp) bookingHelp.hidden = mentorOnly;
-  if (note) note.textContent = !user ? "Sign in to view your booked sessions." : (canMentor(user) && !canLearn(user) ? "Review and manage the sessions learners have booked with you." : (canMentor(user) ? "Your sessions appear here as a learner and as a mentor. Book from the mentor’s profile." : "Your booked sessions appear here. To book, open a mentor profile and choose Book a session."));
+  var note = document.getElementById("sessionPageNote"), tools = document.getElementById("mentorScheduleTools");
+  if (note) note.textContent = !user ? "Sign in to view your booked sessions." : (canMentor(user) && !canLearn(user) ? "Review learner bookings and block times you are unavailable." : (canMentor(user) ? "Your bookings appear here as a learner and a mentor." : "Your booked sessions and chats appear here."));
+  if (tools) { tools.hidden = true; tools.innerHTML = ""; }
   if (!user) {
     var root = document.getElementById("sessionList");
     if (root) root.innerHTML = '<div class="community-empty">Sign in to see your session requests and chats.</div><button type="button" class="btn" data-schedule-signin>Sign in</button>';
     return;
+  }
+  if (canMentor(user) && tools) {
+    var statusResult = await supabaseClient.from("tutor_verification_requests").select("status").eq("user_id", user.id).order("submitted_at", { ascending: false }).limit(1);
+    var latestStatus = statusResult.data && statusResult.data[0];
+    tools.hidden = false;
+    if (statusResult.error) tools.innerHTML = '<p class="muted">Could not load availability settings: ' + esc(authErrorText(statusResult.error)) + '</p>';
+    else if (latestStatus && latestStatus.status === "verified") { tools.innerHTML = scheduleManagerMarkup(); await loadMentorScheduleControls(); }
+    else tools.innerHTML = '<h2>Availability</h2><p class="muted">Complete mentor verification before you can block booking times.</p><a class="btn ghost" href="#dashboard">Open mentor dashboard</a>';
   }
   await loadPeerSessionList();
 }
@@ -1295,20 +1303,20 @@ document.getElementById("sessionChatForm").addEventListener("submit", async func
   } finally { sessionChatBusy = false; updateSessionChatComposer(); }
 });
 function scheduleManagerMarkup() {
-  return '<section class="box schedule-manage"><div class="social-feed-title"><div><span class="community-kicker">MENTOR TOOLS</span><h2>Unavailable times</h2></div><a class="btn ghost" href="#sessions">Manage sessions</a></div><p class="muted">Peer Connect sets 30-minute booking slots every day from 8:00 AM to 8:00 PM IST. Add a blocked period for times you cannot meet.</p><form class="schedule-form" data-schedule-form="block"><label>Block from (IST)<input name="starts_at" type="datetime-local" required></label><label>Until (IST)<input name="ends_at" type="datetime-local" required></label><button class="btn" type="submit">Block time</button></form><div id="blockedTimeList" class="schedule-manage-list"></div><div id="scheduleManageMessage" class="social-message" role="status"></div></section>';
+  return '<div class="schedule-manage"><div class="social-feed-title"><div><span class="community-kicker">MENTOR TOOLS</span><h2>Unavailable times</h2></div></div><p class="muted">Peer Connect sets 30-minute booking slots every day from 8:00 AM to 8:00 PM IST. Add a blocked period for times you cannot meet.</p><form class="schedule-form" data-schedule-form="block"><label>Block from (IST)<input name="starts_at" type="datetime-local" required></label><label>Until (IST)<input name="ends_at" type="datetime-local" required></label><button class="btn" type="submit">Block time</button></form><div id="blockedTimeList" class="schedule-manage-list"></div><div id="scheduleManageMessage" class="social-message" role="status"></div></div>';
 }
 async function loadMentorScheduleControls() {
   var root=document.getElementById("blockedTimeList"); if(!root||!user)return;
   var result=await supabaseClient.from("peer_blocked_times").select("id,starts_at,ends_at,timezone").eq("mentor_id",user.id).gte("ends_at",new Date().toISOString()).order("starts_at").limit(20);
   root.innerHTML=result.error?'<span>'+esc(authErrorText(result.error))+'</span>':(result.data||[]).map(function(row){return '<div>Unavailable · '+esc(sessionTime(row.starts_at,row.timezone))+' to '+esc(sessionTime(row.ends_at,row.timezone))+' <button class="act" data-schedule-delete="block" data-id="'+esc(row.id)+'">Remove</button></div>';}).join("")||"No blocked times.";
 }
-document.getElementById("tutorDashboardBody").addEventListener("submit",async function(event){
+document.getElementById("sessions").addEventListener("submit",async function(event){
   var form=event.target.closest("[data-schedule-form]"); if(!form)return; event.preventDefault(); if(!user)return;
   var data=new FormData(form), row={mentor_id:user.id,starts_at:zonedInputToIso(data.get("starts_at"),"Asia/Kolkata"),ends_at:zonedInputToIso(data.get("ends_at"),"Asia/Kolkata"),timezone:"Asia/Kolkata",label:"Unavailable"};
   if(!row.starts_at||!row.ends_at||row.starts_at>=row.ends_at){document.getElementById("scheduleManageMessage").textContent="Choose an end time after the start time.";return;}
   var result=await supabaseClient.from("peer_blocked_times").insert(row);var msg=document.getElementById("scheduleManageMessage");msg.textContent=result.error?authErrorText(result.error):"Those times are now blocked.";if(!result.error){form.reset();await loadMentorScheduleControls();}
 });
-document.getElementById("tutorDashboardBody").addEventListener("click",async function(event){var button=event.target.closest("[data-schedule-delete]");if(!button)return;var result=await supabaseClient.from("peer_blocked_times").delete().eq("id",button.dataset.id).eq("mentor_id",user.id);if(result.error)window.alert(authErrorText(result.error));await loadMentorScheduleControls();});
+document.getElementById("sessions").addEventListener("click",async function(event){var button=event.target.closest("[data-schedule-delete]");if(!button)return;var result=await supabaseClient.from("peer_blocked_times").delete().eq("id",button.dataset.id).eq("mentor_id",user.id);if(result.error)window.alert(authErrorText(result.error));await loadMentorScheduleControls();});
 function tutorVerificationPanel(status) {
   if (Number(user && user.grade) < 9 || Number(user && user.grade) > 12) return '<section class="box verify-status"><b>Finish your class details</b><p class="muted">Set your class before submitting mentor verification.</p></section>';
   if (status && status.status === "verified") return '<section class="box verify-status"><b><span class="verify-badge">Verified</span> Your mentor profile is approved</b><p class="muted">Your profile can appear in mentor search while availability is on.</p></section>';
@@ -1343,10 +1351,8 @@ async function drawTutorDashboard() {
   }).join("") : '<p class="muted">No booking requests to review.</p>';
   body.innerHTML = '<div class="dash-stats"><div class="dash-stat"><b>' + pendingSessions.length + '</b><span>Bookings to review</span></div><div class="dash-stat"><b>' + upcomingSessions.length + '</b><span>Upcoming sessions</span></div><div class="dash-stat"><b>' + (profile && profile.is_available ? "Available" : "Paused") + '</b><span>Profile visibility</span></div></div>' +
     tutorVerificationPanel(status) +
-    '<div class="dash-grid"><section class="box"><div class="dash-heading"><div><b>Your mentor profile</b><p class="muted">' + esc(profile ? profile.headline || "Add a headline" : "Create your profile so learners can find you.") + '</p></div><button class="btn ghost" data-edit-tutor>Edit profile</button></div><p class="muted">Subjects: ' + esc(profile && profile.subjects ? profile.subjects.join(", ") : "Not set") + '<br>School: ' + esc(user.location && user.location.school || "—") + '<br>Location: ' + esc(user.location ? [user.location.city,user.location.state,user.location.country].join(", ") : "—") + '</p><label class="availability"><input type="checkbox" data-available ' + (profile && profile.is_available ? "checked" : "") + ' ' + (!profile || !status || status.status !== "verified" ? "disabled" : "") + '> Show my profile in mentor search</label></section><section class="box"><b>Session privacy</b><p class="muted">Learners request a 30-minute session directly. Chat unlocks only after you accept and only for that booked time.</p><a class="btn ghost" href="#sessions">View sessions</a></section></div>' +
+    '<div class="dash-grid"><section class="box"><div class="dash-heading"><div><b>Your mentor profile</b><p class="muted">' + esc(profile ? profile.headline || "Add a headline" : "Create your profile so learners can find you.") + '</p></div><button class="btn ghost" data-edit-tutor>Edit profile</button></div><p class="muted">Subjects: ' + esc(profile && profile.subjects ? profile.subjects.join(", ") : "Not set") + '<br>School: ' + esc(user.location && user.location.school || "—") + '<br>Location: ' + esc(user.location ? [user.location.city,user.location.state,user.location.country].join(", ") : "—") + '</p><label class="availability"><input type="checkbox" data-available ' + (profile && profile.is_available ? "checked" : "") + ' ' + (!profile || !status || status.status !== "verified" ? "disabled" : "") + '> Show my profile in mentor search</label></section></div>' +
     '<section class="box request-box"><div class="dash-heading"><div><b>Booking requests</b><p class="muted">Accept or decline requests for a scheduled learning session.</p></div></div>' + bookingRows + '</section>';
-  body.insertAdjacentHTML("beforeend", status && status.status === "verified" ? scheduleManagerMarkup() : '<section class="box schedule-manage"><h2>Scheduling</h2><p class="muted">Finish mentor verification before blocking unavailable times. Peer Connect sets the daily 30-minute booking slots.</p></section>');
-  if (status && status.status === "verified") loadMentorScheduleControls();
 }
 document.getElementById("tutorDashboardBody").addEventListener("click", async function (e) {
   var sessionAction = e.target.closest("[data-session-action]");
@@ -1919,7 +1925,6 @@ function drawMe() {
   var h = "";
   var mu = 'style="margin:6px 0 12px;color:var(--muted)"';
   h += '<div class="box"><b>Account</b><p ' + mu + '>' + (user ? esc(user.n) + " · " + esc(user.e) + "<br>" + accountTypeLabel(user.role) + " · Class " + esc(String(user.grade || "")) + '<br>' + esc(user.location ? [user.location.school,user.location.city,user.location.state,user.location.country].join(" · ") : "Location not set") : "You are not signed in.") + '</p>' + (user ? '<button class="btn ghost" data-edit-details>Edit profile details</button><div class="profile-appearance"><label class="btn ghost">Change profile photo<input type="file" accept="image/jpeg,image/png,image/webp" data-profile-image="avatar"></label><label class="btn ghost">Change banner<input type="file" accept="image/jpeg,image/png,image/webp" data-profile-image="banner"></label></div><div class="profile-social" id="myFollowStats">Loading followers…</div>' : '<button class="btn" data-go="signin">Sign up / Sign in</button>') + '</div>';
-  h += '<div class="box"><b>Sessions</b><p ' + mu + '>Book verified mentors directly and manage confirmed session chats.</p><a class="btn ghost" href="#sessions">View sessions</a> <a class="btn ghost" href="#home">Find a mentor</a></div>';
   h += '<div class="box"><b>Mentor profile</b><p ' + mu + '>' + (canMentor(user) ? 'Your mentor tools and booking requests are on your <a href="#dashboard">dashboard</a>.' : 'Want to guide learners in lower classes? Choose Mentor or Both in your profile.') + '</p>' + (canMentor(user) ? '<a class="btn" href="#dashboard">Mentor dashboard</a>' : '') + '</div>';
   var w = who();
   var mp = posts.filter(function (p) { return p.n === w.n; });
