@@ -1084,6 +1084,7 @@ document.querySelectorAll('[data-nav="verification"]').forEach(function (link) {
 var requestLocationState = "", requestLocationCity = "";
 var scheduleConnections = [], scheduleTypes = [], scheduleSlots = [], scheduleSlotsContext = null;
 var selectedScheduleSlotIndex = null;
+var activeChatSession = null, sessionChatPoll = null, sessionChatSignature = "", sessionChatSignedAt = 0, sessionChatBusy = false;
 function isoTodayIn(timezone) {
   var parts = new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
   var values = {}; parts.forEach(function (part) { values[part.type] = part.value; });
@@ -1200,11 +1201,21 @@ async function loadPeerSessionList() {
   var previous = rows.filter(function(row){return !upcoming.includes(row);}).reverse();
   function rowHtml(row) {
     var learner=relationRow(row.learner), mentor=relationRow(row.mentor);
-    var isMentor = row.mentor_id === user.id, actions = "";
+    var isMentor = row.mentor_id === user.id, actions = "", chatControl = "", now = Date.now();
     if (isMentor && row.status === "pending") actions = '<button class="btn" data-session-action="confirmed" data-session-id="'+esc(row.id)+'">Confirm</button><button class="btn ghost" data-session-action="declined" data-session-id="'+esc(row.id)+'">Decline</button>';
     if (isMentor && row.status === "confirmed") actions = '<button class="btn" data-session-action="completed" data-session-id="'+esc(row.id)+'">Mark completed</button><button class="btn ghost" data-session-action="no_show" data-session-id="'+esc(row.id)+'">Mark no-show</button>';
     if (["pending","confirmed"].includes(row.status)) actions += '<button class="btn ghost" data-session-action="cancelled" data-session-id="'+esc(row.id)+'">Cancel</button>';
-    return '<article class="session-row"><b>30-minute session · '+esc(row.status.replace("_"," "))+'</b><p>'+esc(isMentor ? (learner.display_name || "Learner") : (mentor.display_name || "Mentor"))+' · '+esc(sessionTime(row.starts_at,row.timezone))+'</p>'+(row.learner_note?'<p>Note: '+esc(row.learner_note)+'</p>':'')+(actions?'<div class="session-actions">'+actions+'</div>':'')+'</article>';
+    var starts = new Date(row.starts_at).getTime(), ends = new Date(row.ends_at).getTime();
+    if (row.status === "confirmed") {
+      if (now >= ends) chatControl = '<button class="btn ghost" data-session-chat="'+esc(row.id)+'">View chat history</button>';
+      else if (now >= starts) chatControl = '<button class="btn" data-session-chat="'+esc(row.id)+'">Open session chat</button>';
+      else chatControl = '<span class="session-chat-locked">Chat opens '+esc(sessionTime(row.starts_at,row.timezone))+'</span>';
+    } else if (["completed","no_show","cancelled"].includes(row.status) && starts <= now) {
+      chatControl = '<button class="btn ghost" data-session-chat="'+esc(row.id)+'">View chat history</button>';
+    } else if (row.status === "pending") {
+      chatControl = '<span class="session-chat-locked">Chat opens after the mentor confirms</span>';
+    }
+    return '<article class="session-row"><b>30-minute session · '+esc(row.status.replace("_"," "))+'</b><p>'+esc(isMentor ? (learner.display_name || "Learner") : (mentor.display_name || "Mentor"))+' · '+esc(sessionTime(row.starts_at,row.timezone))+'</p>'+(row.learner_note?'<p>Note: '+esc(row.learner_note)+'</p>':'')+((actions||chatControl)?'<div class="session-actions">'+actions+chatControl+'</div>':'')+'</article>';
   }
   root.innerHTML = '<h3>Upcoming</h3>'+(upcoming.length?upcoming.map(rowHtml).join(""):'<p class="muted">No upcoming sessions.</p>')+'<details><summary>Past and cancelled · '+previous.length+'</summary>'+(previous.length?previous.map(rowHtml).join(""):'<p class="muted">Nothing here yet.</p>')+'</details>';
 }
@@ -1225,9 +1236,106 @@ async function loadPeerSessionsPage() {
 document.getElementById("refreshSessions").addEventListener("click", loadPeerSessionsPage);
 document.getElementById("bookingForm").addEventListener("click", function(event){if(event.target.closest("[data-schedule-signin]"))openSign();});
 document.getElementById("sessionList").addEventListener("click", async function(event){
+  var chatButton=event.target.closest("[data-session-chat]"); if(chatButton){openSessionChat(chatButton.dataset.sessionChat);return;}
   var button=event.target.closest("[data-session-action]"); if(!button)return; button.disabled=true;
   var result=await supabaseClient.from("peer_sessions").update({status:button.dataset.sessionAction}).eq("id",button.dataset.sessionId);
   if(result.error)window.alert(authErrorText(result.error)); await loadPeerSessionList();
+});
+
+function sessionChatCanSend(session) {
+  var now = Date.now();
+  return !!(user && session && session.status === "confirmed" && (session.learner_id === user.id || session.mentor_id === user.id) && now >= new Date(session.starts_at).getTime() && now < new Date(session.ends_at).getTime());
+}
+function updateSessionChatComposer() {
+  var state = document.getElementById("sessionChatState"), text = document.getElementById("sessionChatText"), file = document.getElementById("sessionChatFile"), send = document.getElementById("sessionChatSend");
+  if (!state || !activeChatSession) return;
+  var now = Date.now(), start = new Date(activeChatSession.starts_at).getTime(), end = new Date(activeChatSession.ends_at).getTime(), writable = sessionChatCanSend(activeChatSession);
+  state.textContent = writable ? "Your booked chat is open. Keep it focused on learning; don’t share private contact or home details." : (now < start && activeChatSession.status === "confirmed" ? "This chat opens at " + sessionTime(activeChatSession.starts_at, activeChatSession.timezone) + "." : (activeChatSession.status === "pending" ? "Chat unlocks after the mentor confirms the booking." : (activeChatSession.status === "confirmed" && now < end ? "This chat is temporarily unavailable." : "This session has ended. You can read its history, but can’t send more messages.")));
+  if (text) text.disabled = !writable || sessionChatBusy;
+  if (file) file.disabled = !writable || sessionChatBusy;
+  if (send) send.disabled = !writable || sessionChatBusy;
+  var close = document.getElementById("sessionChatClose"); if (close) close.disabled = sessionChatBusy;
+}
+function sessionChatTime(value) {
+  return new Intl.DateTimeFormat(undefined, { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+}
+async function openSessionChat(sessionId) {
+  if (!user || !supabaseClient) return;
+  var result = await supabaseClient.from("peer_sessions").select("id,learner_id,mentor_id,starts_at,ends_at,timezone,status,learner:profiles!peer_sessions_learner_id_fkey(display_name),mentor:profiles!peer_sessions_mentor_id_fkey(display_name)").eq("id", sessionId).maybeSingle();
+  if (result.error || !result.data) { window.alert(result.error ? authErrorText(result.error) : "This session could not be found."); return; }
+  var row = result.data;
+  if (row.learner_id !== user.id && row.mentor_id !== user.id) { window.alert("Only the people in this session can open its chat."); return; }
+  activeChatSession = row; sessionChatSignature = ""; sessionChatSignedAt = 0;
+  var dialog = document.getElementById("sessionChatDialog"), title = document.getElementById("sessionChatTitle"), subtitle = document.getElementById("sessionChatSubtitle");
+  var isMentor = row.mentor_id === user.id, peer = relationRow(isMentor ? row.learner : row.mentor);
+  title.textContent = "Chat with " + (peer.display_name || (isMentor ? "Learner" : "Mentor"));
+  subtitle.textContent = "Booked 30-minute session · " + sessionChatTime(row.starts_at) + " (India time)";
+  updateSessionChatComposer();
+  if (!dialog.open) dialog.showModal();
+  await loadSessionChatMessages();
+  if (sessionChatPoll) clearInterval(sessionChatPoll);
+  sessionChatPoll = setInterval(function () { loadSessionChatMessages(); updateSessionChatComposer(); }, 3000);
+}
+async function loadSessionChatMessages() {
+  if (!activeChatSession || !user || !supabaseClient) return;
+  var root = document.getElementById("sessionChatMessages");
+  var result = await supabaseClient.from("peer_session_messages").select("id,session_id,sender_id,content,attachment_path,attachment_name,attachment_type,created_at").eq("session_id", activeChatSession.id).order("created_at", { ascending: true }).limit(200);
+  if (result.error) { root.innerHTML = '<div class="community-empty">Could not load chat: ' + esc(authErrorText(result.error)) + '</div>'; return; }
+  var rows = result.data || [], signature = rows.map(function (row) { return row.id + ":" + row.created_at; }).join("|");
+  if (signature === sessionChatSignature && Date.now() - sessionChatSignedAt < 7 * 60 * 1000) return;
+  sessionChatSignature = signature; sessionChatSignedAt = Date.now();
+  var messages = await Promise.all(rows.map(async function (row) {
+    var signedUrl = "";
+    if (row.attachment_path) {
+      var signed = await supabaseClient.storage.from("session-chat-files").createSignedUrl(row.attachment_path, 600);
+      if (!signed.error && signed.data) signedUrl = signed.data.signedUrl;
+    }
+    var attachment = "";
+    if (signedUrl && row.attachment_type && row.attachment_type.indexOf("image/") === 0) attachment = '<a class="session-chat-file" href="' + esc(signedUrl) + '" target="_blank" rel="noopener"><img src="' + esc(signedUrl) + '" alt="' + esc(row.attachment_name || "Shared image") + '"><span>' + esc(row.attachment_name || "Image") + '</span></a>';
+    else if (signedUrl) attachment = '<a class="session-chat-file session-chat-pdf" href="' + esc(signedUrl) + '" target="_blank" rel="noopener">📄 ' + esc(row.attachment_name || "Open PDF") + '</a>';
+    else if (row.attachment_path) attachment = '<span class="muted">Attachment unavailable</span>';
+    var senderLabel = "You";
+    if (row.sender_id !== user.id) {
+      var otherProfile = row.sender_id === activeChatSession.mentor_id ? relationRow(activeChatSession.mentor) : relationRow(activeChatSession.learner);
+      senderLabel = otherProfile.display_name || "Session participant";
+    }
+    return '<article class="session-chat-message' + (row.sender_id === user.id ? ' mine' : '') + '"><b>' + esc(senderLabel) + '</b><time>' + esc(sessionChatTime(row.created_at)) + '</time>' + (row.content ? '<p>' + esc(row.content) + '</p>' : '') + attachment + '</article>';
+  }));
+  root.innerHTML = messages.join("") || '<div class="community-empty">No messages yet. Use this booked time to work through a study question together.</div>';
+  root.scrollTop = root.scrollHeight;
+  updateSessionChatComposer();
+}
+document.getElementById("sessionChatDialog").addEventListener("close", function () {
+  if (sessionChatPoll) clearInterval(sessionChatPoll);
+  sessionChatPoll = null; activeChatSession = null; sessionChatSignature = "";
+});
+document.getElementById("sessionChatDialog").addEventListener("cancel", function (event) { if (sessionChatBusy) event.preventDefault(); });
+document.getElementById("sessionChatClose").addEventListener("click", function () { document.getElementById("sessionChatDialog").close(); });
+document.getElementById("sessionChatForm").addEventListener("submit", async function (event) {
+  event.preventDefault();
+  if (!activeChatSession || !sessionChatCanSend(activeChatSession) || sessionChatBusy) return;
+  var sendingSession = activeChatSession, text = document.getElementById("sessionChatText"), picker = document.getElementById("sessionChatFile"), status = document.getElementById("sessionChatStatus"), body = text.value.trim(), file = picker.files && picker.files[0];
+  if (!body && !file) { status.textContent = "Write a message or choose a file first."; return; }
+  if (body.length > 2000) { status.textContent = "Messages can be up to 2,000 characters."; return; }
+  var allowed = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+  if (file && (!allowed.includes(file.type) || file.size > 10 * 1024 * 1024)) { status.textContent = "Choose a JPG, PNG, WebP, or PDF up to 10 MB."; return; }
+  sessionChatBusy = true; updateSessionChatComposer(); status.textContent = "Sending…";
+  var path = null, uploadError = null;
+  try {
+    if (file) {
+      var safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-140) || "study-file";
+      path = sendingSession.id + "/" + user.id + "/" + Date.now() + "_" + safeName;
+      var uploaded = await supabaseClient.storage.from("session-chat-files").upload(path, file, { contentType: file.type, upsert: false });
+      if (uploaded.error) throw uploaded.error;
+    }
+    var inserted = await supabaseClient.from("peer_session_messages").insert({ session_id: sendingSession.id, sender_id: user.id, content: body, attachment_path: path, attachment_name: file ? file.name.slice(0, 180) : null, attachment_type: file ? file.type : null });
+    if (inserted.error) throw inserted.error;
+    text.value = ""; picker.value = ""; status.textContent = "Sent."; if (activeChatSession && activeChatSession.id === sendingSession.id) { sessionChatSignature = ""; await loadSessionChatMessages(); }
+  } catch (error) {
+    uploadError = error;
+    if (path) await supabaseClient.storage.from("session-chat-files").remove([path]);
+    status.textContent = authErrorText(uploadError);
+  } finally { sessionChatBusy = false; updateSessionChatComposer(); }
 });
 function scheduleManagerMarkup() {
   return '<section class="box schedule-manage"><div class="social-feed-title"><div><span class="community-kicker">MENTOR TOOLS</span><h2>Unavailable times</h2></div><a class="btn ghost" href="#sessions">Manage sessions</a></div><p class="muted">Peer Connect sets 30-minute booking slots every day from 8:00 AM to 8:00 PM IST. Add a blocked period for times you cannot meet.</p><form class="schedule-form" data-schedule-form="block"><label>Block from (IST)<input name="starts_at" type="datetime-local" required></label><label>Until (IST)<input name="ends_at" type="datetime-local" required></label><button class="btn" type="submit">Block time</button></form><div id="blockedTimeList" class="schedule-manage-list"></div><div id="scheduleManageMessage" class="social-message" role="status"></div></section>';
