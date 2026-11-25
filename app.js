@@ -491,7 +491,11 @@ function missingProfileLocation(location) {
 function showProfileLoadError(error) {
   onboardingOpen = false;
   dlg.classList.remove("auth-screen", "profile-dialog", "setup-dialog");
-  dbody.innerHTML = '<h3 id="dt">Couldn’t load your saved profile</h3><p class="muted">Peer Connect could not read your account setup, so it won’t ask you to fill it in again until the read works.</p><div class="err" id="profileLoadErr" role="alert">' + esc(authErrorText(error)) + '</div><div class="row"><button class="btn ghost" id="retryProfileLoad">Try again</button><button class="btn" id="profileErrorSignOut">Sign out</button></div>';
+  var permissionError = /permission denied for table profiles/i.test(authErrorText(error));
+  var detail = permissionError
+    ? 'Supabase is blocking access to your profile. In Supabase, open SQL Editor and run peer_connect_saved_profile_permissions_fix.sql from your project, then return here and choose Try again.'
+    : authErrorText(error);
+  dbody.innerHTML = '<h3 id="dt">Couldn’t load your saved profile</h3><p class="muted">Peer Connect could not read your account setup, so it won’t ask you to fill it in again until the read works.</p><div class="err" id="profileLoadErr" role="alert">' + esc(detail) + '</div><div class="row"><button class="btn ghost" id="retryProfileLoad">Try again</button><button class="btn" id="profileErrorSignOut">Sign out</button></div>';
   if (!dlg.open) dlg.showModal();
   document.getElementById("retryProfileLoad").onclick = async function () {
     dlg.close();
@@ -912,7 +916,10 @@ var allGuidanceAreas = [
   "Time management", "College and career guidance",
 ];
 async function openTutor() {
-  dlg.classList.remove("profile-dialog");
+  // Sign-in uses a full-screen two-column layout. Clear that class before
+  // reusing the shared dialog for the compact mentor-profile editor.
+  dlg.classList.remove("auth-screen", "profile-dialog", "setup-dialog");
+  dlg.classList.add("profile-dialog");
   if (!user) {
     openSign();
     return;
@@ -1068,7 +1075,8 @@ async function loadOwnMentorAchievements(target) {
 }
 function openMentorAchievementManager() {
   if (!canMentor(user)) return;
-  dlg.classList.remove("auth-screen", "profile-dialog");
+  dlg.classList.remove("auth-screen", "profile-dialog", "setup-dialog");
+  dlg.classList.add("profile-dialog");
   dbody.innerHTML = '<h3>Achievements and credentials</h3><p class="muted">Share exam results, certificates, medals, or other milestones. Your original proof stays private. Learners see only details approved by a reviewer.</p><p class="note">A public file is optional. Upload only a copy with your school ID number, roll number, address, date of birth, QR codes, signatures, and personal contact details hidden. A reviewer must approve it before learners can open it.</p><div id="mentorAchievementManager"><p class="muted">Loading your achievements…</p></div><div class="row"><button type="button" class="btn ghost" id="closeAchievementManager">Close</button><button type="button" class="btn" id="startAchievementForm">Add achievement</button></div>';
   if (!dlg.open) dlg.showModal();
   document.getElementById("closeAchievementManager").onclick = function () { dlg.close(); };
@@ -1079,7 +1087,8 @@ function openMentorAchievementForm() {
   if (!canMentor(user)) return;
   var categories = ["Academic result", "Exam or Olympiad", "Debate and public speaking", "Art and performance", "Sports", "Other"],
     wasOpen = dlg.open;
-  dlg.classList.remove("auth-screen", "profile-dialog");
+  dlg.classList.remove("auth-screen", "profile-dialog", "setup-dialog");
+  dlg.classList.add("profile-dialog");
   dbody.innerHTML = '<h3>Add an achievement</h3><p class="muted">Submit supporting proof privately. Only an approved summary and optional redacted copy can be shown on your profile.</p><label for="achievementCategory">Category</label><select id="achievementCategory">' + categories.map(function (category) { return '<option>' + esc(category) + '</option>'; }).join("") + '</select><label for="achievementTitle">Achievement or result</label><input id="achievementTitle" maxlength="120" placeholder="For example: 92% in Class 10 board exams"><label for="achievementIssuer">Awarded by <span class="muted">(optional)</span></label><input id="achievementIssuer" maxlength="120" placeholder="School, board, or competition"><label for="achievementYear">Year <span class="muted">(optional)</span></label><input id="achievementYear" type="number" min="1900" max="2100" placeholder="2026"><label for="achievementSummary">What should learners know?</label><textarea id="achievementSummary" rows="3" maxlength="500" placeholder="Briefly describe what you achieved or learned."></textarea><div class="verify-doc-fields"><label>Private proof <span class="muted">(required; only you and reviewers can access this)</span><input id="achievementEvidence" type="file" accept="image/jpeg,image/png,image/webp,application/pdf"></label><label>Redacted copy for learners <span class="muted">(optional; reviewed before sharing)</span><input id="achievementPublicCopy" type="file" accept="image/jpeg,image/png,image/webp,application/pdf"></label></div><p class="note">JPG, PNG, WebP, or PDF, up to 5 MB per file. Never upload identity documents or copies that show private numbers, barcodes, QR codes, signatures, home details, or contact information.</p><div class="err" id="achievementError" role="alert"></div><div class="row"><button type="button" class="btn ghost" id="cancelAchievementForm">Cancel</button><button type="button" class="btn" id="submitAchievement">Send for review</button></div>';
   if (!wasOpen && !dlg.open) dlg.showModal();
   document.getElementById("cancelAchievementForm").onclick = function () { openMentorAchievementManager(); };
@@ -2153,6 +2162,9 @@ function drawMe() {
     var location = user.location || {};
     var locationText = [location.city, location.state, location.country].filter(Boolean).join(", ") || "Add your location";
     h = '<div class="me-profile-page"><div class="me-profile-hero"><div class="me-cover" id="myProfileCover"></div><div class="me-identity-row"><div class="me-avatar">' + (user.avatarUrl ? '<img src="' + esc(user.avatarUrl) + '" alt="Profile photo">' : esc(ini(user.n))) + '</div><div class="me-identity-copy"><h3>' + esc(user.n) + '</h3><p>' + esc(accountTypeLabel(user.role)) + ' · Class ' + esc(String(user.grade || "—")) + '</p></div></div></div><div class="me-page-grid"><section class="box me-detail-panel"><h3>Account details</h3><dl class="me-detail-list"><div><dt>Email</dt><dd>' + esc(user.e) + '</dd></div><div><dt>Account type</dt><dd>' + esc(accountTypeLabel(user.role)) + '</dd></div><div><dt>Class</dt><dd>' + esc(String(user.grade || "—")) + '</dd></div><div><dt>School</dt><dd>' + esc(location.school || "Add your school") + '</dd></div><div><dt>Location</dt><dd>' + esc(locationText) + '</dd></div></dl></section><aside class="box me-control-panel"><h3>Profile settings</h3><p class="muted">Keep your profile photo, banner, school, and location up to date.</p><button class="btn me-edit-button" data-edit-details>Edit profile</button><div class="me-image-actions"><label class="btn ghost">Change profile photo<input type="file" accept="image/jpeg,image/png,image/webp" data-profile-image="avatar"></label><label class="btn ghost">Change banner<input type="file" accept="image/jpeg,image/png,image/webp" data-profile-image="banner"></label></div><div class="me-community"><h4>Community</h4><div class="profile-social" id="myFollowStats">Loading followers…</div></div></aside></div></div>';
+    if (canMentor(user)) {
+      h = h.replace('</aside></div></div>', '</aside><section class="box me-achievements-panel"><div class="dash-heading"><div><h3>Achievements and credentials</h3><p class="muted">Add exam results, certificates, medals, or other milestones here. Approved highlights appear on your mentor profile.</p></div><button type="button" class="btn" data-profile-achievements>Manage achievements</button></div><div id="myMentorAchievements"><p class="muted">Loading your achievements…</p></div></section></div></div>');
+    }
   }
   document.getElementById("meBody").innerHTML = h;
   if (user && user.bannerUrl) {
@@ -2160,6 +2172,8 @@ function drawMe() {
     if (cover) cover.style.backgroundImage = 'url("' + user.bannerUrl.replace(/["\\\\]/g, "") + '")';
   }
   document.querySelectorAll('#meBody [data-profile-image]').forEach(function (input) { input.onchange = async function () { if (input.files[0]) await uploadProfileImage(input.files[0], input.dataset.profileImage); }; });
+  var myAchievements = document.getElementById("myMentorAchievements");
+  if (myAchievements) loadOwnMentorAchievements(myAchievements);
   if (user) loadProfileSocialForMe();
 }
 async function loadProfileSocialForMe() {
@@ -2171,6 +2185,7 @@ async function loadProfileSocialForMe() {
   target.innerHTML = '<span><b>' + (results[0].count || 0) + '</b> followers</span><span><b>' + (results[1].count || 0) + '</b> following</span>';
 }
 document.getElementById("meBody").addEventListener("click", function (e) {
+  if (e.target.closest("[data-profile-achievements]")) { openMentorAchievementManager(); return; }
   var b = e.target.closest("[data-go]");
   if (!b) {
     if (e.target.closest("[data-edit-details]")) openOnboarding(false);
