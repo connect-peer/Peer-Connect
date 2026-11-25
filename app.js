@@ -1312,6 +1312,21 @@ async function loadSessionSlots() {
   scheduleSlotsContext = { mentorId: mentor.id, typeId: type.id };
   slotsRoot.innerHTML = scheduleSlots.length ? scheduleSlots.map(function (slot, index) { return '<button class="schedule-slot" type="button" data-session-slot="' + index + '">' + esc(sessionClock(slot.starts_at, slot.timezone)) + '</button>'; }).join("") : '<div class="community-empty">No open times on this day. Pick another date or check back later.</div>';
 }
+function peerSessionRowMarkup(row) {
+  var learner = relationRow(row.learner), mentor = relationRow(row.mentor);
+  var isMentor = row.mentor_id === user.id, actions = "", chatControl = "", now = Date.now();
+  if (isMentor && row.status === "pending") actions = '<button class="btn" data-session-action="confirmed" data-session-id="' + esc(row.id) + '">Confirm</button><button class="btn ghost" data-session-action="declined" data-session-id="' + esc(row.id) + '">Decline</button>';
+  if (isMentor && row.status === "confirmed") actions = '<button class="btn" data-session-action="completed" data-session-id="' + esc(row.id) + '">Mark completed</button><button class="btn ghost" data-session-action="no_show" data-session-id="' + esc(row.id) + '">Mark no-show</button>';
+  var starts = new Date(row.starts_at).getTime(), ends = new Date(row.ends_at).getTime();
+  if (row.status === "confirmed") {
+    if (now >= ends) chatControl = '<button class="btn ghost" data-session-chat="' + esc(row.id) + '">View chat history</button>';
+    else if (now >= starts) chatControl = '<button class="btn" data-session-chat="' + esc(row.id) + '">Open session chat</button>';
+    else chatControl = '<button class="btn ghost session-chat-locked" type="button" disabled title="The booked chat opens when the session starts">Chat opens ' + esc(sessionTime(row.starts_at, row.timezone)) + '</button>';
+  } else if (["completed", "no_show", "cancelled"].includes(row.status) && starts <= now) {
+    chatControl = '<button class="btn ghost" data-session-chat="' + esc(row.id) + '">View chat history</button>';
+  } else if (row.status === "pending") chatControl = '<span class="session-chat-locked">Chat opens after the mentor confirms</span>';
+  return '<article class="session-row"><b>30-minute session · ' + esc(row.status.replace("_", " ")) + '</b><p>' + esc(isMentor ? (learner.display_name || "Learner") : (mentor.display_name || "Mentor")) + ' · ' + esc(sessionTime(row.starts_at, row.timezone)) + '</p>' + (row.learner_note ? '<p>Note: ' + esc(row.learner_note) + '</p>' : '') + ((actions || chatControl) ? '<div class="session-actions">' + actions + chatControl + '</div>' : '') + '</article>';
+}
 async function loadPeerSessionList() {
   var root = document.getElementById("sessionList"); if (!root || !user) return;
   var result = await supabaseClient.from("peer_sessions").select("id,connection_id,session_type_id,learner_id,mentor_id,starts_at,ends_at,timezone,status,learner_note,mentor_note,learner:profiles!peer_sessions_learner_id_fkey(display_name),mentor:profiles!peer_sessions_mentor_id_fkey(display_name)").order("starts_at", { ascending: true }).limit(100);
@@ -1326,25 +1341,20 @@ async function loadPeerSessionList() {
     if (row.status === "confirmed") return new Date(row.ends_at).getTime() >= now;
     return row.status === "pending" && new Date(row.starts_at).getTime() >= now;
   });
-  var previous = rows.filter(function(row){return !upcoming.includes(row);}).reverse();
-  function rowHtml(row) {
-    var learner=relationRow(row.learner), mentor=relationRow(row.mentor);
-    var isMentor = row.mentor_id === user.id, actions = "", chatControl = "", now = Date.now();
-    if (isMentor && row.status === "pending") actions = '<button class="btn" data-session-action="confirmed" data-session-id="'+esc(row.id)+'">Confirm</button><button class="btn ghost" data-session-action="declined" data-session-id="'+esc(row.id)+'">Decline</button>';
-    if (isMentor && row.status === "confirmed") actions = '<button class="btn" data-session-action="completed" data-session-id="'+esc(row.id)+'">Mark completed</button><button class="btn ghost" data-session-action="no_show" data-session-id="'+esc(row.id)+'">Mark no-show</button>';
-    var starts = new Date(row.starts_at).getTime(), ends = new Date(row.ends_at).getTime();
-    if (row.status === "confirmed") {
-      if (now >= ends) chatControl = '<button class="btn ghost" data-session-chat="'+esc(row.id)+'">View chat history</button>';
-      else if (now >= starts) chatControl = '<button class="btn" data-session-chat="'+esc(row.id)+'">Open session chat</button>';
-      else chatControl = '<button class="btn ghost session-chat-locked" type="button" disabled title="The booked chat opens when the session starts">Chat opens '+esc(sessionTime(row.starts_at,row.timezone))+'</button>';
-    } else if (["completed","no_show","cancelled"].includes(row.status) && starts <= now) {
-      chatControl = '<button class="btn ghost" data-session-chat="'+esc(row.id)+'">View chat history</button>';
-    } else if (row.status === "pending") {
-      chatControl = '<span class="session-chat-locked">Chat opens after the mentor confirms</span>';
-    }
-    return '<article class="session-row"><b>30-minute session · '+esc(row.status.replace("_"," "))+'</b><p>'+esc(isMentor ? (learner.display_name || "Learner") : (mentor.display_name || "Mentor"))+' · '+esc(sessionTime(row.starts_at,row.timezone))+'</p>'+(row.learner_note?'<p>Note: '+esc(row.learner_note)+'</p>':'')+((actions||chatControl)?'<div class="session-actions">'+actions+chatControl+'</div>':'')+'</article>';
-  }
-  root.innerHTML = '<h3>Upcoming</h3>'+(upcoming.length?upcoming.map(rowHtml).join(""):'<p class="muted">No upcoming sessions.</p>')+'<details class="session-settings"><summary><span aria-hidden="true">⚙</span> Settings</summary><div class="session-settings-content"><h3>Session history</h3><p class="muted">Past and cancelled sessions · '+previous.length+'</p>'+(previous.length?previous.map(rowHtml).join(""):'<p class="muted">No session history yet.</p>')+'</div></details>';
+  root.innerHTML = '<h3>Upcoming</h3>' + (upcoming.length ? upcoming.map(peerSessionRowMarkup).join("") : '<p class="muted">No upcoming sessions.</p>');
+}
+async function loadPeerSessionHistory() {
+  var root = document.getElementById("sessionHistory");
+  if (!root) return;
+  if (!user) { root.innerHTML = '<div class="community-empty">Sign in to view your session history.</div><a class="btn ghost" href="#me">My page</a>'; return; }
+  var result = await supabaseClient.from("peer_sessions").select("id,connection_id,session_type_id,learner_id,mentor_id,starts_at,ends_at,timezone,status,learner_note,mentor_note,learner:profiles!peer_sessions_learner_id_fkey(display_name),mentor:profiles!peer_sessions_mentor_id_fkey(display_name)").order("starts_at", { ascending: false }).limit(100);
+  if (result.error) { root.innerHTML = '<div class="community-empty">Could not load session history: ' + esc(authErrorText(result.error)) + '</div>'; return; }
+  var now = Date.now();
+  var historyRows = (result.data || []).filter(function (row) {
+    var upcoming = row.status === "confirmed" ? new Date(row.ends_at).getTime() >= now : row.status === "pending" && new Date(row.starts_at).getTime() >= now;
+    return !upcoming;
+  });
+  root.innerHTML = historyRows.length ? historyRows.map(peerSessionRowMarkup).join("") : '<div class="community-empty">No session history yet.</div>';
 }
 async function loadPeerSessionsPage() {
   var note = document.getElementById("sessionPageNote"), tools = document.getElementById("mentorScheduleTools");
@@ -1372,6 +1382,10 @@ document.getElementById("sessionList").addEventListener("click", async function(
   var button=event.target.closest("[data-session-action]"); if(!button)return; button.disabled=true;
   var result=await supabaseClient.from("peer_sessions").update({status:button.dataset.sessionAction}).eq("id",button.dataset.sessionId);
   if(result.error)window.alert(authErrorText(result.error)); await loadPeerSessionList();
+});
+document.getElementById("settings").addEventListener("click", function (event) {
+  var chatButton = event.target.closest("[data-session-chat]");
+  if (chatButton) openSessionChat(chatButton.dataset.sessionChat);
 });
 document.getElementById("closeBooking").addEventListener("click", function () { document.getElementById("bookingDialog").close(); });
 document.getElementById("bookingDialog").addEventListener("click", function (event) { if (event.target === this) this.close(); });
@@ -2237,7 +2251,7 @@ dlg.addEventListener("close", function () {
   if (user && (!user.role || !user.grade || missingProfileLocation(user.location))) onboardingOpen = false;
   if (curRoute === "me") drawMe();
 });
-var routes = ["home", "feed", "profile", "doubts", "sessions", "pricing", "me", "dashboard", "verification"],
+var routes = ["home", "feed", "profile", "doubts", "sessions", "pricing", "me", "settings", "dashboard", "verification"],
   names = {
     home: "Mentors",
     feed: "Feed",
@@ -2246,6 +2260,7 @@ var routes = ["home", "feed", "profile", "doubts", "sessions", "pricing", "me", 
     sessions: "Study sessions",
     pricing: "Pricing",
     me: "My page",
+    settings: "Settings",
     dashboard: "Tutor dashboard",
     verification: "Tutor verification review",
   };
@@ -2281,6 +2296,7 @@ function route() {
   if (h === "profile") renderTutorProfilePage();
   if (h === "feed") loadSocialFeed();
   if (h === "sessions") loadPeerSessionsPage();
+  if (h === "settings") loadPeerSessionHistory();
   if (h === "me") drawMe();
   if (h === "dashboard") drawTutorDashboard();
   window.scrollTo(0, 0);
