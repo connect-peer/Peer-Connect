@@ -208,6 +208,41 @@ function renderTutorAbout(tutor, content) {
   if (manage) manage.onclick = openMentorAchievementManager;
   loadMentorAchievementShowcase(tutor, document.getElementById("publicMentorAchievements"));
 }
+function enableProfileImageView(element, imageUrl, label) {
+  if (!element || !imageUrl) return;
+  element.dataset.profileImageView = imageUrl;
+  element.setAttribute("role", "button");
+  element.setAttribute("tabindex", "0");
+  element.setAttribute("aria-label", "View full-size " + label);
+  element.title = "View full-size " + label;
+}
+function openProfileImageViewer(imageUrl, label) {
+  if (!imageUrl) return;
+  var viewer = document.getElementById("profileImageViewer");
+  if (!viewer) {
+    viewer = document.createElement("dialog");
+    viewer.id = "profileImageViewer";
+    viewer.className = "profile-image-viewer";
+    viewer.innerHTML = '<div class="profile-image-viewer-bar"><b class="profile-image-viewer-title"></b><button type="button" class="profile-image-viewer-close" aria-label="Close image">×</button></div><img class="profile-image-viewer-img" alt="">';
+    document.body.appendChild(viewer);
+    viewer.querySelector(".profile-image-viewer-close").onclick = function () { viewer.close(); };
+    viewer.addEventListener("click", function (event) { if (event.target === viewer) viewer.close(); });
+  }
+  viewer.querySelector(".profile-image-viewer-title").textContent = label;
+  var image = viewer.querySelector(".profile-image-viewer-img");
+  image.src = imageUrl;
+  image.alt = label;
+  if (!viewer.open) viewer.showModal();
+}
+document.addEventListener("click", function (event) {
+  var image = event.target.closest && event.target.closest("[data-profile-image-view]");
+  if (image) openProfileImageViewer(image.dataset.profileImageView, image.title || "Profile image");
+});
+document.addEventListener("keydown", function (event) {
+  if (event.key !== "Enter" && event.key !== " ") return;
+  var image = event.target.closest && event.target.closest("[data-profile-image-view]");
+  if (image) { event.preventDefault(); openProfileImageViewer(image.dataset.profileImageView, image.title || "Profile image"); }
+});
 function renderTutorProfilePage() {
   var tutor = activeTutorProfile;
   var root = document.getElementById("tutorProfileContent");
@@ -217,6 +252,8 @@ function renderTutorProfilePage() {
   renderTutorAbout(tutor, document.getElementById("profileContent"));
   var cover = document.getElementById("profileCover");
   if (tutor.bannerUrl) cover.style.backgroundImage = 'url("' + tutor.bannerUrl.replace(/["\\\\]/g, "") + '")';
+  enableProfileImageView(cover, tutor.bannerUrl, "profile banner");
+  enableProfileImageView(document.getElementById("profileAvatar"), tutor.avatarUrl, "profile photo");
   loadProfileSocial(tutor);
   root.querySelectorAll("[data-profile-image]").forEach(function (input) {
     input.onchange = async function () { if (input.files[0]) await uploadProfileImage(input.files[0], input.dataset.profileImage); };
@@ -2170,7 +2207,9 @@ function drawMe() {
   if (user && user.bannerUrl) {
     var cover = document.getElementById("myProfileCover");
     if (cover) cover.style.backgroundImage = 'url("' + user.bannerUrl.replace(/["\\\\]/g, "") + '")';
+    enableProfileImageView(cover, user.bannerUrl, "profile banner");
   }
+  if (user) enableProfileImageView(document.querySelector("#meBody .me-avatar"), user.avatarUrl, "profile photo");
   document.querySelectorAll('#meBody [data-profile-image]').forEach(function (input) { input.onchange = async function () { if (input.files[0]) await uploadProfileImage(input.files[0], input.dataset.profileImage); }; });
   var myAchievements = document.getElementById("myMentorAchievements");
   if (myAchievements) loadOwnMentorAchievements(myAchievements);
