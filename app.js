@@ -743,15 +743,25 @@ async function signOutToLanding() {
       signingOutInApp = false;
       return;
     }
-    await syncAuthUser(null);
+    // Clear the local signed-in state directly. Avoid another profile reload
+    // during sign-out, which can reopen the profile-permission error dialog.
+    user = null;
+    isVerificationAdmin = false;
+    studentEntryPending = true;
+    posts = [];
+    openR = {};
+    paintSign();
+    paintRoleUI();
     history.replaceState(null, document.title, location.pathname + location.search + "#home");
     route();
     if (dlg.open) dlg.close();
     showAuthForm("signin");
     window.setTimeout(function () { signingOutInApp = false; }, 1200);
   } catch (error) {
-    if (message) message.textContent = authErrorText(error);
-    if (button) { button.disabled = false; button.textContent = "Sign out"; }
+    var currentMessage = document.getElementById("accountErr") || document.getElementById("profileLoadErr");
+    var currentButton = document.getElementById("so") || document.getElementById("profileErrorSignOut");
+    if (currentMessage) currentMessage.textContent = authErrorText(error);
+    if (currentButton) { currentButton.disabled = false; currentButton.textContent = "Sign out"; }
     signingOutInApp = false;
   }
 }

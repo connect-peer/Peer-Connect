@@ -1,6 +1,11 @@
 -- Fix Peer Connect profile setup persistence.
 -- Apply once in Supabase SQL Editor. The function only edits the signed-in user's row.
 
+-- The app reads this public profile field for account setup and profile headers.
+-- The verification migration grants selected-column access, so explicitly add
+-- the banner field that was missing from that allowlist.
+grant select (profile_banner_url) on public.profiles to authenticated;
+
 create or replace function public.save_peer_connect_profile(
   p_display_name text,
   p_grade smallint,
