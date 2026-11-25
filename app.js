@@ -194,7 +194,7 @@ function renderTutorProfilePage() {
   root.querySelectorAll("[data-profile-image]").forEach(function (input) {
     input.onchange = async function () { if (input.files[0]) await uploadProfileImage(input.files[0], input.dataset.profileImage); };
   });
-  document.getElementById("profileBack").onclick = function () { location.hash = "tutors"; };
+  document.getElementById("profileBack").onclick = function () { location.hash = "home"; };
   document.getElementById("profileBook").onclick = async function () {
     if (tutor.me) { openTutor(); return; }
     if (!user) { openSign(); return; }
@@ -1010,13 +1010,13 @@ function paintRoleUI() {
   if (isTutor) {
     if (title) title.textContent = user.role === "both" ? "Learn and help others grow." : "Help learners grow with confidence.";
     if (intro) intro.textContent = user.role === "both" ? "Learn from mentors and guide learners in lower classes." : "Manage your mentor profile, choose when you are available, and guide learners.";
-    if (actions) actions.innerHTML = '<a class="btn" href="#dashboard">Open mentor dashboard</a>' + (user.role === "both" ? '<a class="btn ghost" href="#tutors">Find a mentor</a>' : '<a class="btn ghost" href="#doubts">Answer a question</a>');
-    if (cards) cards.innerHTML = '<a href="#dashboard"><b>Your dashboard</b><span>Manage learner requests, profile, and availability in one place.</span></a><a href="#doubts"><b>Share what you know</b><span>Answer questions and build your reputation.</span></a>' + (user.role === "both" ? '<a href="#tutors"><b>Get guidance</b><span>Find mentors for the subjects you are learning.</span></a>' : '<a href="#pricing"><b>Blue Tick</b><span>Optional one-time payment; price and launch date to be decided.</span></a>');
+    if (actions) actions.innerHTML = '<a class="btn" href="#dashboard">Open mentor dashboard</a>' + (user.role === "both" ? '<a class="btn ghost" href="#home">Find a mentor</a>' : '<a class="btn ghost" href="#doubts">Answer a question</a>');
+    if (cards) cards.innerHTML = '<a href="#dashboard"><b>Your dashboard</b><span>Review booking requests, profile, and availability in one place.</span></a><a href="#doubts"><b>Share what you know</b><span>Answer questions and build your reputation.</span></a>' + (user.role === "both" ? '<a href="#home"><b>Get guidance</b><span>Find mentors for the subjects you are learning.</span></a>' : '<a href="#pricing"><b>Blue Tick</b><span>Optional one-time payment; price and launch date to be decided.</span></a>');
   } else {
     if (title) title.textContent = "Find a mentor who gets it.";
     if (intro) intro.textContent = "Peer Connect is a learning network for your school. Find mentors, ask questions, and learn from people who know your topics.";
-    if (actions) actions.innerHTML = '<a class="btn" href="#tutors">Find a mentor</a><a class="btn ghost" href="#doubts">Ask a question</a>';
-    if (cards) cards.innerHTML = '<a href="#tutors"><b>Mentors</b><span>Find verified mentors by subject and location.</span></a><a href="#doubts"><b>Questions</b><span>Ask questions, upvote the best ones, and answer what you know.</span></a><a href="#pricing"><b>Pricing</b><span>Free for learners and mentors. Optional Blue Tick may come later.</span></a>';
+    if (actions) actions.innerHTML = '<a class="btn" href="#home">Find a mentor</a><a class="btn ghost" href="#doubts">Ask a question</a>';
+    if (cards) cards.innerHTML = '<a href="#home"><b>Mentors</b><span>Find verified mentors by subject and location.</span></a><a href="#doubts"><b>Questions</b><span>Ask questions, upvote the best ones, and answer what you know.</span></a><a href="#pricing"><b>Pricing</b><span>Free for learners and mentors. Optional Blue Tick may come later.</span></a>';
   }
 }
 document.querySelectorAll('[data-nav="verification"]').forEach(function (link) {
@@ -1066,7 +1066,7 @@ function paintSessionDateStrip() {
 }
 function renderBookingForm() {
   var root = document.getElementById("bookingForm"); if (!root) return;
-  if (!scheduleMentors.length) { root.innerHTML = '<div class="community-empty">No verified mentors are available for booking right now.</div><a class="btn ghost" href="#tutors">Browse mentors</a>'; return; }
+  if (!scheduleMentors.length) { root.innerHTML = '<div class="community-empty">No verified mentors are available for booking right now.</div><a class="btn ghost" href="#home">Browse mentors</a>'; return; }
   var options = scheduleMentors.map(function (mentor) { return '<option value="' + esc(mentor.id) + '"' + (mentor.id === pendingBookingMentorId ? ' selected' : '') + '>' + esc(mentor.name) + '</option>'; }).join("");
   root.innerHTML = '<div class="schedule-form"><label>Mentor<select id="sessionMentor">' + options + '</select></label><input id="sessionType" type="hidden"><p class="session-policy-note">Company schedule · 30 minutes · Daily 8:00 AM–8:00 PM IST</p><label class="session-date-label">Choose a day<input id="sessionDate" type="date" min="' + isoTodayIn("Asia/Kolkata") + '" value="' + isoTodayIn("Asia/Kolkata") + '"></label><div id="sessionDateStrip" class="session-date-strip" aria-label="Choose a day"></div><p id="sessionBookingMessage" class="muted" role="status"></p></div><div id="sessionSlots" class="schedule-slots"><div class="community-empty">Finding company-set times…</div></div><div class="session-booking-footer"><span class="session-free-note">Peer Connect sessions are free</span><button class="btn" id="requestSession" type="button" hidden disabled>Request booking</button></div>';
   paintSessionDateStrip();
@@ -1520,7 +1520,7 @@ async function loadSocialFeed() {
   var loadingUserId = user.id;
   list.innerHTML = '<div class="community-empty">Loading your learning feed…</div>';
   var result = await supabaseClient.from("posts").select("id, author_id, content, post_type, media_url, media_type, created_at, profiles!posts_author_id_fkey(display_name, grade, avatar_url), post_reactions(user_id, reaction), post_comments(id, author_id, content, created_at, profiles!post_comments_author_id_fkey(display_name))").order("created_at", { ascending: false }).limit(50);
-  if (!user || user.id !== loadingUserId || curRoute !== "home") return;
+  if (!user || user.id !== loadingUserId || curRoute !== "feed") return;
   if (result.error) { list.innerHTML = '<div class="community-empty">Could not load posts: ' + esc(authErrorText(result.error)) + '. Run the v2.0.0 Supabase setup SQL.</div>'; return; }
   var rows = result.data || [];
   await Promise.all(rows.map(async function(row){
@@ -1528,7 +1528,7 @@ async function loadSocialFeed() {
     var signed = await supabaseClient.storage.from("post-media").createSignedUrl(row.media_url, 7200);
     row.media_signed_url = signed.error ? "" : signed.data.signedUrl;
   }));
-  if (!user || user.id !== loadingUserId || curRoute !== "home") return;
+  if (!user || user.id !== loadingUserId || curRoute !== "feed") return;
   list.innerHTML = rows.length ? rows.map(function (row) { return socialPostHtml(row, loadingUserId); }).join("") : '<div class="community-empty">No posts yet. Share a study tip or question to start the feed.</div>';
   var avatar = document.getElementById("socialComposerAvatar");
   if (avatar) avatar.innerHTML = socialAvatar({ avatar_url: user.avatarUrl }, user.n);
@@ -1909,7 +1909,7 @@ function drawMe() {
   var h = "";
   var mu = 'style="margin:6px 0 12px;color:var(--muted)"';
   h += '<div class="box"><b>Account</b><p ' + mu + '>' + (user ? esc(user.n) + " · " + esc(user.e) + "<br>" + accountTypeLabel(user.role) + " · Class " + esc(String(user.grade || "")) + '<br>' + esc(user.location ? [user.location.school,user.location.city,user.location.state,user.location.country].join(" · ") : "Location not set") : "You are not signed in.") + '</p>' + (user ? '<button class="btn ghost" data-edit-details>Edit profile details</button><div class="profile-appearance"><label class="btn ghost">Change profile photo<input type="file" accept="image/jpeg,image/png,image/webp" data-profile-image="avatar"></label><label class="btn ghost">Change banner<input type="file" accept="image/jpeg,image/png,image/webp" data-profile-image="banner"></label></div><div class="profile-social" id="myFollowStats">Loading followers…</div>' : '<button class="btn" data-go="signin">Sign up / Sign in</button>') + '</div>';
-  h += '<div class="box"><b>Sessions</b><p ' + mu + '>Book verified mentors directly and manage confirmed session chats.</p><a class="btn ghost" href="#sessions">View sessions</a> <a class="btn ghost" href="#tutors">Find a mentor</a></div>';
+  h += '<div class="box"><b>Sessions</b><p ' + mu + '>Book verified mentors directly and manage confirmed session chats.</p><a class="btn ghost" href="#sessions">View sessions</a> <a class="btn ghost" href="#home">Find a mentor</a></div>';
   h += '<div class="box"><b>Mentor profile</b><p ' + mu + '>' + (canMentor(user) ? 'Your mentor tools and booking requests are on your <a href="#dashboard">dashboard</a>.' : 'Want to guide learners in lower classes? Choose Mentor or Both in your profile.') + '</p>' + (canMentor(user) ? '<a class="btn" href="#dashboard">Mentor dashboard</a>' : '') + '</div>';
   var w = who();
   var mp = posts.filter(function (p) { return p.n === w.n; });
@@ -1939,10 +1939,10 @@ dlg.addEventListener("close", function () {
   if (user && (!user.role || !user.grade || missingProfileLocation(user.location))) onboardingOpen = false;
   if (curRoute === "me") drawMe();
 });
-var routes = ["home", "tutors", "profile", "doubts", "sessions", "pricing", "me", "dashboard", "verification"],
+var routes = ["home", "feed", "profile", "doubts", "sessions", "pricing", "me", "dashboard", "verification"],
   names = {
-    home: "Home",
-    tutors: "Tutors",
+    home: "Mentors",
+    feed: "Feed",
     profile: "Tutor profile",
     doubts: "Doubts",
     sessions: "Study sessions",
@@ -1951,40 +1951,27 @@ var routes = ["home", "tutors", "profile", "doubts", "sessions", "pricing", "me"
     dashboard: "Tutor dashboard",
     verification: "Tutor verification review",
   };
-function hasSeenStudentIntro(key) {
-  try { if (window.localStorage.getItem(key) === "1") return true; } catch (_localReadError) {}
-  try { if (window.sessionStorage.getItem(key) === "1") return true; } catch (_sessionReadError) {}
-  return false;
-}
-function markStudentIntroSeen(key) {
-  try { window.localStorage.setItem(key, "1"); return; } catch (_localWriteError) {}
-  try { window.sessionStorage.setItem(key, "1"); } catch (_sessionWriteError) {}
-}
 function route() {
   var h = location.hash.replace("#", "");
+  // Keep old mentor links working after making the directory the home page.
+  if (h === "tutors") h = "home";
   if (routes.indexOf(h) < 0) h = "home";
-  if (h === "profile" && !activeTutorProfile) h = "tutors";
+  if (h === "profile" && !activeTutorProfile) h = "home";
   var isStudent = canLearn(user);
   if (isStudent && studentEntryPending) {
     studentEntryPending = false;
-    var introKey = "peerConnectIntroSeen:" + user.id;
-    if (hasSeenStudentIntro(introKey)) {
-      h = "doubts";
-    } else {
-      markStudentIntroSeen(introKey);
-      h = "home";
-    }
+    h = "home";
     if (location.hash !== "#" + h) history.replaceState(null, document.title, location.pathname + location.search + "#" + h);
   }
   if (h === "dashboard" && !canMentor(user)) h = "home";
   if (h === "verification" && (!user || !isVerificationAdmin)) h = "home";
   curRoute = h;
-  document.body.classList.toggle("home-feed", h === "home");
+  document.body.classList.toggle("home-feed", h === "feed");
   document.querySelectorAll("[data-v]").forEach(function (el) {
     el.hidden = el.dataset.v.split(" ").indexOf(h) < 0;
   });
   document.querySelectorAll("[data-nav]").forEach(function (a) {
-    if (a.dataset.nav === (h === "profile" ? "tutors" : h)) a.setAttribute("aria-current", "page");
+    if (a.dataset.nav === (h === "profile" ? "home" : h)) a.setAttribute("aria-current", "page");
     else a.removeAttribute("aria-current");
   });
   document.title = names[h] + " | Peer Connect";
@@ -1994,7 +1981,7 @@ function route() {
   }
   if (h === "verification") drawVerificationAdmin();
   if (h === "profile") renderTutorProfilePage();
-  if (h === "home") loadSocialFeed();
+  if (h === "feed") loadSocialFeed();
   if (h === "sessions") loadPeerSessionsPage();
   if (h === "me") drawMe();
   if (h === "dashboard") drawTutorDashboard();

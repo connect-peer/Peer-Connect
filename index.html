@@ -1057,7 +1057,7 @@ dialog.auth-screen #dbody { width: 100%; height: 100%; display: grid; grid-templ
         <a class="logo" href="#home"><i></i>Peer Connect <span class="app-version" id="appVersion">v2.0.0</span></a>
         <nav>
           <a class="h" data-nav="home" href="#home">Home</a
-          ><a class="h" data-nav="tutors" href="#tutors">Mentors</a
+          ><a class="h" data-nav="feed" href="#feed">Feed</a
           ><a class="h tutor-only" data-role-nav="tutor" data-nav="dashboard" href="#dashboard" hidden>Dashboard</a
           ><a class="h admin-only" data-nav="verification" href="#verification" hidden>Verification</a
           ><a class="h" data-nav="doubts" href="#doubts">Doubts</a
@@ -1072,8 +1072,8 @@ dialog.auth-screen #dbody { width: 100%; height: 100%; display: grid; grid-templ
 
     <div class="app-layout">
       <nav class="app-rail" aria-label="Main navigation">
-        <a href="#home" class="app-rail-link" data-nav="home"><span class="app-rail-icon" aria-hidden="true">⌂</span>Feed</a>
-        <a href="#tutors" class="app-rail-link" data-nav="tutors"><span class="app-rail-icon" aria-hidden="true">◎</span>Mentors</a>
+        <a href="#home" class="app-rail-link" data-nav="home"><span class="app-rail-icon" aria-hidden="true">◎</span>Mentors</a>
+        <a href="#feed" class="app-rail-link" data-nav="feed"><span class="app-rail-icon" aria-hidden="true">⌂</span>Feed</a>
         <a href="#dashboard" class="app-rail-link tutor-only" data-role-nav="tutor" data-nav="dashboard" hidden><span class="app-rail-icon" aria-hidden="true">▦</span>Dashboard</a>
         <a href="#verification" class="app-rail-link admin-only" data-nav="verification" hidden><span class="app-rail-icon" aria-hidden="true">✓</span>Verify mentors</a>
         <a href="#doubts" class="app-rail-link" data-nav="doubts"><span class="app-rail-icon" aria-hidden="true">?</span>Doubts</a>
@@ -1083,7 +1083,7 @@ dialog.auth-screen #dbody { width: 100%; height: 100%; display: grid; grid-templ
         <div class="app-rail-note"><b>Learn together</b><span>Share what you know. Ask when you’re stuck.</span></div>
       </nav>
       <main id="top">
-      <section class="social-home" data-v="home">
+      <section class="social-home" data-v="feed">
         <div class="social-timeline">
           <div class="social-feed-title"><div><span class="community-kicker">PEER CONNECT</span><h1>Your learning feed</h1></div><button class="btn ghost" id="refreshSocialFeed" type="button">Refresh</button></div>
           <section class="social-composer" aria-label="Create a post">
@@ -1096,7 +1096,7 @@ dialog.auth-screen #dbody { width: 100%; height: 100%; display: grid; grid-templ
         </div>
         <aside class="social-sidebar"><section class="social-side-card"><span class="community-kicker">YOUR COMMUNITY</span><h2>Grow by sharing</h2><p>Post a helpful explanation, a resource, or a quick study update. Keep personal details private.</p><div class="community-guideline">A useful post can help someone else make progress today.</div></section></aside>
       </section>
-      <div class="wrap hero" data-v="tutors">
+      <div class="wrap" data-v="home">
         <h1>Verified mentors</h1>
         <p>
           Find a mentor by subject and location. Open a profile to see
@@ -1182,7 +1182,7 @@ dialog.auth-screen #dbody { width: 100%; height: 100%; display: grid; grid-templ
             <div id="flist"></div>
           </div>
           <aside class="doubt-side" aria-label="Peer learning tips">
-          <div class="doubt-side-card"><h3>Learn together</h3><p>Ask a clear question, share what you tried, and guide another learner when you can.</p><a class="btn ghost" href="#tutors">Find a mentor</a></div>
+          <div class="doubt-side-card"><h3>Learn together</h3><p>Ask a clear question, share what you tried, and guide another learner when you can.</p><a class="btn ghost" href="#home">Find a mentor</a></div>
             <div class="doubt-side-card"><h3>Keep it helpful</h3><ul><li>Include the subject and key steps.</li><li>Be respectful when answering.</li><li>Never post personal or private details.</li></ul></div>
           </aside>
           </div>
@@ -1284,7 +1284,7 @@ dialog.auth-screen #dbody { width: 100%; height: 100%; display: grid; grid-templ
 
     <nav class="tabbar" aria-label="Main">
       <a data-nav="home" href="#home">Home</a
-      ><a data-nav="tutors" href="#tutors">Mentors</a
+      ><a data-nav="feed" href="#feed">Feed</a
       ><a class="tutor-only" data-role-nav="tutor" data-nav="dashboard" href="#dashboard" hidden>Dashboard</a
       ><a class="admin-only" data-nav="verification" href="#verification" hidden>Verify</a
       ><a data-nav="doubts" href="#doubts">Doubts</a
