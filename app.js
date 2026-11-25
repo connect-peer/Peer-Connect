@@ -143,8 +143,8 @@ function drawTutorLocationFilters() {
   var cities = Array.from(new Set(tutors.filter(function (t) { return !tutorState || t.state === tutorState; }).map(function (t) { return t.city; }).filter(Boolean))).sort();
   if (states.indexOf(tutorState) < 0) tutorState = "";
   if (cities.indexOf(tutorCity) < 0) tutorCity = "";
-  setLocationOptions(document.getElementById("tutorStateFilter"), states, "All states", tutorState);
-  setLocationOptions(document.getElementById("tutorCityFilter"), cities, "All cities", tutorCity);
+  setLocationOptions(document.getElementById("tutorStateFilter"), states, "Any state", tutorState);
+  setLocationOptions(document.getElementById("tutorCityFilter"), cities, "Any city", tutorCity);
 }
 document.getElementById("tutorStateFilter").addEventListener("change", function (event) {
   tutorState = event.target.value;
@@ -991,7 +991,6 @@ async function openTutor() {
   };
 }
 document.getElementById("btnTutor").addEventListener("click", openTutor);
-document.getElementById("btnFree").addEventListener("click", function () { showAuthForm("signup"); });
 document.getElementById("btnTutor2").addEventListener("click", openTutor);
 
 function paintRoleUI() {
@@ -1174,7 +1173,7 @@ async function loadPeerSessionList() {
     }
     return '<article class="session-row"><b>30-minute session · '+esc(row.status.replace("_"," "))+'</b><p>'+esc(isMentor ? (learner.display_name || "Learner") : (mentor.display_name || "Mentor"))+' · '+esc(sessionTime(row.starts_at,row.timezone))+'</p>'+(row.learner_note?'<p>Note: '+esc(row.learner_note)+'</p>':'')+((actions||chatControl)?'<div class="session-actions">'+actions+chatControl+'</div>':'')+'</article>';
   }
-  root.innerHTML = '<h3>Upcoming</h3>'+(upcoming.length?upcoming.map(rowHtml).join(""):'<p class="muted">No upcoming sessions.</p>')+'<details><summary>Past and cancelled · '+previous.length+'</summary>'+(previous.length?previous.map(rowHtml).join(""):'<p class="muted">Nothing here yet.</p>')+'</details>';
+  root.innerHTML = '<h3>Upcoming</h3>'+(upcoming.length?upcoming.map(rowHtml).join(""):'<p class="muted">No upcoming sessions.</p>')+'<details class="session-settings"><summary><span aria-hidden="true">⚙</span> Settings</summary><div class="session-settings-content"><h3>Session history</h3><p class="muted">Past and cancelled sessions · '+previous.length+'</p>'+(previous.length?previous.map(rowHtml).join(""):'<p class="muted">No session history yet.</p>')+'</div></details>';
 }
 async function loadPeerSessionsPage() {
   var note = document.getElementById("sessionPageNote"), tools = document.getElementById("mentorScheduleTools");
@@ -1923,6 +1922,7 @@ function drawFeed() {
     counts[p.sub] = (counts[p.sub] || 0) + 1;
   });
   document.getElementById("ftabs").innerHTML = [
+    ["all", "All doubts"],
     ["hot", "Hot"],
     ["new", "New"],
     ["top", "Top"],
@@ -1939,8 +1939,7 @@ function drawFeed() {
       );
     })
     .join("");
-  fch.innerHTML = ["All"]
-    .concat(Object.keys(counts))
+  fch.innerHTML = Object.keys(counts)
     .map(function (s) {
       return (
         '<button class="chip" aria-pressed="' +
@@ -1948,9 +1947,7 @@ function drawFeed() {
         '" data-fs="' +
         s +
         '">' +
-        (s === "All"
-          ? "All doubts"
-          : "#" + s.replace(/ /g, "") + " (" + counts[s] + ")") +
+        "#" + s.replace(/ /g, "") + " (" + counts[s] + ")" +
         "</button>"
       );
     })
@@ -1959,7 +1956,7 @@ function drawFeed() {
     return fSub === "All" || p.sub === fSub;
   });
   list.sort(function (a, b) {
-    if (fSort === "new") return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    if (fSort === "all" || fSort === "new") return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     if (fSort === "top") return b.likes - a.likes;
     return b.likes + 2 * b.rep.length - (a.likes + 2 * a.rep.length);
   });
@@ -1973,15 +1970,13 @@ document.getElementById("ftabs").addEventListener("click", function (e) {
   var b = e.target.closest("[data-sort]");
   if (!b) return;
   fSort = b.dataset.sort;
+  if (fSort === "all") fSub = "All";
   drawFeed();
 });
 function drawMe() {
   var h = "";
   var mu = 'style="margin:6px 0 12px;color:var(--muted)"';
   h += '<div class="box"><b>Account</b><p ' + mu + '>' + (user ? esc(user.n) + " · " + esc(user.e) + "<br>" + accountTypeLabel(user.role) + " · Class " + esc(String(user.grade || "")) + '<br>' + esc(user.location ? [user.location.school,user.location.city,user.location.state,user.location.country].join(" · ") : "Location not set") : "You are not signed in.") + '</p>' + (user ? '<button class="btn ghost" data-edit-details>Edit profile details</button><div class="profile-appearance"><label class="btn ghost">Change profile photo<input type="file" accept="image/jpeg,image/png,image/webp" data-profile-image="avatar"></label><label class="btn ghost">Change banner<input type="file" accept="image/jpeg,image/png,image/webp" data-profile-image="banner"></label></div><div class="profile-social" id="myFollowStats">Loading followers…</div>' : '<button class="btn" data-go="signin">Sign up / Sign in</button>') + '</div>';
-  var w = who();
-  var mp = posts.filter(function (p) { return p.n === w.n; });
-  h += '<div class="box"><b>Your doubts (' + mp.length + ')</b>' + (mp.length ? '<ul style="margin:8px 0 0;padding-left:20px">' + mp.map(function (p) { return "<li>" + esc(p.t) + "</li>"; }).join("") + '</ul>' : '<p ' + mu + '>You have not asked a doubt yet.</p><a class="btn ghost" href="#doubts">Ask a doubt</a>') + '</div>';
   document.getElementById("meBody").innerHTML = h;
   document.querySelectorAll('#meBody [data-profile-image]').forEach(function (input) { input.onchange = async function () { if (input.files[0]) await uploadProfileImage(input.files[0], input.dataset.profileImage); }; });
   if (user) loadProfileSocialForMe();

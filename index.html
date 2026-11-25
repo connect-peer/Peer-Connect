@@ -211,6 +211,7 @@ nav a:hover {
   color: var(--bg);
   border-color: var(--ink);
 }
+#ftabs .chip { border-radius:10px; min-width:62px; }
 .quota {
   display: flex;
   justify-content: space-between;
@@ -986,7 +987,15 @@ dialog.auth-screen #dbody { width: 100%; height: 100%; display: grid; grid-templ
   .auth-form-panel .note { margin-top: 7px; }
 }
 .location-filters { display:flex; gap:10px; flex-wrap:wrap; margin:12px 0; }
-.location-filters select { min-width:170px; max-width:100%; }
+.location-filters select { min-width:170px; max-width:100%; padding:10px 38px 10px 12px; border:1px solid var(--line); border-radius:11px; background:var(--surface); color:var(--ink); font:500 14px Figtree,sans-serif; cursor:pointer; }
+.session-settings { margin-top:18px; border:1px solid var(--line); border-radius:13px; background:var(--bg); overflow:hidden; }
+.session-settings>summary { padding:13px 15px; cursor:pointer; font-weight:750; list-style:none; }
+.session-settings>summary::-webkit-details-marker { display:none; }
+.session-settings>summary::after { content:'＋'; float:right; color:var(--brand); }
+.session-settings[open]>summary::after { content:'−'; }
+.session-settings-content { padding:4px 15px 15px; border-top:1px solid var(--line); }
+.session-settings-content h3 { margin:12px 0 5px; }
+.session-settings-content>p { margin:4px 0 10px; }
 .card[data-profile-index] { cursor:pointer; }
 .card[data-profile-index] .btn { cursor:pointer; }
 .profile-cover { min-height:150px; border-radius:18px 18px 0 0; background:linear-gradient(125deg,#1d2d65,#3459df 54%,#8496ff); }
@@ -1126,8 +1135,8 @@ dialog.session-chat-dialog[open]{position:fixed;inset:0;width:100vw;height:100vh
           />
         </div>
         <div class="location-filters" aria-label="Filter tutors by location">
-          <select id="tutorStateFilter" aria-label="Filter tutors by state"><option value="">All states</option></select>
-          <select id="tutorCityFilter" aria-label="Filter tutors by city"><option value="">All cities</option></select>
+          <select id="tutorStateFilter" aria-label="Filter tutors by state"><option value="">Any state</option></select>
+          <select id="tutorCityFilter" aria-label="Filter tutors by city"><option value="">Any city</option></select>
         </div>
         <div
           class="chips"
@@ -1262,7 +1271,6 @@ dialog.session-chat-dialog[open]{position:fixed;inset:0;width:100vw;height:100vh
                 <li>Ask and answer study doubts</li>
                 <li>Build a profile with your class</li>
               </ul>
-              <button class="btn ghost" id="btnFree">Create a free account</button>
             </div>
             <div class="plan">
               <h3>Mentor</h3>
