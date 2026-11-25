@@ -1319,7 +1319,19 @@ document.getElementById("sessions").addEventListener("submit",async function(eve
 document.getElementById("sessions").addEventListener("click",async function(event){var button=event.target.closest("[data-schedule-delete]");if(!button)return;var result=await supabaseClient.from("peer_blocked_times").delete().eq("id",button.dataset.id).eq("mentor_id",user.id);if(result.error)window.alert(authErrorText(result.error));await loadMentorScheduleControls();});
 function tutorVerificationPanel(status) {
   if (Number(user && user.grade) < 9 || Number(user && user.grade) > 12) return '<section class="box verify-status"><b>Finish your class details</b><p class="muted">Set your class before submitting mentor verification.</p></section>';
-  if (status && status.status === "verified") return '<section class="box verify-status"><b><span class="verify-badge">Verified</span> Your mentor profile is approved</b><p class="muted">Your profile can appear in mentor search while availability is on.</p></section>';
+  if (status && status.status === "verified") {
+    var noticeKey = "peerConnectVerifiedNoticeSeen:" + user.id;
+    try {
+      if (window.localStorage.getItem(noticeKey) === "1") return "";
+      window.localStorage.setItem(noticeKey, "1");
+    } catch (_localNoticeError) {
+      try {
+        if (window.sessionStorage.getItem(noticeKey) === "1") return "";
+        window.sessionStorage.setItem(noticeKey, "1");
+      } catch (_sessionNoticeError) {}
+    }
+    return '<section class="box verify-status"><b><span class="verify-badge">Verified</span> Your mentor profile is approved</b><p class="muted">Your profile can appear in mentor search while availability is on.</p></section>';
+  }
   if (status && status.status === "pending") return '<section class="box verify-status"><b>Verification pending</b><p class="muted">Your school ID and fee receipt are private. A reviewer will check them before your mentor profile becomes visible.</p></section>';
   if (status && status.status === "rejected") return '<section class="box verify-status"><b>Verification needs another review</b><p class="muted">Resubmit both documents if a reviewer declined them, or if your verified name, class, school, or subjects changed.</p><button class="btn" data-start-verification>Submit documents again</button></section>';
   return '<section class="box verify-status"><b>Verify your mentor profile</b><p class="muted">Mentors from every class must submit a school ID and fee receipt. A trusted reviewer checks your class, school, and subjects before approving your profile. Files stay private and are removed after review.</p><button class="btn" data-start-verification>Submit for review</button></section>';
