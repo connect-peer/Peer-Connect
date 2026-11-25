@@ -5,6 +5,7 @@
 -- The verification migration grants selected-column access, so explicitly add
 -- the banner field that was missing from that allowlist.
 grant select (profile_banner_url) on public.profiles to authenticated;
+grant update (profile_banner_url) on public.profiles to authenticated;
 
 create or replace function public.save_peer_connect_profile(
   p_display_name text,

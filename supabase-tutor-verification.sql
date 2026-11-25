@@ -248,7 +248,7 @@ revoke select on public.profiles from public;
 grant select (id, username, display_name, bio, avatar_url, grade, created_at, updated_at, role)
   on public.profiles to authenticated;
 revoke update on public.profiles from anon, authenticated;
-grant update (username, display_name, bio, avatar_url, grade, role)
+grant update (username, display_name, bio, avatar_url, profile_banner_url, grade, role)
   on public.profiles to authenticated;
 
 create or replace function public.get_verified_tutor_directory(p_state text default null, p_city text default null)

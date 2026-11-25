@@ -835,9 +835,13 @@ dialog.setup-dialog .row { position: sticky; bottom: -1px; padding: 12px 0 2px; 
 /* Refined social-learning layout across the existing app pages. */
 .wrap { max-width: 1180px; }
 header { backdrop-filter: blur(16px); background: color-mix(in srgb, var(--bg) 90%, transparent); }
-header .wrap { min-height: 68px; }
-header nav { gap: 7px; }
-header nav a.h { padding: 9px 12px; border-radius: 999px; transition: background .16s ease, color .16s ease; }
+header .wrap { min-height: 68px; max-width: none; width: 100%; padding-inline: clamp(12px, 2vw, 30px); gap: 14px; }
+header .logo { flex: 0 0 auto; white-space: nowrap; }
+header nav { flex: 1 1 auto; min-width: 0; gap: 2px; flex-wrap: nowrap; justify-content: flex-end; overflow-x: auto; white-space: nowrap; scrollbar-width: none; }
+header nav::-webkit-scrollbar { display: none; }
+header nav > * { flex: 0 0 auto; white-space: nowrap; }
+header nav a.h { padding: 8px 9px; border-radius: 999px; transition: background .16s ease, color .16s ease; font-size: 14px; }
+header nav #gsign { white-space: nowrap; padding-inline: 14px; }
 header nav a.h:hover, header nav a.h[aria-current="page"] { background: var(--soft); color: var(--brand); }
 .logo { letter-spacing: -.03em; }
 .btn { transition: transform .16s ease, box-shadow .16s ease, background .16s ease; }
@@ -1027,8 +1031,8 @@ dialog.auth-screen #dbody { width: 100%; height: 100%; display: grid; grid-templ
         <nav>
           <a class="h" data-nav="home" href="#home">Home</a
           ><a class="h" data-nav="tutors" href="#tutors">Mentors</a
-          ><a class="h tutor-only" data-role-nav="tutor" data-nav="dashboard" href="#dashboard" hidden>Mentor dashboard</a
-          ><a class="h admin-only" data-nav="verification" href="#verification" hidden>Verify mentors</a
+          ><a class="h tutor-only" data-role-nav="tutor" data-nav="dashboard" href="#dashboard" hidden>Dashboard</a
+          ><a class="h admin-only" data-nav="verification" href="#verification" hidden>Verification</a
           ><a class="h" data-nav="doubts" href="#doubts">Doubts</a
           ><a class="h" data-nav="sessions" href="#sessions">Sessions</a
           ><a class="h" data-nav="pricing" href="#pricing">Pricing</a
