@@ -755,6 +755,7 @@ async function signOutToLanding() {
     history.replaceState(null, document.title, location.pathname + location.search + "#home");
     route();
     if (dlg.open) dlg.close();
+    showAuthForm("signin");
     window.setTimeout(function () { signingOutInApp = false; }, 1200);
   } catch (error) {
     var currentMessage = document.getElementById("accountErr") || document.getElementById("profileLoadErr");
@@ -882,6 +883,7 @@ if (
         history.replaceState(null, document.title, location.pathname + location.search + "#home");
         route();
         if (dlg.open) dlg.close();
+        showAuthForm("signin");
       }
     }, 0);
   });
