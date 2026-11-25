@@ -755,7 +755,6 @@ async function signOutToLanding() {
     history.replaceState(null, document.title, location.pathname + location.search + "#home");
     route();
     if (dlg.open) dlg.close();
-    showAuthForm("signin");
     window.setTimeout(function () { signingOutInApp = false; }, 1200);
   } catch (error) {
     var currentMessage = document.getElementById("accountErr") || document.getElementById("profileLoadErr");
@@ -883,7 +882,6 @@ if (
         history.replaceState(null, document.title, location.pathname + location.search + "#home");
         route();
         if (dlg.open) dlg.close();
-        showAuthForm("signin");
       }
     }, 0);
   });
@@ -1044,15 +1042,15 @@ function paintRoleUI() {
   var actions = document.getElementById("homeActions");
   var cards = document.getElementById("homeCards");
   if (isTutor) {
-    title.textContent = user.role === "both" ? "Learn and help others grow." : "Help learners grow with confidence.";
-    intro.textContent = user.role === "both" ? "Learn from mentors and guide learners in lower classes." : "Manage your mentor profile, choose when you are available, and guide learners.";
-    actions.innerHTML = '<a class="btn" href="#dashboard">Open mentor dashboard</a>' + (user.role === "both" ? '<a class="btn ghost" href="#tutors">Find a mentor</a>' : '<a class="btn ghost" href="#doubts">Answer a question</a>');
-    cards.innerHTML = '<a href="#dashboard"><b>Your dashboard</b><span>Manage learner requests, profile, and availability in one place.</span></a><a href="#doubts"><b>Share what you know</b><span>Answer questions and build your reputation.</span></a>' + (user.role === "both" ? '<a href="#tutors"><b>Get guidance</b><span>Find mentors for the subjects you are learning.</span></a>' : '<a href="#pricing"><b>Blue Tick</b><span>Optional one-time payment; price and launch date to be decided.</span></a>');
+    if (title) title.textContent = user.role === "both" ? "Learn and help others grow." : "Help learners grow with confidence.";
+    if (intro) intro.textContent = user.role === "both" ? "Learn from mentors and guide learners in lower classes." : "Manage your mentor profile, choose when you are available, and guide learners.";
+    if (actions) actions.innerHTML = '<a class="btn" href="#dashboard">Open mentor dashboard</a>' + (user.role === "both" ? '<a class="btn ghost" href="#tutors">Find a mentor</a>' : '<a class="btn ghost" href="#doubts">Answer a question</a>');
+    if (cards) cards.innerHTML = '<a href="#dashboard"><b>Your dashboard</b><span>Manage learner requests, profile, and availability in one place.</span></a><a href="#doubts"><b>Share what you know</b><span>Answer questions and build your reputation.</span></a>' + (user.role === "both" ? '<a href="#tutors"><b>Get guidance</b><span>Find mentors for the subjects you are learning.</span></a>' : '<a href="#pricing"><b>Blue Tick</b><span>Optional one-time payment; price and launch date to be decided.</span></a>');
   } else {
-    title.textContent = "Find a mentor who gets it.";
-    intro.textContent = "Peer Connect is a learning network for your school. Find mentors, ask questions, and learn from people who know your topics.";
-    actions.innerHTML = '<a class="btn" href="#tutors">Find a mentor</a><a class="btn ghost" href="#doubts">Ask a question</a>';
-    cards.innerHTML = '<a href="#tutors"><b>Mentors</b><span>Find verified mentors by subject and location.</span></a><a href="#doubts"><b>Questions</b><span>Ask questions, upvote the best ones, and answer what you know.</span></a><a href="#pricing"><b>Pricing</b><span>Free for learners and mentors. Optional Blue Tick may come later.</span></a>';
+    if (title) title.textContent = "Find a mentor who gets it.";
+    if (intro) intro.textContent = "Peer Connect is a learning network for your school. Find mentors, ask questions, and learn from people who know your topics.";
+    if (actions) actions.innerHTML = '<a class="btn" href="#tutors">Find a mentor</a><a class="btn ghost" href="#doubts">Ask a question</a>';
+    if (cards) cards.innerHTML = '<a href="#tutors"><b>Mentors</b><span>Find verified mentors by subject and location.</span></a><a href="#doubts"><b>Questions</b><span>Ask questions, upvote the best ones, and answer what you know.</span></a><a href="#pricing"><b>Pricing</b><span>Free for learners and mentors. Optional Blue Tick may come later.</span></a>';
   }
 }
 document.querySelectorAll('[data-nav="verification"]').forEach(function (link) {
