@@ -115,7 +115,7 @@ function draw() {
         "</div>" +
         (t.me
           ? '<button class="btn ghost" data-edit-tutor-card>Edit profile</button>'
-          : '<button class="btn" data-book-mentor="' + esc(t.user_id) + '">Book a session</button>') +
+          : '<div class="mentor-booking-cta"><span>Free · 30 min</span><button class="btn" data-book-mentor="' + esc(t.user_id) + '">Book now</button></div>') +
         "</div></article>"
       );
     })
@@ -163,8 +163,7 @@ grid.addEventListener("click", async function (e) {
     e.stopPropagation();
     if (!user) { openSign(); return; }
     if (!canLearn(user)) { document.getElementById("count").textContent = "Choose Learner or Both in your profile to book a mentor."; return; }
-    pendingBookingMentorId = book.dataset.bookMentor;
-    location.hash = "sessions";
+    startMentorBooking(tutors[Number(book.closest("[data-profile-index]").dataset.profileIndex)]);
     return;
   }
   var card = e.target.closest("[data-profile-index]");
@@ -199,8 +198,7 @@ function renderTutorProfilePage() {
     if (tutor.me) { openTutor(); return; }
     if (!user) { openSign(); return; }
     if (!canLearn(user)) { document.getElementById("profileContent").textContent = "Choose Learner or Both in your profile to book a session."; return; }
-    pendingBookingMentorId = tutor.user_id;
-    location.hash = "sessions";
+    startMentorBooking(tutor);
   };
   var socialRoot = document.getElementById("profileSocialStats");
   socialRoot.onclick = async function (event) {
@@ -1064,13 +1062,25 @@ function paintSessionDateStrip() {
     return '<button type="button" class="session-date' + (date === first ? ' selected' : '') + '" data-session-date="' + date + '"><span>' + label + '</span><b>' + Number(date.slice(-2)) + '</b></button>';
   }).join("");
 }
+function startMentorBooking(tutor) {
+  if (!tutor || !tutor.user_id) return;
+  if (!user) { openSign(); return; }
+  if (!canLearn(user)) { window.alert("Choose Learner or Both in your profile to book a mentor."); return; }
+  pendingBookingMentorId = tutor.user_id;
+  scheduleMentors = [{ id: tutor.user_id, name: tutor.n || "Verified mentor" }];
+  scheduleTypes = [];
+  scheduleSlots = [];
+  selectedScheduleSlotIndex = null;
+  var title = document.getElementById("bookingMentorTitle"), dialog = document.getElementById("bookingDialog");
+  if (title) title.textContent = tutor.n || "Verified mentor";
+  renderBookingForm();
+  if (dialog && !dialog.open) dialog.showModal();
+}
 function renderBookingForm() {
   var root = document.getElementById("bookingForm"); if (!root) return;
   if (!scheduleMentors.length) { root.innerHTML = '<div class="community-empty">No verified mentors are available for booking right now.</div><a class="btn ghost" href="#home">Browse mentors</a>'; return; }
-  var options = scheduleMentors.map(function (mentor) { return '<option value="' + esc(mentor.id) + '"' + (mentor.id === pendingBookingMentorId ? ' selected' : '') + '>' + esc(mentor.name) + '</option>'; }).join("");
-  root.innerHTML = '<div class="schedule-form"><label>Mentor<select id="sessionMentor">' + options + '</select></label><input id="sessionType" type="hidden"><p class="session-policy-note">Company schedule · 30 minutes · Daily 8:00 AM–8:00 PM IST</p><label class="session-date-label">Choose a day<input id="sessionDate" type="date" min="' + isoTodayIn("Asia/Kolkata") + '" value="' + isoTodayIn("Asia/Kolkata") + '"></label><div id="sessionDateStrip" class="session-date-strip" aria-label="Choose a day"></div><p id="sessionBookingMessage" class="muted" role="status"></p></div><div id="sessionSlots" class="schedule-slots"><div class="community-empty">Finding company-set times…</div></div><div class="session-booking-footer"><span class="session-free-note">Peer Connect sessions are free</span><button class="btn" id="requestSession" type="button" hidden disabled>Request booking</button></div>';
+  root.innerHTML = '<div class="schedule-form"><input id="sessionType" type="hidden"><p class="session-policy-note">30-minute learning chat · Daily 8:00 AM–8:00 PM IST</p><label class="session-date-label">Choose a day<input id="sessionDate" type="date" min="' + isoTodayIn("Asia/Kolkata") + '" value="' + isoTodayIn("Asia/Kolkata") + '"></label><div id="sessionDateStrip" class="session-date-strip" aria-label="Choose a day"></div><p id="sessionBookingMessage" class="muted" role="status"></p></div><div id="sessionSlots" class="schedule-slots"><div class="community-empty">Finding company-set times…</div></div><div class="session-booking-footer"><span class="session-free-note">Peer Connect sessions are free</span><button class="btn" id="requestSession" type="button" hidden disabled>Request booking</button></div>';
   paintSessionDateStrip();
-  document.getElementById("sessionMentor").onchange = loadSessionTypes;
   document.getElementById("sessionDate").onchange = function () { paintSessionDateStrip(); loadSessionSlots(); };
   document.getElementById("sessionDateStrip").onclick = function (event) {
     var day = event.target.closest("[data-session-date]"); if (!day) return;
@@ -1101,20 +1111,19 @@ function renderBookingForm() {
   loadSessionTypes();
 }
 function selectedScheduleMentor() {
-  var select = document.getElementById("sessionMentor");
-  return select && scheduleMentors.find(function (mentor) { return mentor.id === select.value; });
+  return scheduleMentors.find(function (mentor) { return mentor.id === pendingBookingMentorId; }) || null;
 }
 async function loadSessionTypes() {
-  var mentor = selectedScheduleMentor(), select = document.getElementById("sessionType");
-  if (!mentor || !select) return;
+  var mentor = selectedScheduleMentor(), typeInput = document.getElementById("sessionType");
+  if (!mentor || !typeInput) return;
   scheduleTypes = [];
   scheduleSlots = [];
   selectedScheduleSlotIndex = null;
-  select.value = "";
+  typeInput.value = "";
   var result = await supabaseClient.from("peer_session_types").select("id,duration_minutes,timezone,is_platform_session").eq("mentor_id", mentor.id).eq("is_platform_session", true).eq("is_active", true).maybeSingle();
   if (result.error || !result.data) { var msg=document.getElementById("sessionBookingMessage"); if(msg)msg.textContent=result.error ? authErrorText(result.error) : "Company booking setup is not ready for this mentor."; document.getElementById("sessionSlots").innerHTML='<div class="community-empty">Booking setup is unavailable right now.</div>'; return; }
   scheduleTypes = [result.data];
-  select.value = result.data.id;
+  typeInput.value = result.data.id;
   loadSessionSlots();
 }
 async function loadSessionSlots() {
@@ -1167,27 +1176,28 @@ async function loadPeerSessionList() {
   root.innerHTML = '<h3>Upcoming</h3>'+(upcoming.length?upcoming.map(rowHtml).join(""):'<p class="muted">No upcoming sessions.</p>')+'<details><summary>Past and cancelled · '+previous.length+'</summary>'+(previous.length?previous.map(rowHtml).join(""):'<p class="muted">Nothing here yet.</p>')+'</details>';
 }
 async function loadPeerSessionsPage() {
-  var booking = document.getElementById("bookingForm");
-  if (!user) { if(booking)booking.innerHTML='<div class="community-empty">Sign in to view sessions.</div><button type="button" class="btn" data-schedule-signin>Sign in</button>'; return; }
-  if (!canLearn(user)) { if(booking)booking.innerHTML='<div class="community-empty">Mentor accounts manage availability and session requests from the mentor dashboard.</div><a class="btn ghost" href="#dashboard">Open mentor dashboard</a>'; await loadPeerSessionList(); return; }
-  if (booking) booking.innerHTML='<div class="community-empty">Loading verified mentors…</div>';
-  var result = await supabaseClient.rpc("get_verified_tutor_directory", { p_state: null, p_city: null });
-  if (result.error) { if(booking)booking.innerHTML='<div class="community-empty">'+esc(authErrorText(result.error))+'</div>'; await loadPeerSessionList(); return; }
-  scheduleMentors = (result.data||[]).map(function(row){ return {id:row.user_id,name:row.display_name||"Verified mentor"}; }).filter(function(mentor){return mentor.id!==user.id;});
-  if (pendingBookingMentorId && !scheduleMentors.some(function(mentor){return mentor.id===pendingBookingMentorId;})) pendingBookingMentorId = "";
-  if (!pendingBookingMentorId && scheduleMentors.length) pendingBookingMentorId = scheduleMentors[0].id;
-  draw();
-  if (booking) renderBookingForm();
+  var note = document.getElementById("sessionPageNote"), layout = document.querySelector(".sessions-only-layout"), bookingHelp = document.getElementById("sessionBookingHelp");
+  var mentorOnly = !!user && canMentor(user) && !canLearn(user);
+  if (layout) layout.classList.toggle("mentor-view", mentorOnly);
+  if (bookingHelp) bookingHelp.hidden = mentorOnly;
+  if (note) note.textContent = !user ? "Sign in to view your booked sessions." : (canMentor(user) && !canLearn(user) ? "Review and manage the sessions learners have booked with you." : (canMentor(user) ? "Your sessions appear here as a learner and as a mentor. Book from the mentor’s profile." : "Your booked sessions appear here. To book, open a mentor profile and choose Book a session."));
+  if (!user) {
+    var root = document.getElementById("sessionList");
+    if (root) root.innerHTML = '<div class="community-empty">Sign in to see your session requests and chats.</div><button type="button" class="btn" data-schedule-signin>Sign in</button>';
+    return;
+  }
   await loadPeerSessionList();
 }
 document.getElementById("refreshSessions").addEventListener("click", loadPeerSessionsPage);
-document.getElementById("bookingForm").addEventListener("click", function(event){if(event.target.closest("[data-schedule-signin]"))openSign();});
 document.getElementById("sessionList").addEventListener("click", async function(event){
+  if (event.target.closest("[data-schedule-signin]")) { openSign(); return; }
   var chatButton=event.target.closest("[data-session-chat]"); if(chatButton){openSessionChat(chatButton.dataset.sessionChat);return;}
   var button=event.target.closest("[data-session-action]"); if(!button)return; button.disabled=true;
   var result=await supabaseClient.from("peer_sessions").update({status:button.dataset.sessionAction}).eq("id",button.dataset.sessionId);
   if(result.error)window.alert(authErrorText(result.error)); await loadPeerSessionList();
 });
+document.getElementById("closeBooking").addEventListener("click", function () { document.getElementById("bookingDialog").close(); });
+document.getElementById("bookingDialog").addEventListener("click", function (event) { if (event.target === this) this.close(); });
 
 function sessionChatCanSend(session) {
   var now = Date.now();
