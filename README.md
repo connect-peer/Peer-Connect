@@ -41,19 +41,19 @@ it; the Supabase client is loaded from jsDelivr, and OAuth does not work from a
 
 ## v2.0.0 database setup
 
-Before deploying the v2.0.0 frontend, open the Peer Connect project in Supabase,
-go to **SQL Editor → New query**, paste and run
-`peer_connect_v2_social_scheduling.sql`, then reload the app. This adds social
-post media/comments/likes and scheduling tables, policies, slot generation, and
-database overlap protection. It uses `Asia/Kolkata` for weekly availability and
-stores actual session instants as `timestamptz`.
+Before deploying the frontend, open the Peer Connect project in Supabase and
+go to **SQL Editor → New query**. If the scheduling tables are not in the
+database yet, run `peer_connect_v2_social_scheduling.sql` first. Then run
+`peer_connect_company_fixed_sessions.sql`. The second migration changes booking
+to company-set 30-minute slots every day from 08:00 to 20:00 in `Asia/Kolkata`.
+Mentors can block unavailable periods; they cannot set weekly hours or name
+session types. Actual session instants remain `timestamptz`.
 
-The scheduling flow is **accepted connection → choose mentor session type → pick
-an available slot → mentor confirms**. Pending and confirmed sessions both hold
-the slot. Learners can cancel; mentors can confirm, decline, cancel, complete,
-or mark no-show. Only verified mentors can publish session types or receive
-bookings. The database checks accepted connections and availability and blocks
-overlaps for both mentor and learner.
+The scheduling flow is **accepted connection → choose a day → pick a fixed
+30-minute slot → mentor confirms**. Pending and confirmed sessions both hold the
+slot. Learners can cancel; mentors can confirm, decline, cancel, complete, or
+mark no-show. Only verified mentors can receive bookings. The database checks
+accepted connections, company hours, mentor blocks, and overlapping sessions.
 
 Photo/video uploads use the private `post-media` bucket; the app creates
 short-lived signed links for signed-in feed viewers. Users can upload or delete
@@ -61,10 +61,9 @@ files only in their own folder. Media should not contain private school or
 account information. A static GitHub Pages site must use only the Supabase publishable
 key in `supabase-config.js`; never put a service-role key in frontend files.
 
-If booking slots show `column reference "timezone" is ambiguous`, run
-`peer_connect_schedule_timezone_fix.sql` in the Supabase SQL Editor. It replaces
-the existing slot function with a version that qualifies the session-type
-timezone column, while keeping the same function signature and access rules.
+The company fixed-session migration also replaces the earlier slot function,
+including the timezone qualification that prevents the prior ambiguous-column
+error. Use that migration for the current schedule.
 
 ## Profile setup save fix
 
