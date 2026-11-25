@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.2.1](https://github.com/connect-peer/Peer-Connect/compare/v2.2.0...v2.2.1) (2026-11-25)
+
+
+### Bug Fixes
+
+* chat ([6966ff3](https://github.com/connect-peer/Peer-Connect/commit/6966ff3dfeb16558f95867ad2c115c48f7535c0a))
+* home is now mentors ([562a03e](https://github.com/connect-peer/Peer-Connect/commit/562a03e629ae1ef14b21d981741af0795c265692))
+* remove connection ([b66052d](https://github.com/connect-peer/Peer-Connect/commit/b66052d0e9af048b39ed1748ee8ade1126e61c55))
+
 ## [2.2.0](https://github.com/connect-peer/Peer-Connect/compare/v2.1.1...v2.2.0) (2026-11-25)
 
 
