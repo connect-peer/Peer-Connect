@@ -1975,9 +1975,18 @@ document.getElementById("ftabs").addEventListener("click", function (e) {
 });
 function drawMe() {
   var h = "";
-  var mu = 'style="margin:6px 0 12px;color:var(--muted)"';
-  h += '<div class="box"><b>Account</b><p ' + mu + '>' + (user ? esc(user.n) + " · " + esc(user.e) + "<br>" + accountTypeLabel(user.role) + " · Class " + esc(String(user.grade || "")) + '<br>' + esc(user.location ? [user.location.school,user.location.city,user.location.state,user.location.country].join(" · ") : "Location not set") : "You are not signed in.") + '</p>' + (user ? '<button class="btn ghost" data-edit-details>Edit profile details</button><div class="profile-appearance"><label class="btn ghost">Change profile photo<input type="file" accept="image/jpeg,image/png,image/webp" data-profile-image="avatar"></label><label class="btn ghost">Change banner<input type="file" accept="image/jpeg,image/png,image/webp" data-profile-image="banner"></label></div><div class="profile-social" id="myFollowStats">Loading followers…</div>' : '<button class="btn" data-go="signin">Sign up / Sign in</button>') + '</div>';
+  if (!user) {
+    h = '<div class="box me-signin-card"><div><span class="community-kicker">YOUR PEER CONNECT PROFILE</span><h3>Sign in to see your page</h3><p class="muted">Manage your profile, photo, cover, and community details here.</p></div><button class="btn" data-go="signin">Sign in</button></div>';
+  } else {
+    var location = user.location || {};
+    var locationText = [location.city, location.state, location.country].filter(Boolean).join(", ") || "Add your location";
+    h = '<div class="me-profile-page"><div class="me-profile-hero"><div class="me-cover" id="myProfileCover"></div><div class="me-identity-row"><div class="me-avatar">' + (user.avatarUrl ? '<img src="' + esc(user.avatarUrl) + '" alt="Profile photo">' : esc(ini(user.n))) + '</div><div class="me-identity-copy"><h3>' + esc(user.n) + '</h3><p>' + esc(accountTypeLabel(user.role)) + ' · Class ' + esc(String(user.grade || "—")) + '</p></div></div></div><div class="me-page-grid"><section class="box me-detail-panel"><h3>Account details</h3><dl class="me-detail-list"><div><dt>Email</dt><dd>' + esc(user.e) + '</dd></div><div><dt>Account type</dt><dd>' + esc(accountTypeLabel(user.role)) + '</dd></div><div><dt>Class</dt><dd>' + esc(String(user.grade || "—")) + '</dd></div><div><dt>School</dt><dd>' + esc(location.school || "Add your school") + '</dd></div><div><dt>Location</dt><dd>' + esc(locationText) + '</dd></div></dl></section><aside class="box me-control-panel"><h3>Profile settings</h3><p class="muted">Keep your profile photo, banner, school, and location up to date.</p><button class="btn me-edit-button" data-edit-details>Edit profile</button><div class="me-image-actions"><label class="btn ghost">Change profile photo<input type="file" accept="image/jpeg,image/png,image/webp" data-profile-image="avatar"></label><label class="btn ghost">Change banner<input type="file" accept="image/jpeg,image/png,image/webp" data-profile-image="banner"></label></div><div class="me-community"><h4>Community</h4><div class="profile-social" id="myFollowStats">Loading followers…</div></div></aside></div></div>';
+  }
   document.getElementById("meBody").innerHTML = h;
+  if (user && user.bannerUrl) {
+    var cover = document.getElementById("myProfileCover");
+    if (cover) cover.style.backgroundImage = 'url("' + user.bannerUrl.replace(/["\\\\]/g, "") + '")';
+  }
   document.querySelectorAll('#meBody [data-profile-image]').forEach(function (input) { input.onchange = async function () { if (input.files[0]) await uploadProfileImage(input.files[0], input.dataset.profileImage); }; });
   if (user) loadProfileSocialForMe();
 }
