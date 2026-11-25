@@ -18,12 +18,13 @@ A front-end prototype connected to Supabase Auth. People can create an account w
 
 | Page | Route | What it does |
 |---|---|---|
-| Home | `#home` | Pitch, three cards linking to other pages, "How it works" steps |
+| Home | `#home` | Signed-in community feed with text, photo/video posts, likes, and comments |
 | Tutors | `#tutors` | Search verified tutors, filter by subject/state/city, open profile cards, Connect |
 | Doubts | `#doubts` | Ask a doubt, upvote, sort Hot/New/Top, filter by subject, answer |
 | Pricing | `#pricing` | Student and tutor accounts are free; optional tutor Blue Tick is planned as a one-time purchase with price TBD |
 | My page | `#me` | Account details and location editing |
 | Tutor dashboard | `#dashboard` | Verification submission/status, location-filtered requests, availability, and profile editing |
+| Study sessions | `#sessions` | Book times with accepted mentors and view upcoming/past sessions |
 | Verification review | `#verification` | Private review queue for allowlisted reviewers only |
 
 On phones a bottom tab bar replaces the top links.
@@ -37,6 +38,28 @@ On phones a bottom tab bar replaces the top links.
 No framework or build step. Serve this folder through a local web server to run
 it; the Supabase client is loaded from jsDelivr, and OAuth does not work from a
 `file://` URL.
+
+## v2.0.0 database setup
+
+Before deploying the v2.0.0 frontend, open the Peer Connect project in Supabase,
+go to **SQL Editor → New query**, paste and run
+`peer_connect_v2_social_scheduling.sql`, then reload the app. This adds social
+post media/comments/likes and scheduling tables, policies, slot generation, and
+database overlap protection. It uses `Asia/Kolkata` for weekly availability and
+stores actual session instants as `timestamptz`.
+
+The scheduling flow is **accepted connection → choose mentor session type → pick
+an available slot → mentor confirms**. Pending and confirmed sessions both hold
+the slot. Learners can cancel; mentors can confirm, decline, cancel, complete,
+or mark no-show. Only verified mentors can publish session types or receive
+bookings. The database checks accepted connections and availability and blocks
+overlaps for both mentor and learner.
+
+Photo/video uploads use the private `post-media` bucket; the app creates
+short-lived signed links for signed-in feed viewers. Users can upload or delete
+files only in their own folder. Media should not contain private school or
+account information. A static GitHub Pages site must use only the Supabase publishable
+key in `supabase-config.js`; never put a service-role key in frontend files.
 
 ## 3. Current business rules
 

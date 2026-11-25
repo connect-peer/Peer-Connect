@@ -1001,18 +1001,22 @@ dialog.auth-screen #dbody { width: 100%; height: 100%; display: grid; grid-templ
 .verify-doc-fields input { padding:10px; border:1px solid var(--line); border-radius:10px; background:var(--surface); color:var(--ink); }
 .admin-doc { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; padding:8px 0; }
 @media(max-width:640px){.profile-cover{min-height:110px}.profile-head{padding-left:16px;padding-right:16px}.profile-content{padding:14px 16px}.location-filters select{flex:1;min-width:135px}}
+.social-home{max-width:1380px;margin:0 auto;padding:28px 22px 60px;display:grid;grid-template-columns:205px minmax(0,680px) 280px;gap:24px;align-items:start}.social-rail{position:sticky;top:90px;display:grid;gap:7px}.social-rail-link{padding:13px 15px;border-radius:14px;text-decoration:none;color:var(--muted);font-size:17px;font-weight:700;display:flex;gap:13px;align-items:center}.social-rail-link:hover,.social-rail-link.active{background:var(--soft);color:var(--brand)}.social-rail-note,.social-side-card{border:1px solid var(--line);border-radius:18px;background:var(--surface);padding:18px}.social-rail-note{display:grid;gap:7px;margin-top:14px}.social-rail-note span,.social-side-card p{color:var(--muted);font-size:14px;line-height:1.55}.social-feed-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:17px}.social-feed-title h1{font-size:clamp(28px,4vw,38px);letter-spacing:-.04em;margin-top:5px}.social-composer{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:18px;box-shadow:0 8px 26px rgba(20,34,70,.05)}.social-composer-top{display:flex;gap:13px}.social-avatar{flex:0 0 42px;width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:var(--soft);color:var(--brand);font-weight:800}.social-avatar img{width:100%;height:100%;object-fit:cover;border-radius:inherit}.social-composer textarea{flex:1;min-width:0;resize:vertical;border:0;background:transparent;color:var(--ink);font:inherit;font-size:16px;outline:none;min-height:74px}.social-composer-bottom{display:flex;align-items:center;justify-content:space-between;gap:12px;border-top:1px solid var(--line);padding-top:13px;margin-top:10px}.social-compose-tools{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.social-media-pick{color:var(--brand);font-weight:750;cursor:pointer}.social-media-pick input{position:absolute;width:1px;height:1px;opacity:0}.social-preview img,.social-preview video,.social-post-media img,.social-post-media video{display:block;width:100%;max-height:520px;object-fit:contain;background:#05070c;border-radius:14px;margin-top:13px}.social-message{min-height:0;color:var(--muted);font-size:13px;margin-top:8px}.social-feed-tabs{display:flex;justify-content:space-between;gap:12px;padding:19px 4px 12px;border-bottom:1px solid var(--line);font-weight:750}.social-post-list{display:grid;gap:12px;padding-top:12px}.social-post{background:var(--surface);border:1px solid var(--line);border-radius:19px;padding:18px}.social-post-head{display:flex;align-items:center;gap:11px}.social-post-head .social-avatar{overflow:hidden}.social-post-author{font-weight:800}.social-post-time{color:var(--muted);font-size:12px;margin-top:3px}.social-post-copy{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.65;margin:15px 0 0}.social-post-actions{display:flex;gap:8px;border-top:1px solid var(--line);margin-top:14px;padding-top:11px}.social-post-actions button{flex:1;border:0;border-radius:12px;background:transparent;color:var(--muted);font:inherit;font-weight:700;padding:10px;cursor:pointer}.social-post-actions button:hover,.social-post-actions button[aria-pressed=true]{background:var(--soft);color:var(--brand)}.social-comments{border-top:1px solid var(--line);margin-top:12px;padding-top:10px}.social-comment{padding:7px 0;font-size:14px;line-height:1.5}.social-comment b{margin-right:6px}.social-comment-form{display:flex;gap:8px;margin-top:10px}.social-comment-form input{flex:1;min-width:0;padding:11px;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--ink)}.social-side-card{margin-bottom:13px}.social-side-card h2,.social-side-card h3{margin:8px 0}.social-side-card a{display:block;color:var(--brand);font-weight:700;text-decoration:none;padding:7px 0}.schedule-layout{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:16px;margin:20px 0}.schedule-layout .box h2{font-size:22px}.schedule-form{display:grid;gap:11px;margin-top:14px}.schedule-form label{display:grid;gap:6px;font-weight:700}.schedule-form input,.schedule-form select,.schedule-form textarea{padding:10px 12px;border:1px solid var(--line);border-radius:11px;background:var(--bg);color:var(--ink);font:inherit}.schedule-slots{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}.schedule-slot{border:1px solid var(--brand);border-radius:12px;background:var(--soft);color:var(--brand);padding:9px 12px;font-weight:750;cursor:pointer}.session-row{border-top:1px solid var(--line);padding:13px 0}.session-row:first-child{border-top:0}.session-row p{margin:5px 0;color:var(--muted);font-size:14px}.session-actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}.schedule-manage{margin-top:18px}.schedule-manage-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.schedule-manage .box{padding:15px}.schedule-manage-list{margin-top:10px;color:var(--muted);font-size:13px}.tabbar a[data-nav=sessions]{display:none}
+@media(max-width:1050px){.social-home{grid-template-columns:175px minmax(0,680px);max-width:930px}.social-sidebar{display:none}}
+@media(max-width:700px){.social-home{display:block;padding:14px 12px 76px}.social-rail{display:flex;position:static;overflow:auto;margin-bottom:12px}.social-rail-link{white-space:nowrap;padding:10px 12px}.social-rail-link span{display:inline}.social-rail-note{display:none}.social-feed-title h1{font-size:27px}.social-composer,.social-post{padding:14px}.schedule-layout,.schedule-manage-grid{grid-template-columns:1fr}.tabbar a[data-nav=sessions]{display:block}}
 </style>
   </head>
   <body>
     <header>
       <div class="wrap">
-        <a class="logo" href="#home"><i></i>Peer Connect <span class="app-version" id="appVersion">v1.0.0</span></a>
+        <a class="logo" href="#home"><i></i>Peer Connect <span class="app-version" id="appVersion">v2.0.0</span></a>
         <nav>
           <a class="h" data-nav="home" href="#home">Home</a
           ><a class="h" data-nav="tutors" href="#tutors">Mentors</a
           ><a class="h tutor-only" data-role-nav="tutor" data-nav="dashboard" href="#dashboard" hidden>Mentor dashboard</a
           ><a class="h admin-only" data-nav="verification" href="#verification" hidden>Verify mentors</a
           ><a class="h" data-nav="doubts" href="#doubts">Doubts</a
+          ><a class="h" data-nav="sessions" href="#sessions">Sessions</a
           ><a class="h" data-nav="pricing" href="#pricing">Pricing</a
           ><a class="h" data-nav="me" href="#me">My page</a
           ><button class="btn ghost h" id="btnTutor">Become a mentor</button
@@ -1022,46 +1026,25 @@ dialog.auth-screen #dbody { width: 100%; height: 100%; display: grid; grid-templ
     </header>
 
     <main id="top">
-      <div class="wrap hero" data-v="home">
-        <h1 id="homeTitle">Find a classmate who gets it.</h1>
-        <p id="homeIntro">
-          Peer Connect is a peer learning network for your school. Find mentors, ask
-          questions, and learn from people who have been through the same
-          exams.
-        </p>
-        <div class="search" id="homeActions">
-          <a class="btn" href="#tutors">Find a mentor</a
-          ><a class="btn ghost" href="#doubts">Ask a doubt</a>
+      <section class="social-home" data-v="home">
+        <aside class="social-rail">
+          <a href="#home" class="social-rail-link active">⌂ <span>Feed</span></a>
+          <a href="#tutors" class="social-rail-link">◎ <span>Find mentors</span></a>
+          <a href="#doubts" class="social-rail-link">? <span>Doubts</span></a>
+          <a href="#me" class="social-rail-link">◉ <span>My page</span></a>
+          <div class="social-rail-note"><b>Learn together</b><span>Share what you know. Ask when you’re stuck.</span></div>
+        </aside>
+        <div class="social-timeline">
+          <div class="social-feed-title"><div><span class="community-kicker">PEER CONNECT</span><h1>Your learning feed</h1></div><button class="btn ghost" id="refreshSocialFeed" type="button">Refresh</button></div>
+          <section class="social-composer" aria-label="Create a post">
+            <div class="social-composer-top"><div class="social-avatar" id="socialComposerAvatar">PC</div><textarea id="socialPostText" maxlength="5000" rows="3" placeholder="Share a study tip, ask the community, or post an update…" aria-label="Write a post"></textarea></div>
+            <div class="social-composer-bottom"><div class="social-compose-tools"><label class="social-media-pick">▧ Photo / video<input id="socialPostMedia" type="file" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime"></label><span id="socialMediaName" class="muted">Up to 50 MB</span></div><button class="btn" id="publishSocialPost" type="button">Post</button></div>
+            <div id="socialPostPreview" class="social-preview" hidden></div><div id="socialPostMessage" class="social-message" role="status"></div>
+          </section>
+          <div class="social-feed-tabs"><span>Recent posts</span><span class="muted">From your learning community</span></div>
+          <div id="socialPostList" class="social-post-list" aria-live="polite"><div class="community-empty">Sign in to load your learning feed.</div></div>
         </div>
-        <div class="homecards" id="homeCards">
-          <a href="#tutors"
-            ><b>Mentors</b
-            ><span
-              >Search verified mentors by subject and send a connection
-              request.</span
-            ></a
-          >
-          <a href="#doubts"
-            ><b>Doubts</b
-            ><span
-              >Ask questions, upvote the best ones, and answer what you
-              know.</span
-            ></a
-          >
-          <a href="#pricing"
-            ><b>Pricing</b
-            ><span>Free for everyone, with optional extras.</span></a
-          >
-        </div>
-      </div>
-      <section class="home-community" data-v="home">
-        <div class="wrap">
-          <div class="home-community-heading">
-            <div><span class="community-kicker">PEER CONNECT COMMUNITY</span><h2>Questions waiting for a hand</h2><p>Help a classmate get unstuck, one answer at a time.</p></div>
-            <a class="btn ghost" href="#doubts">Open Doubts</a>
-          </div>
-          <div class="home-question-grid" id="homeQuestionList" aria-live="polite"><div class="community-empty">Loading recent questions…</div></div>
-        </div>
+        <aside class="social-sidebar"><section class="social-side-card"><span class="community-kicker">YOUR COMMUNITY</span><h2>Grow by sharing</h2><p>Post a helpful explanation, a resource, or a quick study update. Keep personal details private.</p><a href="#doubts">Go to Doubts →</a></section><section class="social-side-card"><h3>Explore Peer Connect</h3><a href="#tutors">Find a mentor</a><a href="#doubts">Answer a doubt</a><a href="#me">Edit your profile</a></section></aside>
       </section>
       <div class="wrap hero" data-v="tutors">
         <h1>Verified mentors</h1>
@@ -1100,6 +1083,14 @@ dialog.auth-screen #dbody { width: 100%; height: 100%; display: grid; grid-templ
           <h2>Mentor dashboard</h2>
           <p>Manage your availability, review requests, and help learners get unstuck.</p>
           <div id="tutorDashboardBody"></div>
+        </div>
+      </section>
+
+      <section id="sessions" data-v="sessions" hidden>
+        <div class="wrap">
+          <div class="social-feed-title"><div><span class="community-kicker">PEER CONNECT</span><h1>Study sessions</h1></div><button class="btn ghost" id="refreshSessions" type="button">Refresh</button></div>
+          <p class="muted">Sessions unlock after a mentor accepts your connection. Times are shown in India Standard Time (Asia/Kolkata).</p>
+          <div class="schedule-layout"><section class="box"><h2>Book a session</h2><p class="muted">Choose an accepted mentor, session type, and an open time.</p><div id="bookingForm"><div class="community-empty">Loading accepted connections…</div></div></section><section class="box"><h2>Your sessions</h2><div id="sessionList" class="session-list"><div class="community-empty">Loading sessions…</div></div></section></div>
         </div>
       </section>
 
@@ -1147,7 +1138,7 @@ dialog.auth-screen #dbody { width: 100%; height: 100%; display: grid; grid-templ
         </div>
       </section>
 
-      <section id="how" data-v="home">
+      <section id="how" data-v="how" hidden>
         <div class="wrap">
           <h2>How it works</h2>
           <p>
@@ -1245,6 +1236,7 @@ dialog.auth-screen #dbody { width: 100%; height: 100%; display: grid; grid-templ
       ><a class="tutor-only" data-role-nav="tutor" data-nav="dashboard" href="#dashboard" hidden>Dashboard</a
       ><a class="admin-only" data-nav="verification" href="#verification" hidden>Verify</a
       ><a data-nav="doubts" href="#doubts">Doubts</a
+      ><a data-nav="sessions" href="#sessions">Sessions</a
       ><a data-nav="pricing" href="#pricing">Pricing</a
       ><a data-nav="me" href="#me">Me</a>
     </nav>

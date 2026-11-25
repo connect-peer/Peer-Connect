@@ -983,6 +983,135 @@ document.querySelectorAll('[data-nav="verification"]').forEach(function (link) {
 });
 
 var requestLocationState = "", requestLocationCity = "";
+var scheduleConnections = [], scheduleTypes = [], scheduleSlots = [], scheduleSlotsContext = null;
+function isoTodayIn(timezone) {
+  var parts = new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
+  var values = {}; parts.forEach(function (part) { values[part.type] = part.value; });
+  return values.year + "-" + values.month + "-" + values.day;
+}
+function zonedInputToIso(value, timezone) {
+  var parts = value.split(/[T:-]/).map(Number);
+  if (parts.length < 5 || parts.some(function (part) { return !Number.isFinite(part); })) return null;
+  var wall = Date.UTC(parts[0], parts[1] - 1, parts[2], parts[3], parts[4]);
+  var candidate = wall;
+  for (var i = 0; i < 3; i++) {
+    var formatted = new Intl.DateTimeFormat("en-GB", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(candidate));
+    var got = {}; formatted.forEach(function (part) { got[part.type] = Number(part.value); });
+    var shown = Date.UTC(got.year, got.month - 1, got.day, got.hour, got.minute);
+    candidate += wall - shown;
+  }
+  return new Date(candidate).toISOString();
+}
+function sessionTime(value, timezone) {
+  return new Intl.DateTimeFormat(undefined, { timeZone: timezone || "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) + " · " + (timezone || "Asia/Kolkata");
+}
+function renderBookingForm() {
+  var root = document.getElementById("bookingForm"); if (!root) return;
+  if (!scheduleConnections.length) { root.innerHTML = '<div class="community-empty">No accepted mentor connections yet. Find a mentor, connect, and wait for them to accept before scheduling.</div><a class="btn ghost" href="#tutors">Find a mentor</a>'; return; }
+  var options = scheduleConnections.map(function (connection) { return '<option value="' + esc(connection.id) + '">' + esc(connection.name) + '</option>'; }).join("");
+  root.innerHTML = '<div class="schedule-form"><label>Accepted mentor<select id="sessionConnection">' + options + '</select></label><label>Session type<select id="sessionType"><option value="">Choose a session type</option></select></label><label>Starting from<input id="sessionDate" type="date" min="' + isoTodayIn("Asia/Kolkata") + '" value="' + isoTodayIn("Asia/Kolkata") + '"></label><p id="sessionBookingMessage" class="muted" role="status"></p></div><div id="sessionSlots" class="schedule-slots"></div>';
+  document.getElementById("sessionConnection").onchange = loadSessionTypes;
+  document.getElementById("sessionType").onchange = loadSessionSlots;
+  document.getElementById("sessionDate").onchange = loadSessionSlots;
+  document.getElementById("sessionSlots").onclick = async function (event) {
+    var button = event.target.closest("[data-session-slot]"); if (!button || !scheduleSlotsContext) return;
+    button.disabled = true;
+    var slot = scheduleSlots[Number(button.dataset.sessionSlot)];
+    var result = await supabaseClient.from("peer_sessions").insert({ connection_id: scheduleSlotsContext.connectionId, session_type_id: scheduleSlotsContext.typeId, learner_id: user.id, mentor_id: scheduleSlotsContext.mentorId, starts_at: slot.starts_at, ends_at: slot.ends_at, timezone: slot.timezone, status: "pending" });
+    var message = document.getElementById("sessionBookingMessage");
+    if (result.error) { message.textContent = authErrorText(result.error); button.disabled = false; }
+    else { message.textContent = "Session request sent. It will appear as pending until the mentor confirms it."; await loadSessionSlots(); await loadPeerSessionList(); }
+  };
+  loadSessionTypes();
+}
+function selectedScheduleConnection() {
+  var select = document.getElementById("sessionConnection");
+  return select && scheduleConnections.find(function (connection) { return connection.id === select.value; });
+}
+async function loadSessionTypes() {
+  var connection = selectedScheduleConnection(), select = document.getElementById("sessionType");
+  if (!connection || !select) return;
+  select.innerHTML = '<option value="">Loading session types…</option>';
+  var result = await supabaseClient.from("peer_session_types").select("id,title,duration_minutes,timezone").eq("mentor_id", connection.mentorId).eq("is_active", true).order("duration_minutes");
+  if (result.error) { select.innerHTML = '<option value="">Session setup is not ready</option>'; var msg=document.getElementById("sessionBookingMessage"); if(msg)msg.textContent=authErrorText(result.error)+" — run the v2.0.0 Supabase SQL setup."; return; }
+  scheduleTypes = result.data || [];
+  select.innerHTML = '<option value="">Choose a session type</option>' + scheduleTypes.map(function (type) { return '<option value="' + esc(type.id) + '">' + esc(type.title) + ' · ' + type.duration_minutes + ' min</option>'; }).join("");
+  if (!scheduleTypes.length) { var message=document.getElementById("sessionBookingMessage"); if(message)message.textContent="This mentor has not added session types yet."; }
+  loadSessionSlots();
+}
+async function loadSessionSlots() {
+  var connection = selectedScheduleConnection(), typeSelect = document.getElementById("sessionType"), dateInput = document.getElementById("sessionDate"), slotsRoot = document.getElementById("sessionSlots");
+  if (!connection || !typeSelect || !dateInput || !slotsRoot || !typeSelect.value) { if(slotsRoot)slotsRoot.innerHTML=""; return; }
+  var type = scheduleTypes.find(function (item) { return item.id === typeSelect.value; });
+  if (!type) return;
+  slotsRoot.innerHTML = '<div class="muted">Finding open times…</div>';
+  var result = await supabaseClient.rpc("get_peer_session_slots", { p_mentor_id: connection.mentorId, p_session_type_id: type.id, p_from: dateInput.value, p_days: 14 });
+  if (result.error) { slotsRoot.innerHTML = '<div class="community-empty">' + esc(authErrorText(result.error)) + '</div>'; return; }
+  scheduleSlots = result.data || [];
+  scheduleSlotsContext = { connectionId: connection.id, mentorId: connection.mentorId, typeId: type.id };
+  slotsRoot.innerHTML = scheduleSlots.length ? scheduleSlots.map(function (slot, index) { return '<button class="schedule-slot" type="button" data-session-slot="' + index + '">' + esc(sessionTime(slot.starts_at, slot.timezone)) + '</button>'; }).join("") : '<div class="community-empty">No open slots in the next 14 days. Try another date or check back later.</div>';
+}
+async function loadPeerSessionList() {
+  var root = document.getElementById("sessionList"); if (!root || !user) return;
+  var result = await supabaseClient.from("peer_sessions").select("id,connection_id,session_type_id,learner_id,mentor_id,starts_at,ends_at,timezone,status,learner_note,mentor_note,peer_session_types(title,duration_minutes),learner:profiles!peer_sessions_learner_id_fkey(display_name),mentor:profiles!peer_sessions_mentor_id_fkey(display_name)").order("starts_at", { ascending: true }).limit(100);
+  if (result.error) { root.innerHTML = '<div class="community-empty">Could not load sessions: ' + esc(authErrorText(result.error)) + '</div>'; return; }
+  var rows = result.data || [];
+  if (!rows.length) { root.innerHTML = '<div class="community-empty">No sessions yet. Accepted connections can schedule here.</div>'; return; }
+  var now = Date.now(); rows.sort(function(a,b){return new Date(a.starts_at)-new Date(b.starts_at);});
+  var upcoming = rows.filter(function(row){return new Date(row.starts_at).getTime()>=now && ["pending","confirmed"].includes(row.status);});
+  var previous = rows.filter(function(row){return !upcoming.includes(row);}).reverse();
+  function rowHtml(row) {
+    var type = relationRow(row.peer_session_types), learner=relationRow(row.learner), mentor=relationRow(row.mentor);
+    var isMentor = row.mentor_id === user.id, actions = "";
+    if (isMentor && row.status === "pending") actions = '<button class="btn" data-session-action="confirmed" data-session-id="'+esc(row.id)+'">Confirm</button><button class="btn ghost" data-session-action="declined" data-session-id="'+esc(row.id)+'">Decline</button>';
+    if (isMentor && row.status === "confirmed") actions = '<button class="btn" data-session-action="completed" data-session-id="'+esc(row.id)+'">Mark completed</button><button class="btn ghost" data-session-action="no_show" data-session-id="'+esc(row.id)+'">Mark no-show</button>';
+    if (["pending","confirmed"].includes(row.status)) actions += '<button class="btn ghost" data-session-action="cancelled" data-session-id="'+esc(row.id)+'">Cancel</button>';
+    return '<article class="session-row"><b>'+esc(type.title || "Study session")+' · '+esc(row.status.replace("_"," "))+'</b><p>'+esc(isMentor ? (learner.display_name || "Learner") : (mentor.display_name || "Mentor"))+' · '+esc(sessionTime(row.starts_at,row.timezone))+' ('+(type.duration_minutes||"")+' min)</p>'+(row.learner_note?'<p>Note: '+esc(row.learner_note)+'</p>':'')+(actions?'<div class="session-actions">'+actions+'</div>':'')+'</article>';
+  }
+  root.innerHTML = '<h3>Upcoming</h3>'+(upcoming.length?upcoming.map(rowHtml).join(""):'<p class="muted">No upcoming sessions.</p>')+'<details><summary>Past and cancelled · '+previous.length+'</summary>'+(previous.length?previous.map(rowHtml).join(""):'<p class="muted">Nothing here yet.</p>')+'</details>';
+}
+async function loadPeerSessionsPage() {
+  var booking = document.getElementById("bookingForm");
+  if (!user) { if(booking)booking.innerHTML='<div class="community-empty">Sign in to view sessions.</div><button type="button" class="btn" data-schedule-signin>Sign in</button>'; return; }
+  if (!canLearn(user)) { if(booking)booking.innerHTML='<div class="community-empty">Mentor accounts manage availability and session requests from the mentor dashboard.</div><a class="btn ghost" href="#dashboard">Open mentor dashboard</a>'; await loadPeerSessionList(); return; }
+  if (booking) booking.innerHTML='<div class="community-empty">Loading accepted connections…</div>';
+  var result = await supabaseClient.from("connections").select("id,requester_id,recipient_id,status,requester:profiles!connections_requester_id_fkey(display_name,role),recipient:profiles!connections_recipient_id_fkey(display_name,role)").eq("status","accepted").or("requester_id.eq."+user.id+",recipient_id.eq."+user.id);
+  if (result.error) { if(booking)booking.innerHTML='<div class="community-empty">'+esc(authErrorText(result.error))+'</div>'; await loadPeerSessionList(); return; }
+  scheduleConnections = (result.data||[]).map(function(row){ var otherId=row.requester_id===user.id?row.recipient_id:row.requester_id; var other=relationRow(row.requester_id===otherId?row.requester:row.recipient); return {id:row.id,mentorId:otherId,name:other.display_name||"Accepted peer"}; }).filter(function(connection){return connection.mentorId!==user.id;});
+  if (booking) renderBookingForm();
+  await loadPeerSessionList();
+}
+document.getElementById("refreshSessions").addEventListener("click", loadPeerSessionsPage);
+document.getElementById("bookingForm").addEventListener("click", function(event){if(event.target.closest("[data-schedule-signin]"))openSign();});
+document.getElementById("sessionList").addEventListener("click", async function(event){
+  var button=event.target.closest("[data-session-action]"); if(!button)return; button.disabled=true;
+  var result=await supabaseClient.from("peer_sessions").update({status:button.dataset.sessionAction}).eq("id",button.dataset.sessionId);
+  if(result.error)window.alert(authErrorText(result.error)); await loadPeerSessionList();
+});
+function scheduleManagerMarkup() {
+  return '<section class="box schedule-manage"><div class="social-feed-title"><div><span class="community-kicker">MENTOR TOOLS</span><h2>Availability & session types</h2></div><a class="btn ghost" href="#sessions">Manage sessions</a></div><p class="muted">Set weekly times in Asia/Kolkata. Add a blocked time for a holiday or day off.</p><div class="schedule-manage-grid"><div class="box"><b>Weekly availability</b><form class="schedule-form" data-schedule-form="weekly"><label>Day<select name="weekday">'+[[1,"Monday"],[2,"Tuesday"],[3,"Wednesday"],[4,"Thursday"],[5,"Friday"],[6,"Saturday"],[7,"Sunday"]].map(function(day){return '<option value="'+day[0]+'">'+day[1]+'</option>';}).join("")+'</select></label><label>From<input name="starts_at" type="time" required></label><label>Until<input name="ends_at" type="time" required></label><button class="btn" type="submit">Add weekly time</button></form><div id="weeklyAvailabilityList" class="schedule-manage-list"></div></div><div class="box"><b>Session types</b><form class="schedule-form" data-schedule-form="type"><label>Name<input name="title" maxlength="80" placeholder="Maths guidance" required></label><label>Length<select name="duration_minutes"><option>30</option><option>45</option><option>60</option><option>90</option><option>120</option></select></label><button class="btn" type="submit">Add session type</button></form><div id="sessionTypeList" class="schedule-manage-list"></div></div><div class="box"><b>Holidays & blocked times</b><form class="schedule-form" data-schedule-form="block"><label>Unavailable from (IST)<input name="starts_at" type="datetime-local" required></label><label>Until (IST)<input name="ends_at" type="datetime-local" required></label><label>Label<input name="label" maxlength="100" value="Holiday / unavailable"></label><button class="btn" type="submit">Block time</button></form><div id="blockedTimeList" class="schedule-manage-list"></div></div></div><div id="scheduleManageMessage" class="social-message" role="status"></div></section>';
+}
+async function loadMentorScheduleControls() {
+  var root=document.getElementById("weeklyAvailabilityList"); if(!root||!user)return;
+  var results=await Promise.all([
+    supabaseClient.from("peer_weekly_availability").select("id,weekday,starts_at,ends_at,timezone,is_active").eq("mentor_id",user.id).order("weekday").order("starts_at"),
+    supabaseClient.from("peer_session_types").select("id,title,duration_minutes,is_active").eq("mentor_id",user.id).order("created_at"),
+    supabaseClient.from("peer_blocked_times").select("id,starts_at,ends_at,timezone,label").eq("mentor_id",user.id).gte("ends_at",new Date().toISOString()).order("starts_at").limit(10)
+  ]);
+  var days=["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+  root.innerHTML=results[0].error?'<span>'+esc(authErrorText(results[0].error))+'</span>':(results[0].data||[]).map(function(row){return '<div>'+days[row.weekday-1]+' · '+esc(String(row.starts_at).slice(0,5))+'–'+esc(String(row.ends_at).slice(0,5))+' '+esc(row.timezone)+' <button class="act" data-schedule-delete="weekly" data-id="'+esc(row.id)+'">Remove</button></div>';}).join("")||"No weekly times yet.";
+  document.getElementById("sessionTypeList").innerHTML=results[1].error?'<span>'+esc(authErrorText(results[1].error))+'</span>':(results[1].data||[]).map(function(row){return '<div>'+esc(row.title)+' · '+row.duration_minutes+' min · '+(row.is_active?'Active':'Paused')+' <button class="act" data-schedule-type-toggle="'+(row.is_active?'false':'true')+'" data-id="'+esc(row.id)+'">'+(row.is_active?'Pause':'Reactivate')+'</button></div>';}).join("")||"No session types yet.";
+  document.getElementById("blockedTimeList").innerHTML=results[2].error?'<span>'+esc(authErrorText(results[2].error))+'</span>':(results[2].data||[]).map(function(row){return '<div>'+esc(row.label)+' · '+esc(sessionTime(row.starts_at,row.timezone))+' <button class="act" data-schedule-delete="block" data-id="'+esc(row.id)+'">Remove</button></div>';}).join("")||"No upcoming blocked times.";
+}
+document.getElementById("tutorDashboardBody").addEventListener("submit",async function(event){
+  var form=event.target.closest("[data-schedule-form]"); if(!form)return; event.preventDefault(); if(!user)return;
+  var data=new FormData(form), kind=form.dataset.scheduleForm, table=kind==="weekly"?"peer_weekly_availability":kind==="type"?"peer_session_types":"peer_blocked_times", row={mentor_id:user.id};
+  if(kind==="weekly"){row.weekday=Number(data.get("weekday"));row.starts_at=data.get("starts_at");row.ends_at=data.get("ends_at");row.timezone="Asia/Kolkata";if(row.starts_at>=row.ends_at){document.getElementById("scheduleManageMessage").textContent="The end time must be later than the start time.";return;}}
+  if(kind==="type"){row.title=String(data.get("title")||"").trim();row.duration_minutes=Number(data.get("duration_minutes"));row.timezone="Asia/Kolkata";}
+  if(kind==="block"){row.starts_at=zonedInputToIso(data.get("starts_at"),"Asia/Kolkata");row.ends_at=zonedInputToIso(data.get("ends_at"),"Asia/Kolkata");row.timezone="Asia/Kolkata";row.label=String(data.get("label")||"Unavailable").trim();if(!row.starts_at||!row.ends_at||row.starts_at>=row.ends_at){document.getElementById("scheduleManageMessage").textContent="Choose an end time after the start time.";return;}}
+  var result=await supabaseClient.from(table).insert(row);var msg=document.getElementById("scheduleManageMessage");msg.textContent=result.error?authErrorText(result.error):"Saved.";if(!result.error){form.reset();await loadMentorScheduleControls();}
+});
+document.getElementById("tutorDashboardBody").addEventListener("click",async function(event){var toggle=event.target.closest("[data-schedule-type-toggle]");if(toggle){var changed=await supabaseClient.from("peer_session_types").update({is_active:toggle.dataset.scheduleTypeToggle==="true"}).eq("id",toggle.dataset.id).eq("mentor_id",user.id);if(changed.error)window.alert(authErrorText(changed.error));await loadMentorScheduleControls();return;}var button=event.target.closest("[data-schedule-delete]");if(!button)return;var table=button.dataset.scheduleDelete==="weekly"?"peer_weekly_availability":"peer_blocked_times";var result=await supabaseClient.from(table).delete().eq("id",button.dataset.id).eq("mentor_id",user.id);if(result.error)window.alert(authErrorText(result.error));await loadMentorScheduleControls();});
 function tutorVerificationPanel(status) {
   if (Number(user && user.grade) < 9 || Number(user && user.grade) > 12) return '<section class="box verify-status"><b>Finish your class details</b><p class="muted">Set your class before submitting mentor verification.</p></section>';
   if (status && status.status === "verified") return '<section class="box verify-status"><b><span class="verify-badge">Verified</span> Your mentor profile is approved</b><p class="muted">Your profile can appear in mentor search while availability is on.</p></section>';
@@ -1019,6 +1148,8 @@ async function drawTutorDashboard() {
     tutorVerificationPanel(status) +
     '<div class="dash-grid"><section class="box"><div class="dash-heading"><div><b>Your mentor profile</b><p class="muted">' + esc(profile ? profile.headline || "Add a headline" : "Create your profile so learners can find you.") + '</p></div><button class="btn ghost" data-edit-tutor>Edit profile</button></div><p class="muted">Subjects: ' + esc(profile && profile.subjects ? profile.subjects.join(", ") : "Not set") + '<br>School: ' + esc(user.location && user.location.school || "—") + '<br>Location: ' + esc(user.location ? [user.location.city,user.location.state,user.location.country].join(", ") : "—") + '</p><label class="availability"><input type="checkbox" data-available ' + (profile && profile.is_available ? "checked" : "") + ' ' + (!profile || !status || status.status !== "verified" ? "disabled" : "") + '> Show my profile in mentor search</label></section><section class="box"><b>Privacy</b><p class="muted">Your school and location appear on your mentor profile only after verification. Learner locations are shared with the mentor receiving their request.</p></section></div>' +
     '<section class="box request-box"><div class="dash-heading"><div><b>Student requests</b><p class="muted">Accept requests from classmates you can help.</p></div></div><div class="location-filters"><select id="requestStateFilter"><option value="">All states</option>' + states.map(function (s) { return '<option' + (s === requestLocationState ? ' selected' : '') + '>' + esc(s) + '</option>'; }).join("") + '</select><select id="requestCityFilter"><option value="">All cities</option>' + cities.map(function (s) { return '<option' + (s === requestLocationCity ? ' selected' : '') + '>' + esc(s) + '</option>'; }).join("") + '</select></div>' + (filteredRequests.length ? filteredRequests.map(function (r) { return '<article class="request-row"><div><b>' + esc(r.display_name || "Student") + '</b><p class="muted">Class ' + esc(String(r.grade || "—")) + ' · ' + esc([r.school,r.city,r.state,r.country].filter(Boolean).join(", ") || "Location not added") + ' · ' + esc(r.status) + '</p></div>' + (r.status === "pending" ? '<div class="row"><button class="btn" data-request-action="accepted" data-request-id="' + esc(r.connection_id) + '">Accept</button><button class="btn ghost" data-request-action="rejected" data-request-id="' + esc(r.connection_id) + '">Decline</button></div>' : '') + '</article>'; }).join("") : '<p class="muted">No student requests match those filters.</p>') + '</section>';
+  body.insertAdjacentHTML("beforeend", status && status.status === "verified" ? scheduleManagerMarkup() : '<section class="box schedule-manage"><h2>Scheduling</h2><p class="muted">Finish mentor verification before creating session times. Only verified mentors can accept bookings.</p></section>');
+  if (status && status.status === "verified") loadMentorScheduleControls();
   document.getElementById("requestStateFilter").onchange = function (event) { requestLocationState = event.target.value; requestLocationCity = ""; drawTutorDashboard(); };
   document.getElementById("requestCityFilter").onchange = function (event) { requestLocationCity = event.target.value; drawTutorDashboard(); };
 }
@@ -1182,35 +1313,91 @@ function relativeTime(value) {
   return new Date(value).toLocaleDateString();
 }
 
-async function loadHomeCommunityQuestions() {
-  var list = document.getElementById("homeQuestionList");
-  if (!list || !supabaseClient || !user) return;
-  var loadingUserId = user.id;
-  list.innerHTML = '<div class="community-empty">Loading recent questions…</div>';
-  var result = await supabaseClient
-    .from("doubts")
-    .select("id, body, title, subject, created_at, answers(id)")
-    .eq("status", "open")
-    .order("created_at", { ascending: false })
-    .limit(15);
-  if (!user || user.id !== loadingUserId || curRoute !== "home") return;
-  if (result.error) {
-    list.innerHTML = '<div class="community-empty">The community questions could not load right now.</div>';
-    return;
-  }
-  var unanswered = (result.data || []).filter(function (row) {
-    return !Array.isArray(row.answers) || row.answers.length === 0;
-  }).slice(0, 3);
-  if (!unanswered.length) {
-    list.innerHTML = '<div class="community-empty">No unanswered questions right now. Ask a doubt or browse the feed.</div>';
-    return;
-  }
-  list.innerHTML = unanswered.map(function (row) {
-    var question = String(row.body || row.title || "Question");
-    if (question.length > 140) question = question.slice(0, 137) + "…";
-    return '<article class="community-question"><div class="community-question-meta"><span class="tag">' + esc(String(row.subject || "General")) + '</span><span>' + esc(relativeTime(row.created_at)) + '</span></div><h3>' + esc(question) + '</h3><a href="#doubts">Join the discussion <span aria-hidden="true">→</span></a></article>';
-  }).join("");
+function socialAvatar(profile, name) {
+  return profile && profile.avatar_url
+    ? '<img src="' + esc(profile.avatar_url) + '" alt="">'
+    : esc(ini(name || "Peer Connect").slice(0, 2).toUpperCase());
 }
+function socialPostHtml(row, myId) {
+  var profile = relationRow(row.profiles), name = profile.display_name || "Peer Connect member";
+  var reactions = Array.isArray(row.post_reactions) ? row.post_reactions : [];
+  var comments = Array.isArray(row.post_comments) ? row.post_comments : [];
+  var liked = reactions.some(function (reaction) { return reaction.user_id === myId; });
+  var media = row.media_url ? (row.media_signed_url ? (row.media_type === "video"
+    ? '<div class="social-post-media"><video controls preload="metadata" playsinline src="' + esc(row.media_signed_url) + '"></video></div>'
+    : '<div class="social-post-media"><img loading="lazy" src="' + esc(row.media_signed_url) + '" alt="Photo shared by ' + esc(name) + '"></div>') : '<p class="muted">Media is temporarily unavailable. Refresh the feed to reload it.</p>') : "";
+  return '<article class="social-post" data-social-post="' + esc(row.id) + '"><div class="social-post-head"><div class="social-avatar">' + socialAvatar(profile, name) + '</div><div><div class="social-post-author">' + esc(name) + (profile.grade ? ' · Class ' + esc(String(profile.grade)) : '') + '</div><div class="social-post-time">' + esc(relativeTime(row.created_at)) + '</div></div>' + (row.author_id === myId ? '<button class="act delete-action" data-social-delete="' + esc(row.id) + '" style="margin-left:auto">Delete</button>' : '') + '</div><div class="social-post-copy">' + esc(row.content) + '</div>' + media + '<div class="social-post-actions"><button type="button" data-social-like="' + esc(row.id) + '" aria-pressed="' + liked + '">♥ ' + reactions.length + ' Like</button><button type="button" data-social-comments="' + esc(row.id) + '">◯ ' + comments.length + ' Comments</button><button type="button" data-social-focus="comment-' + esc(row.id) + '">Reply</button></div><div class="social-comments">' + comments.slice(-3).map(function (comment) { var author = relationRow(comment.profiles); return '<div class="social-comment"><b>' + esc(author.display_name || "Learner") + '</b>' + esc(comment.content) + '</div>'; }).join("") + '<form class="social-comment-form" data-social-comment-form="' + esc(row.id) + '"><input id="comment-' + esc(row.id) + '" maxlength="2000" placeholder="Write a comment…" aria-label="Write a comment"><button class="btn ghost" type="submit">Comment</button></form></div></article>';
+}
+async function loadSocialFeed() {
+  var list = document.getElementById("socialPostList");
+  if (!list) return;
+  if (!user || !supabaseClient) { list.innerHTML = '<div class="community-empty">Sign in to view and share posts.</div>'; return; }
+  var loadingUserId = user.id;
+  list.innerHTML = '<div class="community-empty">Loading your learning feed…</div>';
+  var result = await supabaseClient.from("posts").select("id, author_id, content, post_type, media_url, media_type, created_at, profiles!posts_author_id_fkey(display_name, grade, avatar_url), post_reactions(user_id, reaction), post_comments(id, author_id, content, created_at, profiles!post_comments_author_id_fkey(display_name))").order("created_at", { ascending: false }).limit(50);
+  if (!user || user.id !== loadingUserId || curRoute !== "home") return;
+  if (result.error) { list.innerHTML = '<div class="community-empty">Could not load posts: ' + esc(authErrorText(result.error)) + '. Run the v2.0.0 Supabase setup SQL.</div>'; return; }
+  var rows = result.data || [];
+  await Promise.all(rows.map(async function(row){
+    if(!row.media_url || /^https:\/\//i.test(row.media_url)) { row.media_signed_url = row.media_url || ""; return; }
+    var signed = await supabaseClient.storage.from("post-media").createSignedUrl(row.media_url, 7200);
+    row.media_signed_url = signed.error ? "" : signed.data.signedUrl;
+  }));
+  if (!user || user.id !== loadingUserId || curRoute !== "home") return;
+  list.innerHTML = rows.length ? rows.map(function (row) { return socialPostHtml(row, loadingUserId); }).join("") : '<div class="community-empty">No posts yet. Share a study tip or question to start the feed.</div>';
+  var avatar = document.getElementById("socialComposerAvatar");
+  if (avatar) avatar.innerHTML = socialAvatar({ avatar_url: user.avatarUrl }, user.n);
+}
+var socialMediaFile = null, socialPreviewUrl = "";
+document.getElementById("socialPostMedia").addEventListener("change", function (event) {
+  socialMediaFile = event.target.files[0] || null;
+  var preview = document.getElementById("socialPostPreview"), label = document.getElementById("socialMediaName");
+  if (socialPreviewUrl) URL.revokeObjectURL(socialPreviewUrl);
+  preview.hidden = !socialMediaFile;
+  if (!socialMediaFile) { label.textContent = "Up to 50 MB"; preview.innerHTML = ""; return; }
+  socialPreviewUrl = URL.createObjectURL(socialMediaFile);
+  label.textContent = socialMediaFile.name;
+  preview.innerHTML = socialMediaFile.type.indexOf("video/") === 0 ? '<video controls playsinline src="' + socialPreviewUrl + '"></video>' : '<img alt="Selected photo preview" src="' + socialPreviewUrl + '">';
+});
+document.getElementById("publishSocialPost").addEventListener("click", async function () {
+  var button = this, content = document.getElementById("socialPostText").value.trim(), message = document.getElementById("socialPostMessage");
+  if (!user) { openSign(); return; }
+  if (!content) { message.textContent = "Add a message before posting."; return; }
+  if (content.length > 5000) { message.textContent = "Posts can be up to 5,000 characters."; return; }
+  var type = socialMediaFile && socialMediaFile.type.indexOf("video/") === 0 ? "video" : socialMediaFile ? "image" : null;
+  var allowed = ["image/jpeg", "image/png", "image/webp", "image/gif", "video/mp4", "video/webm", "video/quicktime"];
+  if (socialMediaFile && (allowed.indexOf(socialMediaFile.type) < 0 || socialMediaFile.size > 50 * 1024 * 1024)) { message.textContent = "Choose JPG, PNG, WebP, GIF, MP4, WebM, or MOV media under 50 MB."; return; }
+  button.disabled = true; button.textContent = "Posting…"; message.textContent = "";
+  var mediaUrl = null, mediaPath = null;
+  if (socialMediaFile) {
+    var ext = socialMediaFile.name.split(".").pop().toLowerCase().replace(/[^a-z0-9]/g, "") || "bin";
+    mediaPath = user.id + "/" + Date.now() + "-" + Math.random().toString(36).slice(2) + "." + ext;
+    var upload = await supabaseClient.storage.from("post-media").upload(mediaPath, socialMediaFile, { contentType: socialMediaFile.type, upsert: false });
+    if (upload.error) { message.textContent = authErrorText(upload.error) + " — run the post-media SQL setup."; button.disabled = false; button.textContent = "Post"; return; }
+    mediaUrl = mediaPath;
+  }
+  var created = await supabaseClient.from("posts").insert({ author_id: user.id, content: content, post_type: "general", media_url: mediaUrl, media_type: type }).select("id").single();
+  if (created.error) { if (mediaPath) await supabaseClient.storage.from("post-media").remove([mediaPath]); message.textContent = authErrorText(created.error); }
+  else { document.getElementById("socialPostText").value = ""; document.getElementById("socialPostMedia").value = ""; socialMediaFile = null; message.textContent = "Posted to your learning feed."; document.getElementById("socialPostPreview").hidden = true; document.getElementById("socialPostPreview").innerHTML = ""; document.getElementById("socialMediaName").textContent = "Up to 50 MB"; await loadSocialFeed(); }
+  button.disabled = false; button.textContent = "Post";
+});
+document.getElementById("refreshSocialFeed").addEventListener("click", loadSocialFeed);
+document.getElementById("socialPostList").addEventListener("click", async function (event) {
+  var like = event.target.closest("[data-social-like]"), del = event.target.closest("[data-social-delete]"), focus = event.target.closest("[data-social-focus]");
+  if (focus) { var input = document.getElementById(focus.dataset.socialFocus); if (input) input.focus(); return; }
+  if (!user) { openSign(); return; }
+  if (like) { like.disabled = true; var existing = like.getAttribute("aria-pressed") === "true"; var result = existing ? await supabaseClient.from("post_reactions").delete().eq("post_id", like.dataset.socialLike).eq("user_id", user.id) : await supabaseClient.from("post_reactions").insert({ post_id: like.dataset.socialLike, user_id: user.id, reaction: "like" }); if (result.error) window.alert(authErrorText(result.error)); await loadSocialFeed(); }
+  else if (del) { if (!window.confirm("Delete this post?")) return; var postRow=await supabaseClient.from("posts").select("media_url").eq("id",del.dataset.socialDelete).eq("author_id",user.id).maybeSingle(); var removed = await supabaseClient.from("posts").delete().eq("id", del.dataset.socialDelete).eq("author_id", user.id); if (removed.error) window.alert(authErrorText(removed.error)); else { if(postRow.data&&postRow.data.media_url&&!/^https:\/\//i.test(postRow.data.media_url)) await supabaseClient.storage.from("post-media").remove([postRow.data.media_url]); await loadSocialFeed(); } }
+});
+document.getElementById("socialPostList").addEventListener("submit", async function (event) {
+  var form = event.target.closest("[data-social-comment-form]"); if (!form) return; event.preventDefault();
+  if (!user) { openSign(); return; }
+  var input = form.querySelector("input"), value = input.value.trim(); if (!value) return;
+  var button = form.querySelector("button"); button.disabled = true;
+  var result = await supabaseClient.from("post_comments").insert({ post_id: form.dataset.socialCommentForm, author_id: user.id, content: value });
+  if (result.error) window.alert(authErrorText(result.error)); else await loadSocialFeed();
+  button.disabled = false;
+});
 
 async function loadDoubtsFromSupabase() {
   if (!supabaseClient || !user) {
@@ -1567,12 +1754,13 @@ dlg.addEventListener("close", function () {
   if (user && (!user.role || !user.grade || missingProfileLocation(user.location))) onboardingOpen = false;
   if (curRoute === "me") drawMe();
 });
-var routes = ["home", "tutors", "profile", "doubts", "pricing", "me", "dashboard", "verification"],
+var routes = ["home", "tutors", "profile", "doubts", "sessions", "pricing", "me", "dashboard", "verification"],
   names = {
     home: "Home",
     tutors: "Tutors",
     profile: "Tutor profile",
     doubts: "Doubts",
+    sessions: "Study sessions",
     pricing: "Pricing",
     me: "My page",
     dashboard: "Tutor dashboard",
@@ -1620,7 +1808,8 @@ function route() {
   }
   if (h === "verification") drawVerificationAdmin();
   if (h === "profile") renderTutorProfilePage();
-  if (h === "home" && user) loadHomeCommunityQuestions();
+  if (h === "home") loadSocialFeed();
+  if (h === "sessions") loadPeerSessionsPage();
   if (h === "me") drawMe();
   if (h === "dashboard") drawTutorDashboard();
   window.scrollTo(0, 0);
