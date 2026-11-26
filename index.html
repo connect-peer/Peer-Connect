@@ -1304,6 +1304,17 @@ footer { color: var(--muted); }
 .settings-page-grid p { line-height:1.6; }
 .settings-status { display:inline-flex; align-items:center; border:1px solid var(--line); border-radius:999px; padding:8px 13px; color:var(--brand); background:var(--soft); font-weight:750; }
 .settings-history-panel { grid-column:1 / -1; }
+.workspace-switch { margin: 8px 8px 10px; width:calc(100% - 16px); justify-content:center; }
+.startup-loader { position:fixed; inset:0; z-index:10000; display:grid; place-items:center; background:radial-gradient(ellipse at 50% 42%,rgba(154,102,205,.16),transparent 48%),#0c0a10; opacity:1; visibility:visible; transition:opacity .35s ease,visibility .35s ease; }
+.startup-loader.is-done { opacity:0; visibility:hidden; pointer-events:none; }
+.startup-brand { display:flex; flex-direction:column; align-items:center; gap:18px; color:var(--ink); font-size:clamp(25px,4vw,38px); letter-spacing:-.04em; }
+.startup-brand>i { display:grid; place-items:center; width:42px; height:42px; border-radius:14px; background:linear-gradient(145deg,#ffc6df,#d878b1 55%,#846cf2); box-shadow:0 0 28px rgba(229,126,187,.38),inset 0 1px rgba(255,255,255,.48); }
+.startup-brand>i::after { content:""; width:13px;height:13px;border:3px solid #ffe27a;border-radius:50%; }
+.startup-spinner { width:28px;height:28px;border:3px solid rgba(255,255,255,.16);border-top-color:#f4b4d2;border-radius:50%;animation:peer-spin .8s linear infinite; }
+.startup-caption { color:var(--muted);font-size:14px;font-weight:500;letter-spacing:0; }
+@keyframes peer-spin { to { transform:rotate(360deg); } }
+.local-loading { display:flex;align-items:center;gap:12px;min-height:100px;justify-content:center;color:var(--muted); }
+.local-loading::before { content:"";width:20px;height:20px;border:2px solid rgba(255,255,255,.16);border-top-color:#f4b4d2;border-radius:50%;animation:peer-spin .8s linear infinite; }
 @media(max-width:700px) { .settings-page-grid { grid-template-columns:1fr; } .settings-history-panel { grid-column:auto; } }
 </style>
   </head>
@@ -1320,15 +1331,17 @@ footer { color: var(--muted); }
           ><a class="h" data-nav="doubts" href="#doubts">Doubts</a
           ><a class="h" data-nav="me" href="#me">My page</a
           ><a class="h" data-nav="pricing" href="#pricing">Pricing</a
-          ><button class="btn ghost h" id="workspaceSwitch" type="button" hidden>Switch workspace</button
+          ><button class="btn ghost h" data-workspace-switch type="button" hidden>Switch to mentor</button
           ><button class="btn ghost h" id="btnTutor">Become a mentor</button
           ><button class="btn gbtn" id="gsign">Sign up / Sign in</button>
         </nav>
       </div>
     </header>
+    <div class="startup-loader" id="startupLoader" role="status" aria-live="polite"><div class="startup-brand"><i></i><b>Peer Connect</b><span class="startup-spinner"></span><span class="startup-caption">Getting your space ready…</span></div></div>
 
     <div class="app-layout">
       <nav class="app-rail" aria-label="Main navigation">
+        <button class="btn ghost workspace-switch" data-workspace-switch type="button" hidden>Switch to mentor</button>
         <a href="#home" class="app-rail-link" data-workspace-nav="learner" data-nav="home"><span class="app-rail-icon" aria-hidden="true">◎</span>Mentors</a>
         <a href="#dashboard" class="app-rail-link tutor-only" data-role-nav="tutor" data-workspace-nav="mentor" data-nav="dashboard" hidden><span class="app-rail-icon" aria-hidden="true">▦</span>Dashboard</a>
         <a href="#sessions" class="app-rail-link" data-nav="sessions"><span class="app-rail-icon" aria-hidden="true">◷</span>Sessions</a>

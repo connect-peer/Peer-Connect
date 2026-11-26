@@ -249,6 +249,7 @@ function renderTutorProfilePage() {
   if (!tutor || !root) return;
   var locationText = [tutor.school, tutor.city, tutor.state, tutor.country].filter(Boolean).join(" · ");
   root.innerHTML = '<button type="button" class="btn ghost profile-back" id="profileBack">← Back to mentors</button><div class="profile-cover" id="profileCover"></div><section class="profile-head"><div class="av" id="profileAvatar">' + (tutor.avatarUrl ? '<img src="' + esc(tutor.avatarUrl) + '" alt="">' : esc(ini(tutor.n))) + '</div><h2>' + esc(tutor.n) + (tutor.verified ? ' <span class="verify-badge">Verified</span>' : tutor.me ? ' <span class="verify-review-state">' + esc(tutor.verificationStatus || "Not verified") + '</span>' : '') + '</h2><div class="profile-meta">Class ' + esc(String(tutor.g || "").replace(/^Class\s*/i, "")) + ' · ' + esc(locationText) + '</div><p>' + esc(tutor.h) + '</p><div class="tags">' + tutor.s.map(function (subject) { return '<span class="tag">' + esc(subject) + '</span>'; }).join("") + '</div><div class="profile-social" id="profileSocialStats"><span>Loading followers…</span></div><button class="btn" id="profileBook">' + (tutor.me ? 'Edit mentor profile' : 'Book a session') + '</button>' + (tutor.me ? '<div class="profile-appearance"><label class="btn ghost">Change profile photo<input type="file" accept="image/jpeg,image/png,image/webp" data-profile-image="avatar"></label><label class="btn ghost">Change banner<input type="file" accept="image/jpeg,image/png,image/webp" data-profile-image="banner"></label></div>' : '') + '</section><div class="profile-tabs"><button class="btn ghost" data-profile-tab="about" aria-pressed="true">About</button><button class="btn ghost" data-profile-tab="answers" aria-pressed="false">Answers</button></div><div class="profile-content" id="profileContent"></div>';
+  root.querySelectorAll(".profile-appearance").forEach(function (controls) { controls.remove(); });
   renderTutorAbout(tutor, document.getElementById("profileContent"));
   var cover = document.getElementById("profileCover");
   if (tutor.bannerUrl) cover.style.backgroundImage = 'url("' + tutor.bannerUrl.replace(/["\\\\]/g, "") + '")';
@@ -260,7 +261,7 @@ function renderTutorProfilePage() {
   });
   document.getElementById("profileBack").onclick = function () { location.hash = "home"; };
   document.getElementById("profileBook").onclick = async function () {
-    if (tutor.me) { openTutor(); return; }
+    if (tutor.me) { location.hash = "settings"; return; }
     if (!user) { openSign(); return; }
     if (!canLearn(user)) { document.getElementById("profileContent").textContent = "Choose Learner or Both in your profile to book a session."; return; }
     startMentorBooking(tutor);
@@ -284,7 +285,7 @@ function renderTutorProfilePage() {
         renderTutorAbout(tutor, content);
         return;
       }
-      content.innerHTML = '<p class="muted">Loading answers…</p>';
+      content.innerHTML = '<div class="local-loading">Loading answers…</div>';
       var result = await supabaseClient.from("answers").select("content, created_at, doubts(title, subject)").eq("author_id", tutor.user_id).order("created_at", { ascending: false }).limit(10);
       if (result.error) { content.innerHTML = '<p class="muted">Answers are unavailable right now.</p>'; return; }
       content.innerHTML = (result.data || []).length ? '<h3>Recent answers</h3>' + result.data.map(function (answer) { var doubt = Array.isArray(answer.doubts) ? answer.doubts[0] : answer.doubts || {}; return '<article class="box"><b>' + esc(doubt.subject || 'Answer') + '</b><p>' + esc(answer.content || '') + '</p>' + (doubt.title ? '<p class="muted">On: ' + esc(doubt.title) + '</p>' : '') + '</article>'; }).join("") : '<p class="muted">No answers yet.</p>';
@@ -328,6 +329,9 @@ async function uploadProfileImage(file, kind) {
 
 async function loadTutorDirectory() {
   if (!supabaseClient || !user) return;
+  var mentorGrid = document.getElementById("grid"), mentorCount = document.getElementById("count");
+  if (mentorGrid && location.hash.replace(/^#/, "") === "home") mentorGrid.innerHTML = '<div class="local-loading">Finding verified mentors…</div>';
+  if (mentorCount) mentorCount.textContent = "Loading mentor profiles…";
   var result = await supabaseClient.rpc("get_verified_tutor_directory", { p_state: null, p_city: null });
   if (result.error) {
     document.getElementById("count").textContent = authErrorText(result.error);
@@ -408,6 +412,25 @@ var user = null,
   passwordRecoveryPending = false;
 var isVerificationAdmin = false;
 var studentEntryPending = true;
+var activeWorkspace = "learner";
+function hideStartupLoader() {
+  var loader = document.getElementById("startupLoader");
+  if (loader) window.setTimeout(function () { loader.classList.add("is-done"); }, 220);
+}
+function workspaceStorageKey() { return "peerConnectWorkspace:" + (user && user.id || "guest"); }
+function applyWorkspacePreference() {
+  if (!user || normalizeRole(user.role) !== "both") { activeWorkspace = canMentor(user) && !canLearn(user) ? "mentor" : "learner"; return; }
+  try { activeWorkspace = window.localStorage.getItem(workspaceStorageKey()) === "mentor" ? "mentor" : "learner"; } catch (_workspaceError) { activeWorkspace = "learner"; }
+}
+function switchWorkspace() {
+  if (!user || normalizeRole(user.role) !== "both") return;
+  activeWorkspace = activeWorkspace === "mentor" ? "learner" : "mentor";
+  try { window.localStorage.setItem(workspaceStorageKey(), activeWorkspace); } catch (_workspaceError) {}
+  paintRoleUI();
+  var next = activeWorkspace === "mentor" ? "dashboard" : "home";
+  history.replaceState(null, document.title, location.pathname + location.search + "#" + next);
+  route();
+}
 var G =
   '<svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.6 5.9c4.5-4.2 7-10.3 7-17.6z"/><path fill="#FBBC05" d="M10.5 28.7c-.5-1.4-.8-3-.8-4.7s.3-3.2.8-4.7l-7.9-6.1C.9 16.4 0 20.1 0 24s.9 7.6 2.6 10.8l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.6-5.9c-2.1 1.4-4.9 2.3-8.3 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/></svg>';
 
@@ -454,6 +477,7 @@ async function restoreAuthSession() {
 async function syncAuthUser(authUser) {
   if (!authUser) {
     user = null;
+    activeWorkspace = "learner";
     isVerificationAdmin = false;
     studentEntryPending = true;
     posts = [];
@@ -505,6 +529,7 @@ async function syncAuthUser(authUser) {
     bannerUrl: profileResult && profileResult.data ? profileResult.data.profile_banner_url : null,
     location: locationResult && !locationResult.error ? locationResult.data : null,
   };
+  applyWorkspacePreference();
   var adminResult = await supabaseClient.from("verification_admins").select("user_id").eq("user_id", user.id).maybeSingle();
   isVerificationAdmin = !adminResult.error && !!adminResult.data;
   paintSign();
@@ -874,6 +899,7 @@ function openOnboarding(changeRole) {
     user.grade = grade;
     user.role = selectedRole;
     user.location = { school: school, city: city, state: state, country: country };
+    applyWorkspacePreference();
     onboardingOpen = false;
     paintSign();
     paintRoleUI();
@@ -928,10 +954,15 @@ if (
     } else if (!session) {
       showAuthForm("signin");
     }
+    hideStartupLoader();
   }).catch(function (error) {
     console.error("Could not restore Peer Connect session:", error.message);
     if (!user) showAuthForm("signin");
+    hideStartupLoader();
   });
+  window.setTimeout(hideStartupLoader, 12000);
+} else {
+  hideStartupLoader();
 }
 
 var mine = false;
@@ -1167,7 +1198,12 @@ function openMentorAchievementForm() {
 function paintRoleUI() {
   var isTutor = canMentor(user);
   var isSignedIn = !!user;
-  document.querySelectorAll('[data-role-nav="tutor"]').forEach(function (el) { el.hidden = !isTutor; });
+  var isBoth = !!user && normalizeRole(user.role) === "both";
+  document.querySelectorAll('[data-role-nav="tutor"]').forEach(function (el) { el.hidden = !isTutor || (isBoth && activeWorkspace !== "mentor"); });
+  document.querySelectorAll('[data-workspace-nav="learner"]').forEach(function (el) { el.hidden = isTutor && (!isBoth || activeWorkspace !== "learner"); });
+  document.querySelectorAll('[data-workspace-nav="mentor"]').forEach(function (el) { el.hidden = !isTutor || (isBoth && activeWorkspace !== "mentor"); });
+  document.querySelectorAll('[data-workspace-switch]').forEach(function (button) { button.hidden = !isBoth; button.textContent = activeWorkspace === "mentor" ? "Switch to learner" : "Switch to mentor"; });
+  var pricingLinks = document.querySelectorAll('[data-nav="pricing"]'); pricingLinks.forEach(function (el) { el.hidden = isTutor && (!isBoth || activeWorkspace !== "learner"); });
   document.querySelectorAll('.admin-only').forEach(function (el) { el.hidden = !isVerificationAdmin; });
   var become = document.getElementById("btnTutor");
   var becomeFromPricing = document.getElementById("btnTutor2");
@@ -1177,11 +1213,11 @@ function paintRoleUI() {
   var intro = document.getElementById("homeIntro");
   var actions = document.getElementById("homeActions");
   var cards = document.getElementById("homeCards");
-  if (isTutor) {
-    if (title) title.textContent = user.role === "both" ? "Learn and help others grow." : "Help learners grow with confidence.";
-    if (intro) intro.textContent = user.role === "both" ? "Learn from mentors and guide learners in lower classes." : "Manage your mentor profile, choose when you are available, and guide learners.";
-    if (actions) actions.innerHTML = '<a class="btn" href="#dashboard">Open mentor dashboard</a>' + (user.role === "both" ? '<a class="btn ghost" href="#home">Find a mentor</a>' : '<a class="btn ghost" href="#doubts">Answer a question</a>');
-    if (cards) cards.innerHTML = '<a href="#dashboard"><b>Your dashboard</b><span>Review booking requests, profile, and availability in one place.</span></a><a href="#doubts"><b>Share what you know</b><span>Answer questions and build your reputation.</span></a>' + (user.role === "both" ? '<a href="#home"><b>Get guidance</b><span>Find mentors for the subjects you are learning.</span></a>' : '<a href="#pricing"><b>Blue Tick</b><span>Optional one-time payment; price and launch date to be decided.</span></a>');
+  if (isTutor && (!isBoth || activeWorkspace === "mentor")) {
+    if (title) title.textContent = "Your mentor workspace.";
+    if (intro) intro.textContent = "Review bookings, help learners make progress, and manage your mentoring profile.";
+    if (actions) actions.innerHTML = '<a class="btn" href="#dashboard">Open mentor dashboard</a><a class="btn ghost" href="#settings">Mentor settings</a>';
+    if (cards) cards.innerHTML = '<a href="#dashboard"><b>Bookings</b><span>Review learner requests and upcoming sessions.</span></a><a href="#doubts"><b>Guide learners</b><span>Share useful answers with the community.</span></a><a href="#sessions"><b>Sessions</b><span>Open booked chats and session details.</span></a>';
   } else {
     if (title) title.textContent = "Find a mentor who gets it.";
     if (intro) intro.textContent = "Peer Connect is a learning network for your school. Find mentors, ask questions, and learn from people who know your topics.";
@@ -1305,7 +1341,7 @@ async function loadSessionSlots() {
   if (!mentor || !typeSelect || !dateInput || !slotsRoot || !typeSelect.value) { if(slotsRoot)slotsRoot.innerHTML='<div class="community-empty">Company-set times will appear here.</div>'; return; }
   var type = scheduleTypes.find(function (item) { return item.id === typeSelect.value; });
   if (!type) return;
-  slotsRoot.innerHTML = '<div class="muted">Finding open times…</div>';
+  slotsRoot.innerHTML = '<div class="local-loading">Finding open times…</div>';
   var result = await supabaseClient.rpc("get_peer_session_slots", { p_mentor_id: mentor.id, p_session_type_id: type.id, p_from: dateInput.value, p_days: 1 });
   if (result.error) { slotsRoot.innerHTML = '<div class="community-empty">' + esc(authErrorText(result.error)) + '</div>'; return; }
   scheduleSlots = result.data || [];
@@ -1329,6 +1365,7 @@ function peerSessionRowMarkup(row) {
 }
 async function loadPeerSessionList() {
   var root = document.getElementById("sessionList"); if (!root || !user) return;
+  root.innerHTML = '<div class="local-loading">Loading your sessions…</div>';
   var result = await supabaseClient.from("peer_sessions").select("id,connection_id,session_type_id,learner_id,mentor_id,starts_at,ends_at,timezone,status,learner_note,mentor_note,learner:profiles!peer_sessions_learner_id_fkey(display_name),mentor:profiles!peer_sessions_mentor_id_fkey(display_name)").order("starts_at", { ascending: true }).limit(100);
   if (result.error) { root.innerHTML = '<div class="community-empty">Could not load sessions: ' + esc(authErrorText(result.error)) + '</div>'; return; }
   var rows = result.data || [];
@@ -1356,22 +1393,33 @@ async function loadPeerSessionHistory() {
   });
   root.innerHTML = historyRows.length ? historyRows.map(peerSessionRowMarkup).join("") : '<div class="community-empty">No session history yet.</div>';
 }
+async function loadPeerSettingsPage() {
+  var account = document.getElementById("accountSettingsBody"), mentor = document.getElementById("mentorSettingsPanel"), mentorBody = document.getElementById("mentorSettingsBody");
+  if (!account) return;
+  account.innerHTML = '<div class="local-loading">Loading your account settings…</div>';
+  if (!user) { account.innerHTML = '<p class="muted">Sign in to manage your account settings.</p><button class="btn" type="button" data-settings-signin>Sign in</button>'; if (mentor) mentor.hidden = true; await loadPeerSessionHistory(); return; }
+  account.innerHTML = '<p><b>' + esc(user.n) + '</b><br>' + esc(user.e) + '<br>' + esc(accountTypeLabel(user.role)) + ' · Class ' + esc(String(user.grade || "—")) + '</p><p class="muted">' + esc((user.location && [user.location.school,user.location.city,user.location.state,user.location.country].filter(Boolean).join(" · ")) || "Add your school and location") + '</p><div class="row"><button class="btn ghost" type="button" data-settings-edit-profile>Edit account details</button><label class="btn ghost">Profile photo<input type="file" accept="image/jpeg,image/png,image/webp" data-settings-image="avatar" hidden></label><label class="btn ghost">Banner<input type="file" accept="image/jpeg,image/png,image/webp" data-settings-image="banner" hidden></label></div>';
+  if (mentor) mentor.hidden = !canMentor(user);
+  if (canMentor(user) && mentorBody) {
+    mentorBody.innerHTML = '<div class="local-loading">Loading mentor settings…</div>';
+    var results = await Promise.all([
+      supabaseClient.from("tutor_profiles").select("headline,subjects,is_available").eq("user_id", user.id).maybeSingle(),
+      supabaseClient.from("tutor_verification_requests").select("id,status,submitted_at").eq("user_id", user.id).order("submitted_at", { ascending: false }).limit(1),
+    ]);
+    var profile = results[0].data, status = results[1].data && results[1].data[0] || null;
+    var verify = results[1].error ? '<p class="err">' + esc(authErrorText(results[1].error)) + '</p>' : tutorVerificationPanel(status);
+    mentorBody.innerHTML = verify + '<section class="settings-subsection"><h3>Mentor profile</h3><p class="muted">' + esc(profile && profile.headline || "Create your mentor profile to help learners find you.") + '</p><p class="muted">Guidance areas: ' + esc(profile && profile.subjects ? profile.subjects.join(", ") : "Not set") + '</p><button class="btn ghost" type="button" data-edit-tutor>' + (profile ? 'Edit mentor profile' : 'Create mentor profile') + '</button> <button class="btn ghost" type="button" data-manage-achievements>Manage achievements</button><label class="availability"><input type="checkbox" data-available ' + (profile && profile.is_available ? "checked" : "") + ' ' + (!profile || !status || status.status !== "verified" ? "disabled" : "") + '> Show my profile in mentor search</label></section>' + (status && status.status === "verified" ? '<section class="settings-subsection">' + scheduleManagerMarkup() + '</section>' : '<p class="muted">Availability controls unlock after mentor verification.</p>');
+    if (status && status.status === "verified") await loadMentorScheduleControls();
+  }
+  await loadPeerSessionHistory();
+}
 async function loadPeerSessionsPage() {
-  var note = document.getElementById("sessionPageNote"), tools = document.getElementById("mentorScheduleTools");
-  if (note) note.textContent = !user ? "Sign in to view your booked sessions." : (canMentor(user) && !canLearn(user) ? "Review learner bookings and block times you are unavailable." : (canMentor(user) ? "Your bookings appear here as a learner and a mentor." : "Your booked sessions and chats appear here."));
-  if (tools) { tools.hidden = true; tools.innerHTML = ""; }
+  var note = document.getElementById("sessionPageNote");
+  if (note) note.textContent = !user ? "Sign in to view your booked sessions." : "Your upcoming bookings and session chats appear here.";
   if (!user) {
     var root = document.getElementById("sessionList");
     if (root) root.innerHTML = '<div class="community-empty">Sign in to see your session requests and chats.</div><button type="button" class="btn" data-schedule-signin>Sign in</button>';
     return;
-  }
-  if (canMentor(user) && tools) {
-    var statusResult = await supabaseClient.from("tutor_verification_requests").select("status").eq("user_id", user.id).order("submitted_at", { ascending: false }).limit(1);
-    var latestStatus = statusResult.data && statusResult.data[0];
-    tools.hidden = false;
-    if (statusResult.error) tools.innerHTML = '<p class="muted">Could not load availability settings: ' + esc(authErrorText(statusResult.error)) + '</p>';
-    else if (latestStatus && latestStatus.status === "verified") { tools.innerHTML = scheduleManagerMarkup(); await loadMentorScheduleControls(); }
-    else tools.innerHTML = '<h2>Availability</h2><p class="muted">Complete mentor verification before you can block booking times.</p><a class="btn ghost" href="#dashboard">Open mentor dashboard</a>';
   }
   await loadPeerSessionList();
 }
@@ -1386,7 +1434,17 @@ document.getElementById("sessionList").addEventListener("click", async function(
 document.getElementById("settings").addEventListener("click", function (event) {
   var chatButton = event.target.closest("[data-session-chat]");
   if (chatButton) openSessionChat(chatButton.dataset.sessionChat);
+  if (event.target.closest("[data-settings-signin]")) { openSign(); return; }
+  if (event.target.closest("[data-settings-edit-profile]")) { openOnboarding(false); return; }
+  if (event.target.closest("[data-edit-tutor]")) { openTutor(); return; }
+  if (event.target.closest("[data-manage-achievements]")) { openMentorAchievementManager(); return; }
+  if (event.target.closest("[data-start-verification]")) { openTutorVerificationForm(); return; }
 });
+document.getElementById("settings").addEventListener("change", async function (event) {
+  var imageInput = event.target.closest("[data-settings-image]");
+  if (imageInput && imageInput.files && imageInput.files[0]) { await uploadProfileImage(imageInput.files[0], imageInput.dataset.settingsImage); imageInput.value = ""; return; }
+});
+document.querySelectorAll("[data-workspace-switch]").forEach(function (button) { button.addEventListener("click", switchWorkspace); });
 document.getElementById("closeBooking").addEventListener("click", function () { document.getElementById("bookingDialog").close(); });
 document.getElementById("bookingDialog").addEventListener("click", function (event) { if (event.target === this) this.close(); });
 
@@ -1533,16 +1591,17 @@ function scheduleManagerMarkup() {
 }
 async function loadMentorScheduleControls() {
   var root=document.getElementById("blockedTimeList"); if(!root||!user)return;
+  root.innerHTML='<div class="local-loading">Loading blocked times…</div>';
   var result=await supabaseClient.from("peer_blocked_times").select("id,starts_at,ends_at,timezone").eq("mentor_id",user.id).gte("ends_at",new Date().toISOString()).order("starts_at").limit(20);
   root.innerHTML=result.error?'<span>'+esc(authErrorText(result.error))+'</span>':(result.data||[]).map(function(row){return '<div>Unavailable · '+esc(sessionTime(row.starts_at,row.timezone))+' to '+esc(sessionTime(row.ends_at,row.timezone))+' <button class="act" data-schedule-delete="block" data-id="'+esc(row.id)+'">Remove</button></div>';}).join("")||"No blocked times.";
 }
-document.getElementById("sessions").addEventListener("submit",async function(event){
+document.getElementById("settings").addEventListener("submit",async function(event){
   var form=event.target.closest("[data-schedule-form]"); if(!form)return; event.preventDefault(); if(!user)return;
   var data=new FormData(form), row={mentor_id:user.id,starts_at:zonedInputToIso(data.get("starts_at"),"Asia/Kolkata"),ends_at:zonedInputToIso(data.get("ends_at"),"Asia/Kolkata"),timezone:"Asia/Kolkata",label:"Unavailable"};
   if(!row.starts_at||!row.ends_at||row.starts_at>=row.ends_at){document.getElementById("scheduleManageMessage").textContent="Choose an end time after the start time.";return;}
   var result=await supabaseClient.from("peer_blocked_times").insert(row);var msg=document.getElementById("scheduleManageMessage");msg.textContent=result.error?authErrorText(result.error):"Those times are now blocked.";if(!result.error){form.reset();await loadMentorScheduleControls();}
 });
-document.getElementById("sessions").addEventListener("click",async function(event){var button=event.target.closest("[data-schedule-delete]");if(!button)return;var result=await supabaseClient.from("peer_blocked_times").delete().eq("id",button.dataset.id).eq("mentor_id",user.id);if(result.error)window.alert(authErrorText(result.error));await loadMentorScheduleControls();});
+document.getElementById("settings").addEventListener("click",async function(event){var button=event.target.closest("[data-schedule-delete]");if(!button)return;var result=await supabaseClient.from("peer_blocked_times").delete().eq("id",button.dataset.id).eq("mentor_id",user.id);if(result.error)window.alert(authErrorText(result.error));await loadMentorScheduleControls();});
 function tutorVerificationPanel(status) {
   if (Number(user && user.grade) < 9 || Number(user && user.grade) > 12) return '<section class="box verify-status"><b>Finish your class details</b><p class="muted">Set your class before submitting mentor verification.</p></section>';
   if (status && status.status === "verified") {
@@ -1569,17 +1628,16 @@ async function drawTutorDashboard() {
     body.innerHTML = '<div class="box">Choose Mentor or Both to open the mentor dashboard.</div>';
     return;
   }
-  body.innerHTML = '<div class="box">Loading your mentor dashboard…</div>';
+  body.innerHTML = '<div class="box local-loading">Loading your mentor dashboard…</div>';
   var results = await Promise.all([
     supabaseClient.from("tutor_profiles").select("headline, subjects, is_available").eq("user_id", user.id).maybeSingle(),
-    supabaseClient.from("tutor_verification_requests").select("id, status, submitted_at").eq("user_id", user.id).order("submitted_at", { ascending: false }).limit(1),
     supabaseClient.from("peer_sessions").select("id,learner_id,starts_at,ends_at,timezone,status,learner:profiles!peer_sessions_learner_id_fkey(display_name)").eq("mentor_id", user.id).order("starts_at", { ascending: true }).limit(100),
   ]);
-  if (results[0].error || results[1].error || results[2].error) {
-    body.innerHTML = '<div class="box err">' + esc(authErrorText(results[0].error || results[1].error || results[2].error)) + '</div>';
+  if (results[0].error || results[1].error) {
+    body.innerHTML = '<div class="box err">' + esc(authErrorText(results[0].error || results[1].error)) + '</div>';
     return;
   }
-  var profile = results[0].data, status = (results[1].data || [])[0] || null, sessions = results[2].data || [];
+  var profile = results[0].data, sessions = results[1].data || [];
   var now = Date.now();
   var pendingSessions = sessions.filter(function (s) { return s.status === "pending"; });
   var upcomingSessions = sessions.filter(function (s) { return s.status === "confirmed" && new Date(s.ends_at).getTime() >= now; });
@@ -1588,11 +1646,7 @@ async function drawTutorDashboard() {
     return '<article class="request-row"><div><b>' + esc(learner.display_name || "Learner") + '</b><p class="muted">30-minute session · ' + esc(sessionTime(s.starts_at, s.timezone)) + '</p></div><div class="row"><button class="btn" data-session-action="confirmed" data-session-id="' + esc(s.id) + '">Accept</button><button class="btn ghost" data-session-action="declined" data-session-id="' + esc(s.id) + '">Decline</button></div></article>';
   }).join("") : '<p class="muted">No booking requests to review.</p>';
   body.innerHTML = '<div class="dash-stats"><div class="dash-stat"><b>' + pendingSessions.length + '</b><span>Bookings to review</span></div><div class="dash-stat"><b>' + upcomingSessions.length + '</b><span>Upcoming sessions</span></div><div class="dash-stat"><b>' + (profile && profile.is_available ? "Available" : "Paused") + '</b><span>Profile visibility</span></div></div>' +
-    tutorVerificationPanel(status) +
-    '<div class="dash-grid"><section class="box"><div class="dash-heading"><div><b>Your mentor profile</b><p class="muted">' + esc(profile ? profile.headline || "Add a guidance note" : "Create your profile so learners can find you.") + '</p></div><button class="btn ghost" data-edit-tutor>Edit profile</button></div><p class="muted">Guidance areas: ' + esc(profile && profile.subjects ? profile.subjects.join(", ") : "Not set") + '<br>School: ' + esc(user.location && user.location.school || "—") + '<br>Location: ' + esc(user.location ? [user.location.city,user.location.state,user.location.country].join(", ") : "—") + '</p><label class="availability"><input type="checkbox" data-available ' + (profile && profile.is_available ? "checked" : "") + ' ' + (!profile || !status || status.status !== "verified" ? "disabled" : "") + '> Show my profile in mentor search</label></section></div>' +
     '<section class="box request-box"><div class="dash-heading"><div><b>Booking requests</b><p class="muted">Accept or decline requests for a scheduled learning session.</p></div></div>' + bookingRows + '</section>';
-  var mentorProfilePanel = body.querySelector(".dash-grid .box");
-  if (mentorProfilePanel) mentorProfilePanel.insertAdjacentHTML("beforeend", '<div class="mentor-achievement-dashboard"><p class="muted">Add reviewed exam results, certificates, medals, and other milestones to your public profile.</p><button type="button" class="btn ghost" data-manage-achievements>Manage achievements</button></div>');
 }
 document.getElementById("tutorDashboardBody").addEventListener("click", async function (e) {
   var sessionAction = e.target.closest("[data-session-action]");
@@ -1601,16 +1655,14 @@ document.getElementById("tutorDashboardBody").addEventListener("click", async fu
     var result = await supabaseClient.from("peer_sessions").update({ status: sessionAction.dataset.sessionAction }).eq("id", sessionAction.dataset.sessionId).eq("mentor_id", user.id);
     if (result.error) window.alert(authErrorText(result.error));
     await drawTutorDashboard();
-  } else if (e.target.closest("[data-manage-achievements]")) openMentorAchievementManager();
-  else if (e.target.closest("[data-edit-tutor]")) openTutor();
-  else if (e.target.closest("[data-start-verification]")) openTutorVerificationForm();
+  }
 });
-document.getElementById("tutorDashboardBody").addEventListener("change", async function (e) {
+document.getElementById("settings").addEventListener("change", async function (e) {
   if (!e.target.matches("[data-available]")) return;
   var result = await supabaseClient.from("tutor_profiles").update({ is_available: e.target.checked }).eq("user_id", user.id);
   if (result.error) window.alert(authErrorText(result.error));
   await loadTutorDirectory();
-  await drawTutorDashboard();
+  await loadPeerSettingsPage();
 });
 
 function openTutorVerificationForm() {
@@ -1654,7 +1706,8 @@ function openTutorVerificationForm() {
       errorEl.textContent = authErrorText(metadata.error); button.disabled = false; button.textContent = "Send for review"; return;
     }
     dlg.close();
-    await drawTutorDashboard();
+    if (curRoute === "settings") await loadPeerSettingsPage();
+    else await drawTutorDashboard();
   };
 }
 
@@ -1662,7 +1715,7 @@ async function drawVerificationAdmin() {
   var body = document.getElementById("verificationAdminBody");
   if (!body) return;
   if (!user || !isVerificationAdmin) { body.innerHTML = '<div class="box">This area is for trusted reviewers only.</div>'; return; }
-  body.innerHTML = '<div class="box">Loading review queue…</div>';
+  body.innerHTML = '<div class="box local-loading">Loading review queue…</div>';
   var result = await supabaseClient.from("tutor_verification_requests").select("id, user_id, submitted_at").eq("status", "pending").order("submitted_at", { ascending: true });
   if (result.error) { body.innerHTML = '<div class="box err">' + esc(authErrorText(result.error)) + '</div>'; return; }
   if (!result.data || !result.data.length) { body.innerHTML = '<div class="box">No tutor verification requests waiting.</div>'; await drawAchievementReviewQueue(body); return; }
@@ -1819,7 +1872,7 @@ async function loadSocialFeed() {
   if (!list) return;
   if (!user || !supabaseClient) { list.innerHTML = '<div class="community-empty">Sign in to view and share posts.</div>'; return; }
   var loadingUserId = user.id;
-  list.innerHTML = '<div class="community-empty">Loading your learning feed…</div>';
+  list.innerHTML = '<div class="local-loading">Loading your learning feed…</div>';
   var result = await supabaseClient.from("posts").select("id, author_id, content, post_type, media_url, media_type, created_at, profiles!posts_author_id_fkey(display_name, grade, avatar_url), post_reactions(user_id, reaction), post_comments(id, author_id, content, created_at, profiles!post_comments_author_id_fkey(display_name))").order("created_at", { ascending: false }).limit(50);
   if (!user || user.id !== loadingUserId || curRoute !== "feed") return;
   if (result.error) { list.innerHTML = '<div class="community-empty">Could not load posts: ' + esc(authErrorText(result.error)) + '. Run the v2.0.0 Supabase setup SQL.</div>'; return; }
@@ -1892,7 +1945,7 @@ async function loadDoubtsFromSupabase() {
     return;
   }
   var loadingUserId = user.id;
-  flist.innerHTML = '<div class="empty">Loading saved doubts…</div>';
+  flist.innerHTML = '<div class="local-loading">Loading saved doubts…</div>';
   var result = await supabaseClient
     .from("doubts")
     .select("id, author_id, title, body, subject, grade, created_at, profiles!doubts_author_id_fkey(display_name, grade), answers(id, author_id, content, is_accepted, created_at, profiles!answers_author_id_fkey(display_name, grade))")
@@ -2208,11 +2261,12 @@ document.getElementById("ftabs").addEventListener("click", function (e) {
 function drawMe() {
   var h = "";
   if (!user) {
-    h = '<div class="box me-signin-card"><div><span class="community-kicker">YOUR PEER CONNECT PROFILE</span><h3>Sign in to see your page</h3><p class="muted">Manage your profile, photo, cover, and community details here.</p></div><button class="btn" data-go="signin">Sign in</button></div>';
+    h = '<div class="box me-signin-card"><div><span class="community-kicker">YOUR PEER CONNECT PROFILE</span><h3>Sign in to see your page</h3><p class="muted">Your profile and community details live here.</p></div><button class="btn" data-go="signin">Sign in</button></div>';
   } else {
     var location = user.location || {};
     var locationText = [location.city, location.state, location.country].filter(Boolean).join(", ") || "Add your location";
     h = '<div class="me-profile-page"><div class="me-profile-hero"><div class="me-cover" id="myProfileCover"></div><div class="me-identity-row"><div class="me-avatar">' + (user.avatarUrl ? '<img src="' + esc(user.avatarUrl) + '" alt="Profile photo">' : esc(ini(user.n))) + '</div><div class="me-identity-copy"><h3>' + esc(user.n) + '</h3><p>' + esc(accountTypeLabel(user.role)) + ' · Class ' + esc(String(user.grade || "—")) + '</p></div></div></div><div class="me-page-grid"><section class="box me-detail-panel"><h3>Account details</h3><dl class="me-detail-list"><div><dt>Email</dt><dd>' + esc(user.e) + '</dd></div><div><dt>Account type</dt><dd>' + esc(accountTypeLabel(user.role)) + '</dd></div><div><dt>Class</dt><dd>' + esc(String(user.grade || "—")) + '</dd></div><div><dt>School</dt><dd>' + esc(location.school || "Add your school") + '</dd></div><div><dt>Location</dt><dd>' + esc(locationText) + '</dd></div></dl></section><aside class="box me-control-panel"><h3>Profile settings</h3><p class="muted">Keep your profile photo, banner, school, and location up to date.</p><button class="btn me-edit-button" data-edit-details>Edit profile</button><div class="me-image-actions"><label class="btn ghost">Change profile photo<input type="file" accept="image/jpeg,image/png,image/webp" data-profile-image="avatar"></label><label class="btn ghost">Change banner<input type="file" accept="image/jpeg,image/png,image/webp" data-profile-image="banner"></label></div><div class="me-community"><h4>Community</h4><div class="profile-social" id="myFollowStats">Loading followers…</div></div></aside></div></div>';
+    h = h.replace(/<aside class="box me-control-panel">[\s\S]*?<\/aside>/, '<aside class="box me-control-panel"><h3>Community</h3><div class="profile-social" id="myFollowStats">Loading followers…</div><a class="btn ghost" href="#settings">Account settings</a></aside>');
     if (canMentor(user)) {
       h = h.replace('</aside></div></div>', '</aside><section class="box me-achievements-panel"><div class="dash-heading"><div><h3>Achievements and credentials</h3><p class="muted">Add exam results, certificates, medals, or other milestones here. Approved highlights appear on your mentor profile.</p></div><button type="button" class="btn" data-profile-achievements>Manage achievements</button></div><div id="myMentorAchievements"><p class="muted">Loading your achievements…</p></div></section></div></div>');
     }
@@ -2273,9 +2327,12 @@ function route() {
   var isStudent = canLearn(user);
   if (isStudent && studentEntryPending) {
     studentEntryPending = false;
-    h = "home";
+    h = canMentor(user) && activeWorkspace === "mentor" ? "dashboard" : "home";
     if (location.hash !== "#" + h) history.replaceState(null, document.title, location.pathname + location.search + "#" + h);
   }
+  if (h === "home" && canMentor(user) && !canLearn(user)) h = "dashboard";
+  if (h === "home" && canLearn(user) && canMentor(user) && activeWorkspace === "mentor") h = "dashboard";
+  if (h === "dashboard" && canLearn(user) && canMentor(user) && activeWorkspace !== "mentor") h = "home";
   if (h === "dashboard" && !canMentor(user)) h = "home";
   if (h === "verification" && (!user || !isVerificationAdmin)) h = "home";
   curRoute = h;
@@ -2296,7 +2353,7 @@ function route() {
   if (h === "profile") renderTutorProfilePage();
   if (h === "feed") loadSocialFeed();
   if (h === "sessions") loadPeerSessionsPage();
-  if (h === "settings") loadPeerSessionHistory();
+  if (h === "settings") loadPeerSettingsPage();
   if (h === "me") drawMe();
   if (h === "dashboard") drawTutorDashboard();
   window.scrollTo(0, 0);
