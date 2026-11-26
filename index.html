@@ -1038,7 +1038,7 @@ dialog.auth-screen #dbody { width: 100%; height: 100%; display: grid; grid-templ
 .me-identity-copy { min-width:0; padding-bottom:4px; }
 .me-identity-copy h3 { margin:5px 0; font-size:clamp(26px,3vw,36px); letter-spacing:-.035em; }
 .me-identity-copy p { margin:0; color:var(--muted); font-size:16px; }
-.me-page-grid { display:grid; grid-template-columns:minmax(0,1.3fr) minmax(300px,.7fr); gap:20px; align-items:stretch; }
+.me-page-grid { display:grid; grid-template-columns:minmax(0,1.3fr) minmax(300px,.7fr); gap:20px; align-items:start; }
 .me-achievements-panel { grid-column:1 / -1; }
 .me-detail-panel,.me-control-panel { min-width:0; padding:26px; border:1px solid var(--line); border-radius:20px; background:var(--surface); }
 .me-detail-panel h3,.me-control-panel h3 { margin:7px 0 18px; font-size:24px; }
@@ -1298,12 +1298,16 @@ footer { color: var(--muted); }
 .profile-image-viewer-title { color:var(--muted); font-size:14px; }
 .profile-image-viewer-close { display:grid; place-items:center; width:40px; height:40px; border:1px solid var(--line); border-radius:50%; background:rgba(255,255,255,.06); color:var(--ink); font-size:26px; cursor:pointer; }
 .profile-image-viewer-img { display:block; width:100%; height:100%; min-height:0; object-fit:contain; border-radius:14px; }
-.settings-page-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin-top:20px; }
+.settings-page-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin-top:20px; align-items:start; }
 .settings-page-grid>.box { max-width:none; padding:24px; }
+.settings-page-grid>.box { align-self:start; }
 .settings-page-grid h2 { margin:2px 0 10px; font-size:22px; }
 .settings-page-grid p { line-height:1.6; }
 .settings-status { display:inline-flex; align-items:center; border:1px solid var(--line); border-radius:999px; padding:8px 13px; color:var(--brand); background:var(--soft); font-weight:750; }
 .settings-history-panel { grid-column:1 / -1; }
+.session-history-more { margin-top:14px; padding-top:14px; border-top:1px solid var(--line); }
+.session-history-more summary { cursor:pointer; color:var(--brand); font-weight:700; padding:8px 0; }
+.session-history-older { max-height:440px; overflow:auto; padding-right:6px; overscroll-behavior:contain; }
 .workspace-switch { margin: 8px 8px 10px; width:calc(100% - 16px); justify-content:center; }
 .startup-loader { position:fixed; inset:0; z-index:10000; display:grid; place-items:center; background:radial-gradient(ellipse at 50% 42%,rgba(154,102,205,.16),transparent 48%),#0c0a10; opacity:1; visibility:visible; transition:opacity .35s ease,visibility .35s ease; }
 .startup-loader.is-done { opacity:0; visibility:hidden; pointer-events:none; }
@@ -1554,7 +1558,7 @@ footer { color: var(--muted); }
           <div class="social-feed-title"><div><span class="community-kicker">YOUR PREFERENCES</span><h1>Settings</h1></div></div>
           <div class="settings-page-grid">
             <section class="box"><h2>Account and profile</h2><p class="muted">Update your account details, profile photo, banner, school, and location.</p><div id="accountSettingsBody"></div></section>
-            <section class="box" id="mentorSettingsPanel" hidden><h2>Mentor workspace</h2><p class="muted">Manage your mentor profile, verification, availability, and guidance areas here.</p><div id="mentorSettingsBody"></div></section>
+            <section class="box" id="mentorSettingsPanel" hidden><h2>Mentor workspace</h2><p class="muted">Edit your mentor profile, submit verification, manage achievements, and control profile visibility here. Block unavailable booking times from your dashboard.</p><div id="mentorSettingsBody"></div></section>
             <section class="box"><h2>Appearance</h2><p class="muted">Peer Connect uses its dark theme across your devices.</p><span class="settings-status">Dark theme · On</span></section>
             <section class="box settings-history-panel"><h2>Session history</h2><p class="muted">Past and cancelled sessions, with chat history when available.</p><div id="sessionHistory"><div class="community-empty">Loading your session history…</div></div></section>
           </div>

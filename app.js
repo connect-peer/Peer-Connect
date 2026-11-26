@@ -205,7 +205,7 @@ async function loadMentorAchievementShowcase(tutor, target) {
 function renderTutorAbout(tutor, content) {
   content.innerHTML = '<h3>About</h3><p>' + esc(tutor.h || 'Peer Connect mentor') + '</p><p class="muted">School: ' + esc(tutor.school || '—') + '<br>Location: ' + esc([tutor.city, tutor.state, tutor.country].filter(Boolean).join(', ') || '—') + '</p><section class="mentor-achievement-showcase"><div class="achievement-section-heading"><div><h3>Achievements and credentials</h3><p class="muted">Reviewed highlights that show experience and milestones.</p></div>' + (tutor.me ? '<button type="button" class="btn ghost" data-achievement-manager>Manage achievements</button>' : '') + '</div><div id="publicMentorAchievements"><p class="muted">Loading achievements…</p></div></section>';
   var manage = content.querySelector("[data-achievement-manager]");
-  if (manage) manage.onclick = openMentorAchievementManager;
+  if (manage) manage.remove();
   loadMentorAchievementShowcase(tutor, document.getElementById("publicMentorAchievements"));
 }
 function enableProfileImageView(element, imageUrl, label) {
@@ -1225,10 +1225,6 @@ function paintRoleUI() {
     if (cards) cards.innerHTML = '<a href="#home"><b>Mentors</b><span>Find verified mentors by subject and location.</span></a><a href="#doubts"><b>Questions</b><span>Ask questions, upvote the best ones, and answer what you know.</span></a><a href="#pricing"><b>Pricing</b><span>Free for learners and mentors. Optional Blue Tick may come later.</span></a>';
   }
 }
-document.querySelectorAll('[data-nav="verification"]').forEach(function (link) {
-  link.addEventListener("click", function () { window.setTimeout(drawVerificationAdmin, 0); });
-});
-
 var scheduleMentors = [], scheduleTypes = [], scheduleSlots = [], scheduleSlotsContext = null;
 var selectedScheduleSlotIndex = null;
 var activeChatSession = null, sessionChatPoll = null, sessionChatClock = null, sessionChatSignature = "", sessionChatSignedAt = 0, sessionChatBusy = false;
@@ -1391,7 +1387,9 @@ async function loadPeerSessionHistory() {
     var upcoming = row.status === "confirmed" ? new Date(row.ends_at).getTime() >= now : row.status === "pending" && new Date(row.starts_at).getTime() >= now;
     return !upcoming;
   });
-  root.innerHTML = historyRows.length ? historyRows.map(peerSessionRowMarkup).join("") : '<div class="community-empty">No session history yet.</div>';
+  if (!historyRows.length) { root.innerHTML = '<div class="community-empty">No session history yet.</div>'; return; }
+  var recent = historyRows.slice(0, 5), older = historyRows.slice(5);
+  root.innerHTML = recent.map(peerSessionRowMarkup).join("") + (older.length ? '<details class="session-history-more"><summary>Show ' + older.length + ' older sessions</summary><div class="session-history-older">' + older.map(peerSessionRowMarkup).join("") + '</div></details>' : '');
 }
 async function loadPeerSettingsPage() {
   var account = document.getElementById("accountSettingsBody"), mentor = document.getElementById("mentorSettingsPanel"), mentorBody = document.getElementById("mentorSettingsBody");
@@ -1408,8 +1406,7 @@ async function loadPeerSettingsPage() {
     ]);
     var profile = results[0].data, status = results[1].data && results[1].data[0] || null;
     var verify = results[1].error ? '<p class="err">' + esc(authErrorText(results[1].error)) + '</p>' : tutorVerificationPanel(status);
-    mentorBody.innerHTML = verify + '<section class="settings-subsection"><h3>Mentor profile</h3><p class="muted">' + esc(profile && profile.headline || "Create your mentor profile to help learners find you.") + '</p><p class="muted">Guidance areas: ' + esc(profile && profile.subjects ? profile.subjects.join(", ") : "Not set") + '</p><button class="btn ghost" type="button" data-edit-tutor>' + (profile ? 'Edit mentor profile' : 'Create mentor profile') + '</button> <button class="btn ghost" type="button" data-manage-achievements>Manage achievements</button><label class="availability"><input type="checkbox" data-available ' + (profile && profile.is_available ? "checked" : "") + ' ' + (!profile || !status || status.status !== "verified" ? "disabled" : "") + '> Show my profile in mentor search</label></section>' + (status && status.status === "verified" ? '<section class="settings-subsection">' + scheduleManagerMarkup() + '</section>' : '<p class="muted">Availability controls unlock after mentor verification.</p>');
-    if (status && status.status === "verified") await loadMentorScheduleControls();
+    mentorBody.innerHTML = verify + '<section class="settings-subsection"><h3>Mentor profile</h3><p class="muted">' + esc(profile && profile.headline || "Create your mentor profile to help learners find you.") + '</p><p class="muted">Guidance areas: ' + esc(profile && profile.subjects ? profile.subjects.join(", ") : "Not set") + '</p><button class="btn ghost" type="button" data-edit-tutor>' + (profile ? 'Edit mentor profile' : 'Create mentor profile') + '</button><label class="availability"><input type="checkbox" data-available ' + (profile && profile.is_available ? "checked" : "") + ' ' + (!profile || !status || status.status !== "verified" ? "disabled" : "") + '> Show my profile in mentor search</label></section><section class="settings-subsection"><h3>Achievements and credentials</h3><p class="muted">Reviewed highlights shown on your public mentor profile.</p><button class="btn ghost" type="button" data-manage-achievements>Manage achievements</button></section>';
   }
   await loadPeerSessionHistory();
 }
@@ -1595,13 +1592,13 @@ async function loadMentorScheduleControls() {
   var result=await supabaseClient.from("peer_blocked_times").select("id,starts_at,ends_at,timezone").eq("mentor_id",user.id).gte("ends_at",new Date().toISOString()).order("starts_at").limit(20);
   root.innerHTML=result.error?'<span>'+esc(authErrorText(result.error))+'</span>':(result.data||[]).map(function(row){return '<div>Unavailable · '+esc(sessionTime(row.starts_at,row.timezone))+' to '+esc(sessionTime(row.ends_at,row.timezone))+' <button class="act" data-schedule-delete="block" data-id="'+esc(row.id)+'">Remove</button></div>';}).join("")||"No blocked times.";
 }
-document.getElementById("settings").addEventListener("submit",async function(event){
+document.getElementById("dashboard").addEventListener("submit",async function(event){
   var form=event.target.closest("[data-schedule-form]"); if(!form)return; event.preventDefault(); if(!user)return;
   var data=new FormData(form), row={mentor_id:user.id,starts_at:zonedInputToIso(data.get("starts_at"),"Asia/Kolkata"),ends_at:zonedInputToIso(data.get("ends_at"),"Asia/Kolkata"),timezone:"Asia/Kolkata",label:"Unavailable"};
   if(!row.starts_at||!row.ends_at||row.starts_at>=row.ends_at){document.getElementById("scheduleManageMessage").textContent="Choose an end time after the start time.";return;}
   var result=await supabaseClient.from("peer_blocked_times").insert(row);var msg=document.getElementById("scheduleManageMessage");msg.textContent=result.error?authErrorText(result.error):"Those times are now blocked.";if(!result.error){form.reset();await loadMentorScheduleControls();}
 });
-document.getElementById("settings").addEventListener("click",async function(event){var button=event.target.closest("[data-schedule-delete]");if(!button)return;var result=await supabaseClient.from("peer_blocked_times").delete().eq("id",button.dataset.id).eq("mentor_id",user.id);if(result.error)window.alert(authErrorText(result.error));await loadMentorScheduleControls();});
+document.getElementById("dashboard").addEventListener("click",async function(event){var button=event.target.closest("[data-schedule-delete]");if(!button)return;var result=await supabaseClient.from("peer_blocked_times").delete().eq("id",button.dataset.id).eq("mentor_id",user.id);if(result.error)window.alert(authErrorText(result.error));await loadMentorScheduleControls();});
 function tutorVerificationPanel(status) {
   if (Number(user && user.grade) < 9 || Number(user && user.grade) > 12) return '<section class="box verify-status"><b>Finish your class details</b><p class="muted">Set your class before submitting mentor verification.</p></section>';
   if (status && status.status === "verified") {
@@ -1632,12 +1629,13 @@ async function drawTutorDashboard() {
   var results = await Promise.all([
     supabaseClient.from("tutor_profiles").select("headline, subjects, is_available").eq("user_id", user.id).maybeSingle(),
     supabaseClient.from("peer_sessions").select("id,learner_id,starts_at,ends_at,timezone,status,learner:profiles!peer_sessions_learner_id_fkey(display_name)").eq("mentor_id", user.id).order("starts_at", { ascending: true }).limit(100),
+    supabaseClient.from("tutor_verification_requests").select("status").eq("user_id", user.id).order("submitted_at", { ascending: false }).limit(1),
   ]);
-  if (results[0].error || results[1].error) {
-    body.innerHTML = '<div class="box err">' + esc(authErrorText(results[0].error || results[1].error)) + '</div>';
+  if (results[0].error || results[1].error || results[2].error) {
+    body.innerHTML = '<div class="box err">' + esc(authErrorText(results[0].error || results[1].error || results[2].error)) + '</div>';
     return;
   }
-  var profile = results[0].data, sessions = results[1].data || [];
+  var profile = results[0].data, sessions = results[1].data || [], verification = (results[2].data || [])[0];
   var now = Date.now();
   var pendingSessions = sessions.filter(function (s) { return s.status === "pending"; });
   var upcomingSessions = sessions.filter(function (s) { return s.status === "confirmed" && new Date(s.ends_at).getTime() >= now; });
@@ -1645,8 +1643,12 @@ async function drawTutorDashboard() {
     var learner = relationRow(s.learner);
     return '<article class="request-row"><div><b>' + esc(learner.display_name || "Learner") + '</b><p class="muted">30-minute session · ' + esc(sessionTime(s.starts_at, s.timezone)) + '</p></div><div class="row"><button class="btn" data-session-action="confirmed" data-session-id="' + esc(s.id) + '">Accept</button><button class="btn ghost" data-session-action="declined" data-session-id="' + esc(s.id) + '">Decline</button></div></article>';
   }).join("") : '<p class="muted">No booking requests to review.</p>';
+  var unavailablePanel = verification && verification.status === "verified"
+    ? '<section class="box dashboard-unavailable">' + scheduleManagerMarkup() + '</section>'
+    : '<section class="box dashboard-unavailable"><h2>Unavailable times</h2><p class="muted">Blocking booking times will be available after your mentor profile is verified.</p><a class="btn ghost" href="#settings">Mentor settings</a></section>';
   body.innerHTML = '<div class="dash-stats"><div class="dash-stat"><b>' + pendingSessions.length + '</b><span>Bookings to review</span></div><div class="dash-stat"><b>' + upcomingSessions.length + '</b><span>Upcoming sessions</span></div><div class="dash-stat"><b>' + (profile && profile.is_available ? "Available" : "Paused") + '</b><span>Profile visibility</span></div></div>' +
-    '<section class="box request-box"><div class="dash-heading"><div><b>Booking requests</b><p class="muted">Accept or decline requests for a scheduled learning session.</p></div></div>' + bookingRows + '</section>';
+    unavailablePanel + '<section class="box request-box"><div class="dash-heading"><div><b>Booking requests</b><p class="muted">Accept or decline requests for a scheduled learning session.</p></div></div>' + bookingRows + '</section>';
+  if (verification && verification.status === "verified") await loadMentorScheduleControls();
 }
 document.getElementById("tutorDashboardBody").addEventListener("click", async function (e) {
   var sessionAction = e.target.closest("[data-session-action]");
@@ -1747,6 +1749,7 @@ async function drawVerificationAdmin() {
   await drawAchievementReviewQueue(body);
 }
 async function drawAchievementReviewQueue(body) {
+  body.querySelectorAll(".achievement-review-queue").forEach(function (oldSection) { oldSection.remove(); });
   var result = await supabaseClient.from("mentor_achievements")
     .select("id,user_id,category,title,issuer,achievement_year,public_summary,evidence_path,public_evidence_path,created_at")
     .eq("status", "pending").order("created_at", { ascending: true });
@@ -2266,10 +2269,8 @@ function drawMe() {
     var location = user.location || {};
     var locationText = [location.city, location.state, location.country].filter(Boolean).join(", ") || "Add your location";
     h = '<div class="me-profile-page"><div class="me-profile-hero"><div class="me-cover" id="myProfileCover"></div><div class="me-identity-row"><div class="me-avatar">' + (user.avatarUrl ? '<img src="' + esc(user.avatarUrl) + '" alt="Profile photo">' : esc(ini(user.n))) + '</div><div class="me-identity-copy"><h3>' + esc(user.n) + '</h3><p>' + esc(accountTypeLabel(user.role)) + ' · Class ' + esc(String(user.grade || "—")) + '</p></div></div></div><div class="me-page-grid"><section class="box me-detail-panel"><h3>Account details</h3><dl class="me-detail-list"><div><dt>Email</dt><dd>' + esc(user.e) + '</dd></div><div><dt>Account type</dt><dd>' + esc(accountTypeLabel(user.role)) + '</dd></div><div><dt>Class</dt><dd>' + esc(String(user.grade || "—")) + '</dd></div><div><dt>School</dt><dd>' + esc(location.school || "Add your school") + '</dd></div><div><dt>Location</dt><dd>' + esc(locationText) + '</dd></div></dl></section><aside class="box me-control-panel"><h3>Profile settings</h3><p class="muted">Keep your profile photo, banner, school, and location up to date.</p><button class="btn me-edit-button" data-edit-details>Edit profile</button><div class="me-image-actions"><label class="btn ghost">Change profile photo<input type="file" accept="image/jpeg,image/png,image/webp" data-profile-image="avatar"></label><label class="btn ghost">Change banner<input type="file" accept="image/jpeg,image/png,image/webp" data-profile-image="banner"></label></div><div class="me-community"><h4>Community</h4><div class="profile-social" id="myFollowStats">Loading followers…</div></div></aside></div></div>';
-    h = h.replace(/<aside class="box me-control-panel">[\s\S]*?<\/aside>/, '<aside class="box me-control-panel"><h3>Community</h3><div class="profile-social" id="myFollowStats">Loading followers…</div><a class="btn ghost" href="#settings">Account settings</a></aside>');
-    if (canMentor(user)) {
-      h = h.replace('</aside></div></div>', '</aside><section class="box me-achievements-panel"><div class="dash-heading"><div><h3>Achievements and credentials</h3><p class="muted">Add exam results, certificates, medals, or other milestones here. Approved highlights appear on your mentor profile.</p></div><button type="button" class="btn" data-profile-achievements>Manage achievements</button></div><div id="myMentorAchievements"><p class="muted">Loading your achievements…</p></div></section></div></div>');
-    }
+    h = h.replace(/<section class="box me-detail-panel">[\s\S]*?<\/section>/, '<section class="box me-detail-panel"><h3>Profile</h3><p>' + esc(accountTypeLabel(user.role)) + ' · Class ' + esc(String(user.grade || "—")) + '</p><p class="muted">School: ' + esc(location.school || "—") + '<br>Location: ' + esc(locationText) + '</p></section>');
+    h = h.replace(/<aside class="box me-control-panel">[\s\S]*?<\/aside>/, '<aside class="box me-control-panel"><h3>Community</h3><div class="profile-social" id="myFollowStats">Loading followers…</div><a class="btn ghost" href="#settings">Account and profile settings</a></aside>');
   }
   document.getElementById("meBody").innerHTML = h;
   if (user && user.bannerUrl) {
@@ -2279,8 +2280,6 @@ function drawMe() {
   }
   if (user) enableProfileImageView(document.querySelector("#meBody .me-avatar"), user.avatarUrl, "profile photo");
   document.querySelectorAll('#meBody [data-profile-image]').forEach(function (input) { input.onchange = async function () { if (input.files[0]) await uploadProfileImage(input.files[0], input.dataset.profileImage); }; });
-  var myAchievements = document.getElementById("myMentorAchievements");
-  if (myAchievements) loadOwnMentorAchievements(myAchievements);
   if (user) loadProfileSocialForMe();
 }
 async function loadProfileSocialForMe() {
@@ -2292,7 +2291,6 @@ async function loadProfileSocialForMe() {
   target.innerHTML = '<span><b>' + (results[0].count || 0) + '</b> followers</span><span><b>' + (results[1].count || 0) + '</b> following</span>';
 }
 document.getElementById("meBody").addEventListener("click", function (e) {
-  if (e.target.closest("[data-profile-achievements]")) { openMentorAchievementManager(); return; }
   var b = e.target.closest("[data-go]");
   if (!b) {
     if (e.target.closest("[data-edit-details]")) openOnboarding(false);
