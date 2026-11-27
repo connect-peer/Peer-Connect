@@ -783,6 +783,17 @@ nav a[aria-current="page"] {
 dialog.setup-dialog { width: min(560px, calc(100% - 24px)); max-width: 560px; max-height: min(92vh, 860px); max-height: min(92dvh, 860px); overflow-y: auto; overscroll-behavior: contain; }
 dialog.setup-dialog #dbody { display: block; width: auto; height: auto; min-height: 0; overflow: visible; }
 dialog.setup-dialog .row { position: sticky; bottom: -1px; padding: 12px 0 2px; background: var(--surface); z-index: 2; }
+.learner-goal-fields { margin: 18px 0 4px; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: color-mix(in srgb, var(--soft) 45%, var(--surface)); }
+.learner-goal-fields[hidden] { display: none; }
+.learner-goal-fields h4 { margin: 0 0 4px; font: 700 19px "Bricolage Grotesque", Figtree, sans-serif; }
+.learner-goal-fields > p { margin: 0 0 14px; }
+.profile-goal-group { min-width: 0; margin: 14px 0; padding: 0; border: 0; }
+.profile-goal-group legend { margin-bottom: 8px; font-weight: 700; }
+.goal-checkbox-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.goal-checkbox-grid label { display: inline-flex; align-items: center; gap: 7px; width: auto; margin: 0; padding: 8px 11px; border: 1px solid var(--line); border-radius: 999px; color: var(--ink); background: var(--bg); cursor: pointer; }
+dialog.setup-dialog .goal-checkbox-grid input[type="checkbox"] { width: 16px; height: 16px; margin: 0; padding: 0; accent-color: var(--brand); }
+.goal-checkbox-grid label:has(input:checked) { border-color: var(--brand); background: var(--soft); }
+.profile-goal-group small { display: block; margin-top: 7px; }
 .role-option strong,
 .role-option span {
   display: block;

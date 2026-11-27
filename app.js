@@ -511,12 +511,19 @@ async function syncAuthUser(authUser) {
   }
   var locationResult = supabaseClient ? await supabaseClient.from("profile_locations")
     .select("city, state, country, school").eq("user_id", authUser.id).maybeSingle() : null;
+  var guidanceResult = supabaseClient ? await supabaseClient.from("learner_guidance_profiles")
+    .select("goal_decision, board, target_exam, help_subjects, preferred_languages, city_tier")
+    .eq("user_id", authUser.id).maybeSingle() : null;
   if (profileResult && profileResult.error) {
     showProfileLoadError(profileResult.error);
     return;
   }
   if (locationResult && locationResult.error) {
     showProfileLoadError(locationResult.error);
+    return;
+  }
+  if (guidanceResult && guidanceResult.error) {
+    showProfileLoadError(guidanceResult.error);
     return;
   }
   user = {
@@ -528,13 +535,14 @@ async function syncAuthUser(authUser) {
     avatarUrl: profileResult && profileResult.data ? profileResult.data.avatar_url : null,
     bannerUrl: profileResult && profileResult.data ? profileResult.data.profile_banner_url : null,
     location: locationResult && !locationResult.error ? locationResult.data : null,
+    guidance: guidanceResult && !guidanceResult.error ? guidanceResult.data : null,
   };
   applyWorkspacePreference();
   var adminResult = await supabaseClient.from("verification_admins").select("user_id").eq("user_id", user.id).maybeSingle();
   isVerificationAdmin = !adminResult.error && !!adminResult.data;
   paintSign();
   paintRoleUI();
-  if ((!user.role || !user.grade || missingProfileLocation(user.location)) && !onboardingOpen) openOnboarding(false);
+  if (profileNeedsSetup(user) && !onboardingOpen) openOnboarding(false);
   if (user.role) loadTutorDirectory();
   if (curRoute === "dashboard" && canMentor(user)) drawTutorDashboard();
   if (typeof drawMe === "function" && curRoute === "me") drawMe();
@@ -549,13 +557,16 @@ function missingProfileLocation(location) {
     return !value || String(value).trim() === "" || String(value).toLowerCase() === "not set";
   });
 }
+function profileNeedsSetup(account) {
+  return !!account && (!account.role || !account.grade || missingProfileLocation(account.location) || (canLearn(account) && !account.guidance));
+}
 
 function showProfileLoadError(error) {
   onboardingOpen = false;
   dlg.classList.remove("auth-screen", "profile-dialog", "setup-dialog");
-  var permissionError = /permission denied for table profiles/i.test(authErrorText(error));
+  var permissionError = /permission denied for table (profiles|learner_guidance_profiles)/i.test(authErrorText(error));
   var detail = permissionError
-    ? 'Supabase is blocking access to your profile. In Supabase, open SQL Editor and run peer_connect_saved_profile_permissions_fix.sql from your project, then return here and choose Try again.'
+    ? 'Supabase is blocking access to your saved profile. In Supabase, open SQL Editor and run the profile setup and learner goals SQL files from your project, then return here and choose Try again.'
     : authErrorText(error);
   dbody.innerHTML = '<h3 id="dt">Couldn’t load your saved profile</h3><p class="muted">Peer Connect could not read your account setup, so it won’t ask you to fill it in again until the read works.</p><div class="err" id="profileLoadErr" role="alert">' + esc(detail) + '</div><div class="row"><button class="btn ghost" id="retryProfileLoad">Try again</button><button class="btn" id="profileErrorSignOut">Sign out</button></div>';
   if (!dlg.open) dlg.showModal();
@@ -825,17 +836,37 @@ async function signOutToLanding() {
   }
 }
 
+var learnerGoalDecisionChoices = [
+  ["choose_stream", "Choose my stream"],
+  ["start_class_11", "Start Class 11 right"],
+  ["exam_roadmap", "JEE / NEET roadmap"],
+  ["choose_branch_college", "Choose a branch or college"],
+  ["recover_result", "Recover from a bad result"],
+  ["other", "Other"],
+];
+var learnerBoardChoices = ["CBSE", "ICSE", "State board", "Other"];
+var learnerHelpSubjects = ["Maths", "Physics", "Chemistry", "Biology", "English", "Computer Science", "History", "Accountancy", "Economics", "Other"];
+var learnerLanguageChoices = ["English", "Hindi", "Bengali", "Tamil", "Telugu", "Marathi", "Kannada", "Malayalam", "Gujarati", "Punjabi", "Urdu", "Other"];
+function learnerGoalCheckboxGroup(name, title, options, selected, limit) {
+  selected = selected || [];
+  return '<fieldset class="profile-goal-group' + (limit ? ' goal-help-subjects' : '') + '"' + (limit ? ' data-goal-limit="' + limit + '"' : '') + '><legend>' + esc(title) + '</legend><div class="goal-checkbox-grid">' + options.map(function (option) {
+    var checked = selected.indexOf(option) >= 0;
+    return '<label><input type="checkbox" name="' + esc(name) + '" value="' + esc(option) + '"' + (checked ? ' checked' : '') + '><span>' + esc(option) + '</span></label>';
+  }).join("") + '</div>' + (limit ? '<small class="muted">Choose up to ' + limit + '.</small>' : '') + '</fieldset>';
+}
 function openOnboarding(changeRole) {
   if (!user || !supabaseClient || onboardingOpen) return;
+  var setupRequired = profileNeedsSetup(user);
   dlg.classList.remove("auth-screen");
   dlg.classList.remove("profile-dialog");
   dlg.classList.add("setup-dialog");
   onboardingOpen = true;
   var selectedRole = normalizeRole(user.role) || (changeRole ? "" : "learner");
   var savedLocation = user.location || {};
-  var rolePicker = '<fieldset class="role-options"><legend>How do you want to use Peer Connect?</legend><button type="button" class="role-option' + (selectedRole === "learner" || selectedRole === "student" ? " selected" : "") + '" data-role="learner" aria-pressed="' + (selectedRole === "learner" || selectedRole === "student") + '"><strong>Learner</strong><span>Find mentors, ask questions, and get guidance.</span></button><button type="button" class="role-option' + (selectedRole === "mentor" || selectedRole === "tutor" ? " selected" : "") + '" data-role="mentor" aria-pressed="' + (selectedRole === "mentor" || selectedRole === "tutor") + '"><strong>Mentor</strong><span>Share what you know and guide learners in lower classes.</span></button><button type="button" class="role-option' + (selectedRole === "both" ? " selected" : "") + '" data-role="both" aria-pressed="' + (selectedRole === "both") + '"><strong>Both</strong><span>Get guidance from seniors and mentor learners in lower classes.</span></button></fieldset>';
+  var savedGuidance = user.guidance || {};
+  var rolePicker = '<fieldset class="role-options"><legend>How do you want to use Meridian?</legend><button type="button" class="role-option' + (selectedRole === "learner" || selectedRole === "student" ? " selected" : "") + '" data-role="learner" aria-pressed="' + (selectedRole === "learner" || selectedRole === "student") + '"><strong>Learner</strong><span>Find mentors, ask questions, and get guidance.</span></button><button type="button" class="role-option' + (selectedRole === "mentor" || selectedRole === "tutor" ? " selected" : "") + '" data-role="mentor" aria-pressed="' + (selectedRole === "mentor" || selectedRole === "tutor") + '"><strong>Mentor</strong><span>Share what you know and guide learners in lower classes.</span></button><button type="button" class="role-option' + (selectedRole === "both" ? " selected" : "") + '" data-role="both" aria-pressed="' + (selectedRole === "both") + '"><strong>Both</strong><span>Get guidance from seniors and mentor learners in lower classes.</span></button></fieldset>';
   dbody.innerHTML =
-    '<h3 id="dt">Set up your profile</h3><p style="color:var(--muted);margin:6px 0 14px">Add your school and location so you can find peers nearby. Learner location details are shared only with a mentor after they send a request.</p>' +
+    '<h3 id="dt">Set up your profile</h3><p style="color:var(--muted);margin:6px 0 14px">Add your school, location, and guidance goals so Meridian can help you find the right people.</p>' +
     '<label for="profileName">Name</label><input id="profileName" autocomplete="name" value="' + esc(user.n) + '">' +
     '<label for="profileGrade">Class</label><select id="profileGrade" required aria-label="Choose your class"><option value="">Choose your class</option>' +
     [9, 10, 11, 12].map(function (grade) {
@@ -845,9 +876,20 @@ function openOnboarding(changeRole) {
     '<label for="profileCity">City</label><input id="profileCity" maxlength="100" autocomplete="address-level2" value="' + esc(savedLocation.city || "") + '">' +
     '<label for="profileState">State</label><input id="profileState" maxlength="100" autocomplete="address-level1" value="' + esc(savedLocation.state || "") + '">' +
     '<label for="profileCountry">Country</label><input id="profileCountry" maxlength="100" autocomplete="country-name" value="' + esc(savedLocation.country || "") + '">' +
-    rolePicker + '<div class="err" id="profileErr" role="alert"></div>' +
-    '<div class="row"><button class="btn ghost" id="cancelProfile">Cancel</button><button class="btn" id="saveProfile">Continue</button></div>';
+    rolePicker + '<div id="learnerGoalFields" class="learner-goal-fields"><h4>Your guidance goals</h4><p class="muted">Tell us what you’re working toward. You can update this any time.</p>' +
+    '<label for="learnerGoalDecision">What would you like guidance with?</label><select id="learnerGoalDecision" required><option value="">Choose a goal</option>' + learnerGoalDecisionChoices.map(function (item) { return '<option value="' + item[0] + '"' + (savedGuidance.goal_decision === item[0] ? ' selected' : '') + '>' + esc(item[1]) + '</option>'; }).join("") + '</select>' +
+    '<label for="learnerBoard">Your board</label><select id="learnerBoard" required><option value="">Choose your board</option>' + learnerBoardChoices.map(function (item) { return '<option' + (savedGuidance.board === item ? ' selected' : '') + '>' + esc(item) + '</option>'; }).join("") + '</select>' +
+    '<label for="learnerTargetExam">Target exam <span class="muted">(optional)</span></label><input id="learnerTargetExam" maxlength="80" value="' + esc(savedGuidance.target_exam || '') + '" placeholder="For example, JEE Main or NEET">' +
+    learnerGoalCheckboxGroup("learnerHelpSubjects", "Subjects you want help with", learnerHelpSubjects, savedGuidance.help_subjects, 3) +
+    learnerGoalCheckboxGroup("learnerLanguages", "Languages you prefer", learnerLanguageChoices, savedGuidance.preferred_languages) +
+    '<label for="learnerCityTier">City type <span class="muted">(optional)</span></label><select id="learnerCityTier"><option value="">Prefer not to say</option><option value="tier_1"' + (savedGuidance.city_tier === "tier_1" ? ' selected' : '') + '>Tier 1</option><option value="tier_2"' + (savedGuidance.city_tier === "tier_2" ? ' selected' : '') + '>Tier 2</option><option value="tier_3"' + (savedGuidance.city_tier === "tier_3" ? ' selected' : '') + '>Tier 3</option><option value="other"' + (savedGuidance.city_tier === "other" ? ' selected' : '') + '>Other / not sure</option></select></div>' +
+    '<div class="err" id="profileErr" role="alert"></div>' +
+    '<div class="row"><button class="btn ghost" id="cancelProfile"' + (setupRequired ? ' hidden' : '') + '>Cancel</button><button class="btn" id="saveProfile">Continue</button></div>';
+  dlg.dataset.setupRequired = String(setupRequired);
   if (!dlg.open) dlg.showModal();
+  var goalFields = document.getElementById("learnerGoalFields");
+  function updateGoalVisibility() { goalFields.hidden = !canLearn({ role: selectedRole }); }
+  updateGoalVisibility();
   document.getElementById("cancelProfile").onclick = function () { dlg.close(); };
   dbody.querySelectorAll("[data-role]").forEach(function (button) {
     button.onclick = function () {
@@ -857,7 +899,16 @@ function openOnboarding(changeRole) {
         option.classList.toggle("selected", selected);
         option.setAttribute("aria-pressed", String(selected));
       });
+      updateGoalVisibility();
     };
+  });
+  dbody.querySelectorAll("[data-goal-limit] input[type=checkbox]").forEach(function (input) {
+    input.addEventListener("change", function () {
+      var group = input.closest("[data-goal-limit]"), limit = Number(group.dataset.goalLimit);
+      var checked = group.querySelectorAll("input:checked");
+      if (checked.length > limit) { input.checked = false; document.getElementById("profileErr").textContent = "Choose up to " + limit + " subjects."; }
+      else document.getElementById("profileErr").textContent = "";
+    });
   });
   document.getElementById("saveProfile").onclick = async function () {
     var saveButton = this;
@@ -867,12 +918,25 @@ function openOnboarding(changeRole) {
     var city = document.getElementById("profileCity").value.trim();
     var state = document.getElementById("profileState").value.trim();
     var country = document.getElementById("profileCountry").value.trim();
+    var needsLearnerGoals = canLearn({ role: selectedRole });
+    var guidance = needsLearnerGoals ? {
+      goal_decision: document.getElementById("learnerGoalDecision").value,
+      board: document.getElementById("learnerBoard").value,
+      target_exam: document.getElementById("learnerTargetExam").value.trim() || null,
+      help_subjects: Array.from(dbody.querySelectorAll('input[name="learnerHelpSubjects"]:checked')).map(function (input) { return input.value; }),
+      preferred_languages: Array.from(dbody.querySelectorAll('input[name="learnerLanguages"]:checked')).map(function (input) { return input.value; }),
+      city_tier: document.getElementById("learnerCityTier").value || null,
+    } : null;
     var message = document.getElementById("profileErr");
     if (!name || !grade || !selectedRole || !school || !city || !state || !country) {
       message.textContent = "Add your name, class, school, city, state, country, and account type.";
       return;
     }
     if (grade < 9 || grade > 12) { message.textContent = "Choose a class from 9 to 12."; return; }
+    if (needsLearnerGoals && (!guidance.goal_decision || !guidance.board || guidance.preferred_languages.length < 1 || guidance.help_subjects.length > 3)) {
+      message.textContent = "Choose a guidance goal, your board, and at least one preferred language. Choose no more than three subjects.";
+      return;
+    }
     saveButton.disabled = true;
     saveButton.textContent = "Saving profile…";
     message.textContent = "";
@@ -894,6 +958,14 @@ function openOnboarding(changeRole) {
     } else if (saved.error) {
       message.textContent = authErrorText(saved.error);
       saveButton.disabled = false; saveButton.textContent = "Continue"; return;
+    }
+    if (needsLearnerGoals) {
+      var guidanceSave = await supabaseClient.from("learner_guidance_profiles").upsert({ user_id: user.id, ...guidance }, { onConflict: "user_id" });
+      if (guidanceSave.error) {
+        message.textContent = authErrorText(guidanceSave.error) + " — run supabase_meridian_learner_goals.sql in Supabase SQL Editor first.";
+        saveButton.disabled = false; saveButton.textContent = "Continue"; return;
+      }
+      user.guidance = guidance;
     }
     user.n = name;
     user.grade = grade;
@@ -2268,8 +2340,13 @@ function drawMe() {
   } else {
     var location = user.location || {};
     var locationText = [location.city, location.state, location.country].filter(Boolean).join(", ") || "Add your location";
+    var guidance = user.guidance || {};
+    var goalDecision = learnerGoalDecisionChoices.filter(function (item) { return item[0] === guidance.goal_decision; })[0];
+    var guidanceDetail = canLearn(user)
+      ? '<section class="me-guidance-goals"><h4>Guidance goals</h4><p><b>' + esc(goalDecision ? goalDecision[1] : "Add your goal") + '</b></p><p class="muted">Board: ' + esc(guidance.board || "Not set") + (guidance.target_exam ? '<br>Target exam: ' + esc(guidance.target_exam) : '') + (guidance.help_subjects && guidance.help_subjects.length ? '<br>Focus subjects: ' + esc(guidance.help_subjects.join(", ")) : '') + (guidance.preferred_languages && guidance.preferred_languages.length ? '<br>Languages: ' + esc(guidance.preferred_languages.join(", ")) : '') + '</p></section>'
+      : '';
     h = '<div class="me-profile-page"><div class="me-profile-hero"><div class="me-cover" id="myProfileCover"></div><div class="me-identity-row"><div class="me-avatar">' + (user.avatarUrl ? '<img src="' + esc(user.avatarUrl) + '" alt="Profile photo">' : esc(ini(user.n))) + '</div><div class="me-identity-copy"><h3>' + esc(user.n) + '</h3><p>' + esc(accountTypeLabel(user.role)) + ' · Class ' + esc(String(user.grade || "—")) + '</p></div></div></div><div class="me-page-grid"><section class="box me-detail-panel"><h3>Account details</h3><dl class="me-detail-list"><div><dt>Email</dt><dd>' + esc(user.e) + '</dd></div><div><dt>Account type</dt><dd>' + esc(accountTypeLabel(user.role)) + '</dd></div><div><dt>Class</dt><dd>' + esc(String(user.grade || "—")) + '</dd></div><div><dt>School</dt><dd>' + esc(location.school || "Add your school") + '</dd></div><div><dt>Location</dt><dd>' + esc(locationText) + '</dd></div></dl></section><aside class="box me-control-panel"><h3>Profile settings</h3><p class="muted">Keep your profile photo, banner, school, and location up to date.</p><button class="btn me-edit-button" data-edit-details>Edit profile</button><div class="me-image-actions"><label class="btn ghost">Change profile photo<input type="file" accept="image/jpeg,image/png,image/webp" data-profile-image="avatar"></label><label class="btn ghost">Change banner<input type="file" accept="image/jpeg,image/png,image/webp" data-profile-image="banner"></label></div><div class="me-community"><h4>Community</h4><div class="profile-social" id="myFollowStats">Loading followers…</div></div></aside></div></div>';
-    h = h.replace(/<section class="box me-detail-panel">[\s\S]*?<\/section>/, '<section class="box me-detail-panel"><h3>Profile</h3><p>' + esc(accountTypeLabel(user.role)) + ' · Class ' + esc(String(user.grade || "—")) + '</p><p class="muted">School: ' + esc(location.school || "—") + '<br>Location: ' + esc(locationText) + '</p></section>');
+    h = h.replace(/<section class="box me-detail-panel">[\s\S]*?<\/section>/, '<section class="box me-detail-panel"><h3>Profile</h3><p>' + esc(accountTypeLabel(user.role)) + ' · Class ' + esc(String(user.grade || "—")) + '</p><p class="muted">School: ' + esc(location.school || "—") + '<br>Location: ' + esc(locationText) + '</p>' + guidanceDetail + '</section>');
     h = h.replace(/<aside class="box me-control-panel">[\s\S]*?<\/aside>/, '<aside class="box me-control-panel"><h3>Community</h3><div class="profile-social" id="myFollowStats">Loading followers…</div><a class="btn ghost" href="#settings">Account and profile settings</a></aside>');
   }
   document.getElementById("meBody").innerHTML = h;
@@ -2300,8 +2377,11 @@ document.getElementById("meBody").addEventListener("click", function (e) {
   else openTutor();
 });
 dlg.addEventListener("close", function () {
-  if (user && (!user.role || !user.grade || missingProfileLocation(user.location))) onboardingOpen = false;
+  onboardingOpen = false;
   if (curRoute === "me") drawMe();
+});
+dlg.addEventListener("cancel", function (event) {
+  if (dlg.dataset.setupRequired === "true") event.preventDefault();
 });
 var routes = ["home", "feed", "profile", "doubts", "sessions", "pricing", "me", "settings", "dashboard", "verification"],
   names = {

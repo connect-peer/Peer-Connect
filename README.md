@@ -148,6 +148,16 @@ Do not manually set a verification status or add a reviewer from browser code.
 The browser uses only the Supabase publishable key; never add a service-role
 key to `supabase-config.js`.
 
+### Meridian learner guidance goals
+
+Before deploying the learner-goals onboarding update, run
+`supabase_meridian_learner_goals.sql` in **Supabase → SQL Editor → New query**.
+This creates a private, owner-only table for a learner's guidance goal, board,
+optional exam, focus subjects, preferred languages, and optional city tier.
+The SQL does not need an email address; rows are linked to the signed-in
+account through its profile ID. Do not make this table public until a secure
+matching endpoint is in place.
+
 Location details are not selected from the public `profiles` table. Tutor
 directory results expose locations only for approved tutors. A student's
 location is returned only to the tutor receiving their connection request.
