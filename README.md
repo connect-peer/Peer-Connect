@@ -18,6 +18,22 @@ Booking requests, decisions, cancellations, and 10-minute call reminders appear 
 
 These SQL files use `auth.uid()` to tie rows to signed-in profiles; they do not need an email address written into SQL. The Meridian migration is designed to be rerun after updates; back up the project before applying database changes and use the latest complete file.
 
+### Meridian team admin access
+
+The **Meridian Admin** page is for team accounts explicitly listed in `public.verification_admins`. The app and database both check this allow-list; ordinary users cannot grant themselves admin access. Add only trusted team accounts, after they have signed in once, by replacing the example email and running this in the Supabase SQL Editor:
+
+```sql
+insert into public.verification_admins (user_id)
+select u.id
+from auth.users u
+where lower(u.email) = lower('TEAM_MEMBER_EMAIL')
+  and not exists (
+    select 1 from public.verification_admins a where a.user_id = u.id
+  );
+```
+
+Admin access enables the app's review queues and moderation/settlement tools. It does not bypass database protections or put a service-role key in the website. Keep private learner chats and unrelated private data outside blanket admin access; use only the specific review tools needed for safety and account operations.
+
 ## Current product rules
 
 - The public brand is **Meridian**. Existing Supabase table and RPC names remain internal compatibility interfaces; Meridian-prefixed browser settings automatically migrate previous saved preferences.

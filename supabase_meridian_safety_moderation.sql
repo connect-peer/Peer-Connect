@@ -93,11 +93,30 @@ do $$ begin
 end $$;
 alter table public.reports validate constraint reports_meridian_severity_check;
 alter table public.reports alter column status set default 'new';
+-- Table grants and RLS are separate. Grant the operations the app needs, then
+-- keep reads/updates reviewer-only and allow users to submit only new reports.
+alter table public.reports enable row level security;
+revoke all on table public.reports from anon;
+grant insert, select, update on table public.reports to authenticated;
+drop policy if exists "Meridian members submit reports" on public.reports;
+create policy "Meridian members submit reports" on public.reports
+  for insert to authenticated with check (
+    reporter_id = (select auth.uid()) and status = 'new'
+    and reviewed_by is null and reviewed_at is null and action_taken is null
+    and severity = 'normal' and is_auto_flagged = false
+  );
 drop policy if exists "Meridian reviewers read reports" on public.reports;
 create policy "Meridian reviewers read reports" on public.reports
   for select to authenticated using (public.is_peer_connect_verification_admin());
+drop policy if exists "Meridian restrict report reads to reviewers" on public.reports;
+create policy "Meridian restrict report reads to reviewers" on public.reports as restrictive
+  for select to authenticated using (public.is_peer_connect_verification_admin());
 drop policy if exists "Meridian reviewers update reports" on public.reports;
 create policy "Meridian reviewers update reports" on public.reports
+  for update to authenticated using (public.is_peer_connect_verification_admin())
+  with check (public.is_peer_connect_verification_admin());
+drop policy if exists "Meridian restrict report updates to reviewers" on public.reports;
+create policy "Meridian restrict report updates to reviewers" on public.reports as restrictive
   for update to authenticated using (public.is_peer_connect_verification_admin())
   with check (public.is_peer_connect_verification_admin());
 
@@ -1000,7 +1019,10 @@ drop policy if exists "Meridian restrict achievement deletion" on public.mentor_
 create policy "Meridian restrict achievement deletion" on public.mentor_achievements as restrictive
   for delete to authenticated using ((select auth.uid()) = user_id or public.is_peer_connect_verification_admin());
 
-create or replace function public.get_peer_public_mentor_achievements(p_user_id uuid)
+-- The public API shape changed in this migration. PostgreSQL cannot change a
+-- table-returning function's OUT column types with CREATE OR REPLACE.
+drop function if exists public.get_peer_public_mentor_achievements(uuid);
+create function public.get_peer_public_mentor_achievements(p_user_id uuid)
 returns table (id uuid, category text, title text, issuer text, achievement_year smallint, public_summary text, public_evidence_path text, status text)
 language sql stable security definer set search_path = '' as $$
   select a.id,a.category,a.title,a.issuer,a.achievement_year,a.public_summary,a.public_evidence_path,a.status
