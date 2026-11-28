@@ -1,5 +1,31 @@
 # Changelog
 
+## [2.6.0](https://github.com/connect-peer/Meridian/compare/v2.5.0...v2.6.0) (2026-11-28)
+
+
+### Features
+
+* admins ([3c549f0](https://github.com/connect-peer/Meridian/commit/3c549f0ce837c8c058cd58f5d398ac1be2a1abf0))
+
+
+### Bug Fixes
+
+* error ([3e95317](https://github.com/connect-peer/Meridian/commit/3e9531777e6f1ab3a54c8630a9518de247fbb578))
+* fix ([1091265](https://github.com/connect-peer/Meridian/commit/1091265f243454b7f7e0f0b65f5f4ea888fff269))
+* fix ([e0a5c21](https://github.com/connect-peer/Meridian/commit/e0a5c21d1211bd34dc47e2ae623c8dc48d030598))
+* loading ([9febfc7](https://github.com/connect-peer/Meridian/commit/9febfc77fc876ed1e096dd375693e75e4bacabd4))
+* ui ([c55bac8](https://github.com/connect-peer/Meridian/commit/c55bac8b0c711ab32f14eeda9d0af43a6227d78d))
+* ui ([fd3ed83](https://github.com/connect-peer/Meridian/commit/fd3ed833b7202a0a667bdf03d3429c05e33dc679))
+* ui ([606ad85](https://github.com/connect-peer/Meridian/commit/606ad854179b552780eff0ea71d24fd9a51122a2))
+* ui ([0e0566b](https://github.com/connect-peer/Meridian/commit/0e0566b7ed38699817bee2c31859479f81e3b3d0))
+* ui ([5e1d39a](https://github.com/connect-peer/Meridian/commit/5e1d39aec0fd26ed0b80986aa843e0d90f4750ae))
+* ui ([216f52b](https://github.com/connect-peer/Meridian/commit/216f52bb3e956afa1dad16cb334b7ce801d71d3f))
+* ui ([d72fbb9](https://github.com/connect-peer/Meridian/commit/d72fbb962ebe7915c6443b2da90295c36bc078b7))
+* ui ([1836575](https://github.com/connect-peer/Meridian/commit/1836575abced6c6619187abe124c06cdc32e9c4d))
+* ui ([0189f57](https://github.com/connect-peer/Meridian/commit/0189f576b69f889d5ec225e85fb864cf5033dbbe))
+* ui ([cf83184](https://github.com/connect-peer/Meridian/commit/cf83184195400dfa39d58380ddb356ad832e49f5))
+* UI ([74afe2c](https://github.com/connect-peer/Meridian/commit/74afe2c21d3433d6bb7ea1b83f3074eb3b2ff8f9))
+
 ## [2.5.0](https://github.com/connect-peer/Peer-Connect/compare/v2.4.0...v2.5.0) (2026-11-28)
 
 
