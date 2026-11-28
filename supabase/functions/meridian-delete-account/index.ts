@@ -35,10 +35,8 @@ function hasUnresolvedSession(sessions: SessionRow[]) {
   return sessions.some((session) => {
     const payment = session.payment_status;
     const payout = session.payout_status;
-    if (["pending", "confirmed"].includes(session.status)) return true;
     if (["held", "refund_pending", "credit_pending"].includes(payment)) return true;
     if (payment === "captured" && payout !== "paid") return true;
-    if (payment === "checkout_pending" && !["cancelled", "declined", "no_show"].includes(session.status)) return true;
     if (["captured", "waiting_for_completion", "payout_pending", "refund_pending", "payout_setup_required"].includes(payout || "")) return true;
     return false;
   });
@@ -67,7 +65,7 @@ Deno.serve(async (req) => {
     const sessionRows = (sessions || []) as SessionRow[];
     const sessionIds = sessionRows.map((session) => session.session_id);
     if (hasUnresolvedSession(sessionRows)) {
-      return json(409, { error: "First cancel or complete active calls and resolve any pending refund or mentor payout. Your account has not been deleted." });
+      return json(409, { error: "An actual payment, refund, or mentor payout still needs to be settled. Resolve it before deleting this account. Your account has not been deleted." });
     }
 
     // Remove user-owned uploads before deleting Auth; Supabase Auth refuses to

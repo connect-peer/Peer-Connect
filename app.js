@@ -2076,7 +2076,7 @@ async function loadPeerSettingsPage() {
     ]);
     var profile = results[0].data, status = results[1].data && results[1].data[0] || null;
     var verify = results[1].error ? '<p class="err">' + esc(authErrorText(results[1].error)) + '</p>' : tutorVerificationPanel(status);
-    mentorBody.innerHTML = verify + '<section class="settings-subsection"><h3>Mentor profile</h3><p class="muted">' + esc(profile && profile.headline || "Create your mentor profile to help learners find you.") + '</p><p class="muted">Guidance areas: ' + esc(profile && profile.subjects ? profile.subjects.join(", ") : "Not set") + '</p><button class="btn ghost" type="button" data-edit-tutor>' + (profile ? 'Edit mentor profile' : 'Create mentor profile') + '</button><label class="availability"><input type="checkbox" data-available ' + (profile && profile.is_available ? "checked" : "") + ' ' + (!profile || !status || status.status !== "verified" ? "disabled" : "") + '> Show my profile in mentor search</label></section><section class="settings-subsection"><h3>Achievements and credentials</h3><p class="muted">Reviewed highlights shown on your public mentor profile.</p><button class="btn ghost" type="button" data-manage-achievements>Manage achievements</button></section>';
+    mentorBody.innerHTML = verify + '<section class="settings-subsection"><h3>Mentor profile</h3><p class="muted">' + esc(profile && profile.headline || "Create your mentor profile to help learners find you.") + '</p><p class="muted">Guidance areas: ' + esc(profile && profile.subjects ? profile.subjects.join(", ") : "Not set") + '</p><button class="btn ghost" type="button" data-edit-tutor>' + (profile ? 'Edit mentor profile' : 'Create mentor profile') + '</button><label class="availability"><input type="checkbox" data-available ' + (profile && profile.is_available && status && status.status === "verified" ? "checked" : "") + ' ' + (!profile || !status || status.status !== "verified" ? "disabled" : "") + '> Show my profile in mentor search</label></section><section class="settings-subsection"><h3>Achievements and credentials</h3><p class="muted">Reviewed highlights shown on your public mentor profile.</p><button class="btn ghost" type="button" data-manage-achievements>Manage achievements</button></section>';
   }
   await loadPeerSessionHistory();
 }
@@ -2410,7 +2410,16 @@ async function drawTutorDashboard() {
   var unavailablePanel = verification && verification.status === "verified"
     ? '<section class="box dashboard-unavailable">' + scheduleManagerMarkup() + '</section>'
     : '<section class="box dashboard-unavailable"><h2>Unavailable times</h2><p class="muted">Blocking booking times will be available after your mentor profile is verified.</p><a class="btn ghost" href="#settings">Mentor settings</a></section>';
-  body.innerHTML = '<div class="dash-stats"><div class="dash-stat"><b>' + pendingSessions.length + '</b><span>Bookings to review</span></div><div class="dash-stat"><b>' + upcomingSessions.length + '</b><span>Upcoming sessions</span></div><div class="dash-stat"><b>' + (profile && profile.is_available ? "Available" : "Paused") + '</b><span>Profile visibility</span></div></div>' +
+  var verificationNotice = "";
+  if (!profile) {
+    verificationNotice = '<section class="box verify-status"><b>Set up your mentor profile</b><p class="muted">After you create it, submit your school ID and fee receipt for review. Your profile will not appear in mentor search until it is approved.</p><a class="btn" href="#settings">Set up mentor profile</a></section>';
+  } else if (!verification || verification.status === "rejected") {
+    verificationNotice = '<section class="box verify-status"><b>Verification required</b><p class="muted">Your mentor profile is saved, but it is not visible to learners yet. Submit your school ID and fee receipt for review.</p><a class="btn" href="#settings">Verify my profile</a></section>';
+  } else if (verification.status === "pending") {
+    verificationNotice = '<section class="box verify-status"><b>Verification in review</b><p class="muted">Your profile will appear in mentor search after a reviewer approves your documents.</p><a class="btn ghost" href="#settings">View verification status</a></section>';
+  }
+  var visibilityLabel = !profile ? "Not set up" : !verification || verification.status !== "verified" ? "Unverified" : profile.is_available ? "Available" : "Paused";
+  body.innerHTML = verificationNotice + '<div class="dash-stats"><div class="dash-stat"><b>' + pendingSessions.length + '</b><span>Bookings to review</span></div><div class="dash-stat"><b>' + upcomingSessions.length + '</b><span>Upcoming sessions</span></div><div class="dash-stat"><b>' + visibilityLabel + '</b><span>Profile visibility</span></div></div>' +
     unavailablePanel + '<section class="box request-box"><div class="dash-heading"><div><b>Booking requests</b><p class="muted">Accept or decline requests for a scheduled learning session.</p></div></div>' + bookingRows + '</section><section class="box request-box"><h2>Earnings ledger</h2><div id="mentorEarningsLedger"><div class="local-loading">Loading earnings…</div></div></section>';
   await loadMeridianFinancialLedger(document.getElementById("mentorEarningsLedger"), false);
   if (verification && verification.status === "verified") await loadMentorScheduleControls();

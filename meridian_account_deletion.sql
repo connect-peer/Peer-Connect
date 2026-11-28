@@ -26,14 +26,12 @@ begin
     left join public.meridian_session_financials as finance on finance.session_id = ps.id
     where (ps.learner_id = actor or ps.mentor_id = actor)
       and (
-        ps.status in ('pending','confirmed')
-        or ps.payment_status in ('held','refund_pending','credit_pending')
+        ps.payment_status in ('held','refund_pending','credit_pending')
         or (ps.payment_status = 'captured' and coalesce(finance.payout_status, '') <> 'paid')
-        or (ps.payment_status = 'checkout_pending' and ps.status not in ('cancelled','declined','no_show'))
         or coalesce(finance.payout_status, '') in ('captured','waiting_for_completion','payout_pending','refund_pending','payout_setup_required')
       )
   ) then
-    raise exception 'First cancel or complete active calls and resolve pending refunds or mentor payouts.' using errcode = '55000';
+    raise exception 'An actual payment, refund, or mentor payout still needs to be settled.' using errcode = '55000';
   end if;
 
   -- Clear audit references where the account acted as a reviewer. Keep the
