@@ -2224,6 +2224,31 @@ header nav > a.h:focus-visible, .tabbar a:focus-visible,
   .tabbar [data-nav="pricing"], .tabbar [data-nav="settings"],
   .tabbar [data-nav="verification"], .tabbar [data-nav="dashboard"] { display: none !important; }
 }
+
+/* Meridian directory filters: clearer groups and roomier, readable chips. */
+#chips.chips { gap: 18px; padding: 16px; border: 1.5px solid var(--line); background: var(--surface); }
+.chip-group-all { display: flex; align-items: center; gap: 14px; }
+.chip-group-label { margin: 0 0 9px; color: var(--ink); font: 700 13px/1.3 Inter, Arial, sans-serif; letter-spacing: .06em; }
+.chip-group-all .chip-group-label { margin: 0; }
+.chip-row { gap: 9px; }
+.chip-group .chip { min-height: 42px; padding: 9px 13px; font: 600 14px/1.2 Inter, Arial, sans-serif; letter-spacing: 0; }
+.chip-group-all .chip { border-color: #FFE94A; color: #FFE94A; }
+.chip-group-all .chip[aria-pressed="true"] { background: #FFE94A; color: var(--on-accent); }
+
+/* A distinct staff workspace for review work. */
+.safety-reviewer-portal-page { padding-top: 28px; }
+.safety-reviewer-portal-page > h1 { margin: 4px 0 10px; font-size: clamp(32px, 4vw, 48px); }
+.safety-reviewer-portal-page > p { max-width: 70ch; }
+.safety-portal-shortcuts, .safety-review-jumps { display: flex; flex-wrap: wrap; gap: 10px; margin: 20px 0; }
+.safety-review-jumps { padding: 14px 0; border-top: 1.5px solid var(--line); border-bottom: 1.5px solid var(--line); }
+.safety-reviewer-portal-page #verificationAdminBody > section { scroll-margin-top: 100px; }
+.safety-reviewer-portal-page #verificationAdminBody > section > h2 { margin-top: 0; }
+body.safety-reviewer-portal header nav > [data-nav="sessions"],
+body.safety-reviewer-portal .tabbar [data-nav="sessions"] { display: none !important; }
+.guardian-consent-confirm-dialog { width: min(520px, calc(100vw - 28px)); }
+.guardian-consent-confirm-dialog .box { margin: 0; border: 0; }
+.guardian-consent-confirm-dialog h2 { margin: 8px 0; font-size: clamp(24px, 4vw, 32px); }
+.guardian-consent-confirm-dialog .row { justify-content: flex-end; margin-top: 24px; }
 </style>
   </head>
   <body>
@@ -2235,19 +2260,19 @@ header nav > a.h:focus-visible, .tabbar a:focus-visible,
           ><a class="h" data-nav="home" data-workspace-nav="learner" href="#home">Find</a
           ><a class="h tutor-only" data-role-nav="tutor" data-workspace-nav="mentor" data-nav="dashboard" href="#dashboard" hidden>Dashboard</a
           ><a class="h" data-nav="sessions" href="#sessions">Calls</a
-          ><a class="h admin-only" data-nav="verification" href="#verification" hidden>Meridian Admin</a
+          ><a class="h admin-only" data-nav="verification" href="#verification" hidden>Safety review</a
           ><a class="h" data-nav="doubts" href="#doubts">Doubts</a
           ><a class="h" data-nav="me" href="#me">Me</a
           ><a class="h" data-nav="pricing" href="#pricing">Pricing</a
-          ><button class="btn ghost h" data-workspace-switch type="button" hidden>Switch to Senior</button
-          ><button class="btn ghost h" id="btnTutor">Become a Senior</button
+          ><button class="btn ghost h" data-workspace-switch type="button" hidden>Switch to Mentor</button
+          ><button class="btn ghost h" id="btnTutor">Become a Mentor</button
           ><button class="account-menu-toggle" id="accountMenuToggle" type="button" aria-label="Open account menu" aria-haspopup="true" aria-controls="accountMenu" aria-expanded="false"><span aria-hidden="true">M</span></button>
           ><div class="account-menu" id="accountMenu" role="menu" aria-label="Account menu" hidden>
             <a role="menuitem" data-nav="settings" href="#settings">Settings</a>
             <a role="menuitem" data-nav="pricing" href="#pricing">Pricing</a>
-            <button role="menuitem" class="account-menu-switch" data-workspace-switch type="button" hidden>Switch to Senior</button>
+            <button role="menuitem" class="account-menu-switch" data-workspace-switch type="button" hidden>Switch to Mentor</button>
             <button role="menuitem" class="meridian-notification-trigger" id="meridianNotificationBell" type="button" aria-label="Alerts"><span>Alerts</span><span id="meridianNotificationCount" aria-live="polite"></span></button>
-            <a role="menuitem" class="admin-only" data-nav="verification" href="#verification" hidden>Meridian Admin</a>
+            <a role="menuitem" class="admin-only" data-nav="verification" href="#verification" hidden>Safety review</a>
             <span class="account-menu-separator" role="separator"></span>
             <button class="account-menu-signout" id="gsign" type="button">Sign up / Sign in</button>
           </div>
@@ -2258,12 +2283,12 @@ header nav > a.h:focus-visible, .tabbar a:focus-visible,
 
     <div class="app-layout">
       <nav class="app-rail" aria-label="Main navigation">
-        <button class="btn ghost workspace-switch" data-workspace-switch type="button" hidden>Switch to Senior</button>
-        <a href="#home" class="app-rail-link" data-workspace-nav="learner" data-nav="home"><span class="app-rail-icon" aria-hidden="true">◎</span>Find a Senior</a>
+        <button class="btn ghost workspace-switch" data-workspace-switch type="button" hidden>Switch to Mentor</button>
+        <a href="#home" class="app-rail-link" data-workspace-nav="learner" data-nav="home"><span class="app-rail-icon" aria-hidden="true">◎</span>Find a Mentor</a>
         <a href="#dashboard" class="app-rail-link tutor-only" data-role-nav="tutor" data-workspace-nav="mentor" data-nav="dashboard" hidden><span class="app-rail-icon" aria-hidden="true">▦</span>Dashboard</a>
         <a href="#sessions" class="app-rail-link" data-nav="sessions"><span class="app-rail-icon" aria-hidden="true">◷</span>Bearings calls</a>
         <a href="#feed" class="app-rail-link" data-nav="feed"><span class="app-rail-icon" aria-hidden="true">⌂</span>Feed</a>
-        <a href="#verification" class="app-rail-link admin-only" data-nav="verification" hidden><span class="app-rail-icon" aria-hidden="true">✓</span>Meridian Admin</a>
+        <a href="#verification" class="app-rail-link admin-only" data-nav="verification" hidden><span class="app-rail-icon" aria-hidden="true">✓</span>Safety review</a>
         <a href="#doubts" class="app-rail-link" data-nav="doubts"><span class="app-rail-icon" aria-hidden="true">?</span>Doubts</a>
         <a href="#me" class="app-rail-link" data-nav="me"><span class="app-rail-icon" aria-hidden="true">◉</span>My page</a>
         <a href="#pricing" class="app-rail-link" data-nav="pricing"><span class="app-rail-icon" aria-hidden="true">₹</span>Pricing</a>
@@ -2285,12 +2310,12 @@ header nav > a.h:focus-visible, .tabbar a:focus-visible,
         <aside class="social-sidebar"><section class="social-side-card"><span class="community-kicker">YOUR COMMUNITY</span><h2>Grow by sharing</h2><p>Post a helpful explanation, a resource, or a quick study update. Keep personal details private.</p><div class="community-guideline">A useful post can help someone else make progress today.</div></section></aside>
       </section>
       <div class="wrap" data-v="home">
-        <h1>Find your Meridian Senior</h1>
+        <h1>Find your Meridian Mentor</h1>
         <p>
-          Find a verified Senior by what you want help with. Open a Journey map to see their path and guidance areas.
+          Find a verified Mentor by what you want help with. Open a Journey map to see their path and guidance areas.
         </p>
         <section class="box meridian-matches" id="matchedMentors" hidden aria-live="polite">
-          <div class="social-feed-title"><div><span class="community-kicker">MATCHED FOR YOU</span><h2>Meridian Seniors for your next step</h2></div></div>
+          <div class="social-feed-title"><div><span class="community-kicker">MATCHED FOR YOU</span><h2>Meridian Mentors for your next step</h2></div></div>
           <p class="muted">These Journey maps fit your goals, class stage, language, and open times.</p>
           <div id="matchedMentorList" class="meridian-match-grid"></div>
         </section>
@@ -2299,10 +2324,10 @@ header nav > a.h:focus-visible, .tabbar a:focus-visible,
             id="q"
             type="search"
             placeholder="Search a name, goal, subject, or exam"
-            aria-label="Search Meridian Seniors"
+            aria-label="Search Meridian Mentors"
           />
         </div>
-        <div class="location-filters" aria-label="Filter Meridian Seniors by location">
+        <div class="location-filters" aria-label="Filter Meridian Mentors by location">
           <select id="tutorStateFilter" aria-label="Filter by state"><option value="">Any state</option></select>
           <select id="tutorCityFilter" aria-label="Filter by city"><option value="">Any city</option></select>
         </div>
@@ -2312,7 +2337,7 @@ header nav > a.h:focus-visible, .tabbar a:focus-visible,
           role="group"
           aria-label="Filter by guidance area"
         ></div>
-        <div class="quota"><span id="count"></span><span>Choose a Senior and book a Bearings call</span></div>
+        <div class="quota"><span id="count"></span><span>Choose a Mentor and book a Bearings call</span></div>
         <div class="grid" id="grid"></div>
       </div>
 
@@ -2322,7 +2347,7 @@ header nav > a.h:focus-visible, .tabbar a:focus-visible,
 
       <section id="dashboard" data-v="dashboard">
         <div class="wrap">
-          <h2>Senior dashboard</h2>
+          <h2>Mentor dashboard</h2>
           <p>Review Bearings call requests, manage your Journey map, and set unavailable times.</p>
           <div id="tutorDashboardBody"></div>
         </div>
@@ -2338,9 +2363,20 @@ header nav > a.h:focus-visible, .tabbar a:focus-visible,
       </section>
 
       <section id="verification" data-v="verification" hidden>
-        <div class="wrap">
-          <h2>Meridian Admin</h2>
-          <p>Team-only tools for mentor verification, learner safety, reports, achievements, and session settlements.</p>
+        <div class="wrap safety-reviewer-portal-page">
+          <span class="community-kicker">MERIDIAN TEAM</span>
+          <h1>Safety review</h1>
+          <p>Review reports, mentor applications, achievements, and guardian confirmations.</p>
+          <nav class="safety-portal-shortcuts" aria-label="Community pages">
+            <a class="btn ghost" href="#feed">Open feed</a>
+            <a class="btn ghost" href="#home">Find mentors</a>
+          </nav>
+          <nav class="safety-review-jumps" aria-label="Review queues">
+            <button class="btn ghost" type="button" data-review-jump="safety-mentor-verification">Mentor applications</button>
+            <button class="btn ghost" type="button" data-review-jump="safety-reports">Reports</button>
+            <button class="btn ghost" type="button" data-review-jump="safety-achievements">Achievements</button>
+            <button class="btn ghost" type="button" data-review-jump="safety-guardians">Guardians</button>
+          </nav>
           <div id="verificationAdminBody"></div>
         </div>
       </section>
@@ -2424,7 +2460,7 @@ header nav > a.h:focus-visible, .tabbar a:focus-visible,
       <section id="pricing" data-v="pricing">
         <div class="wrap">
           <h2>Guidance with clear pricing</h2>
-          <p>Learners join Meridian for free and pay only when they book a verified Senior for a 30-minute Bearings call.</p>
+          <p>Learners join Meridian for free and pay only when they book a verified Mentor for a 30-minute Bearings call.</p>
           <div class="plans">
             <div class="plan">
               <h3>Learner</h3>
@@ -2437,21 +2473,21 @@ header nav > a.h:focus-visible, .tabbar a:focus-visible,
               </ul>
             </div>
             <div class="plan">
-              <h3>Meridian Senior</h3>
+              <h3>Meridian Mentor</h3>
               <div class="price">Free</div>
               <ul>
                 <li>Create a guidance profile for free</li>
                 <li>School verification is required before appearing in search</li>
-                <li>Choose a ₹99–₹299 price for each 30-minute call</li>
+                <li>Choose ₹99 or ₹149 for each 30-minute call</li>
                 <li>Block times you cannot take a call</li>
               </ul>
-              <button class="btn ghost" id="btnTutor2">Set up Senior profile</button>
+              <button class="btn ghost" id="btnTutor2">Set up Mentor profile</button>
             </div>
             <div class="plan">
               <h3>How each call is split</h3>
               <div class="price">75% · 25%</div>
               <ul>
-                <li>75% is the Senior’s share</li>
+                <li>75% is the Mentor’s share</li>
                 <li>25% is Meridian’s platform fee</li>
                 <li>The split is recorded after a call is completed</li>
                 <li>Payment and payouts unlock after provider setup</li>
@@ -2495,13 +2531,13 @@ header nav > a.h:focus-visible, .tabbar a:focus-visible,
     </nav>
     <footer>
       <div class="wrap">
-        Meridian is a learner community. Seniors are learners too, so Bearings calls
+        Meridian is a learner community. Mentors are learners too, so Bearings calls
         take place in school or in a supervised space.
       </div>
     </footer>
 
     <dialog id="bookingDialog" class="session-booking-dialog" aria-labelledby="bookingMentorTitle">
-      <header class="booking-dialog-head"><div><span class="community-kicker">BOOK A BEARINGS CALL</span><h2 id="bookingMentorTitle">Meridian Senior</h2><p>Choose an open 30-minute time.</p></div><button class="session-chat-close" id="closeBooking" type="button" aria-label="Close booking">×</button></header>
+      <header class="booking-dialog-head"><div><span class="community-kicker">BOOK A BEARINGS CALL</span><h2 id="bookingMentorTitle">Meridian Mentor</h2><p>Choose an open 30-minute time.</p></div><button class="session-chat-close" id="closeBooking" type="button" aria-label="Close booking">×</button></header>
       <div class="booking-dialog-content"><div id="bookingForm"></div></div>
     </dialog>
     <dialog id="sessionChatDialog" class="session-chat-dialog" aria-labelledby="sessionChatTitle">
@@ -2518,6 +2554,9 @@ header nav > a.h:focus-visible, .tabbar a:focus-visible,
     </dialog>
     <dialog id="meridianNotificationDialog" class="meridian-notification-dialog" aria-labelledby="meridianNotificationTitle">
       <section class="meridian-notification-panel"><header><div><span class="community-kicker">YOUR ACCOUNT</span><h2 id="meridianNotificationTitle">Notifications</h2></div><button class="session-chat-close" id="meridianNotificationClose" type="button" aria-label="Close notifications">×</button></header><div id="meridianNotificationList" aria-live="polite"><div class="local-loading">Loading notifications…</div></div></section>
+    </dialog>
+    <dialog id="guardianConsentConfirmDialog" class="guardian-consent-confirm-dialog" aria-labelledby="guardianConsentConfirmTitle">
+      <section class="box"><span class="community-kicker">PRIVATE SAFETY CHECK</span><h2 id="guardianConsentConfirmTitle">Confirm guardian consent</h2><p>Only continue if you personally confirmed consent with this learner’s parent or guardian. This unlocks bookings for the learner.</p><form method="dialog" class="row"><button class="btn ghost" value="cancel">Go back</button><button class="btn" value="confirmed">I confirmed consent</button></form></section>
     </dialog>
     <dialog id="dlg" aria-labelledby="dt"><div id="dbody"></div></dialog>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.2"></script>

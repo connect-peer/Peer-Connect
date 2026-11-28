@@ -8,7 +8,7 @@
  * Map of this file (search for these names):
  *   STATE        tutors, posts, user, mine, fSub, fSort, openR
  *   TUTORS PAGE  drawChips(), draw()
- *   PRICING      Learner and Meridian Senior plans
+ *   PRICING      Learner and Meridian Mentor plans
  *   SIGN IN      paintSign(), openSign()    (Supabase email and Google Auth)
  *   TUTOR FORM   openTutor()                (creates a tutor profile)
  *   DOUBTS PAGE  who(), hasBlue(), postHtml(), drawFeed()
@@ -41,7 +41,7 @@ var pendingBookingMentorId = "";
 function canMentor(account) { return !!account && ["mentor", "both", "tutor"].indexOf(account.role) >= 0; }
 function canLearn(account) { return !!account && ["learner", "both", "student"].indexOf(account.role) >= 0; }
 function normalizeRole(role) { return role === "student" ? "learner" : role === "tutor" ? "mentor" : role; }
-function accountTypeLabel(role) { return role === "both" ? "Learner + Meridian Senior" : canMentor({ role: role }) ? "Meridian Senior" : "Learner"; }
+function accountTypeLabel(role) { return role === "both" ? "Learner + Meridian Mentor" : canMentor({ role: role }) ? "Meridian Mentor" : "Learner"; }
 var grid = document.getElementById("grid"),
   chips = document.getElementById("chips");
 function ini(n) {
@@ -53,8 +53,8 @@ function ini(n) {
     .join("");
 }
 function publicName(name) {
-  var parts = String(name || "Meridian Senior").trim().split(/\s+/).filter(Boolean);
-  if (parts.length < 2) return parts[0] || "Meridian Senior";
+  var parts = String(name || "Meridian Mentor").trim().split(/\s+/).filter(Boolean);
+  if (parts.length < 2) return parts[0] || "Meridian Mentor";
   return parts[0] + " " + parts[parts.length - 1].charAt(0).toUpperCase() + ".";
 }
 function esc(s) {
@@ -139,15 +139,15 @@ function draw() {
     if (user.location && mentor.city && user.location.city && mentor.city.toLowerCase() === user.location.city.toLowerCase()) score += 10;
     else if (user.location && mentor.state && user.location.state && mentor.state.toLowerCase() === user.location.state.toLowerCase()) score += 5;
     mentor.matchScore = score;
-    mentor.matchReason = matchedSubjects.length ? "Matches your " + matchedSubjects.join(" and ") + " goals" : goalMatch ? "Relevant to your guidance goal" : delta === 1 ? "One class ahead of you" : "A Senior in your next classes";
+    mentor.matchReason = matchedSubjects.length ? "Matches your " + matchedSubjects.join(" and ") + " goals" : goalMatch ? "Relevant to your guidance goal" : delta === 1 ? "One class ahead of you" : "A Mentor in your next classes";
   });
   list.sort(function (a, b) {
     return (b.matchScore || 0) - (a.matchScore || 0) || (b.blue ? 1 : 0) - (a.blue ? 1 : 0);
   });
-  document.getElementById("count").textContent = list.length + (list.length === 1 ? " verified Meridian Senior" : " verified Meridian Seniors");
+  document.getElementById("count").textContent = list.length + (list.length === 1 ? " verified Meridian Mentor" : " verified Meridian Mentors");
   if (!list.length) {
     grid.innerHTML = tutors.length
-      ? '<div class="empty">No Meridian Seniors match. Try another area or a shorter search.</div>'
+      ? '<div class="empty">No Meridian Mentors match. Try another area or a shorter search.</div>'
       : '<div class="empty">No Journey maps have been approved for discovery yet.</div>';
     return;
   }
@@ -177,7 +177,7 @@ function draw() {
         "</div>" +
         (t.me
           ? '<div class="mentor-booking-cta"><button class="btn ghost" data-edit-tutor-card>Edit profile</button></div>'
-          : '<div class="mentor-booking-cta"><button type="button" class="btn ghost mentor-journey-button">View Journey map</button><span>30 min · ₹' + esc(t.sessionPrice || 199) + '</span><button class="btn" data-book-mentor="' + esc(t.user_id) + '">Book a Bearings call</button></div>') +
+          : '<div class="mentor-booking-cta"><button type="button" class="btn ghost mentor-journey-button">View Journey map</button><span>30 min · ₹' + esc(t.sessionPrice || 149) + '</span><button class="btn" data-book-mentor="' + esc(t.user_id) + '">Book a Bearings call</button></div>') +
         "</div></article>"
       );
     })
@@ -226,7 +226,7 @@ grid.addEventListener("click", async function (e) {
   if (book) {
     e.stopPropagation();
     if (!user) { openSign(); return; }
-    if (!canLearn(user)) { document.getElementById("count").textContent = "Switch to Learner or Both to book a Meridian Senior."; return; }
+    if (!canLearn(user)) { document.getElementById("count").textContent = "Switch to Learner or Both to book a Meridian Mentor."; return; }
     startMentorBooking(tutors[Number(book.closest("[data-profile-index]").dataset.profileIndex)]);
     return;
   }
@@ -267,7 +267,7 @@ async function loadMentorAchievementShowcase(tutor, target) {
   target.innerHTML = cards.join("");
 }
 function renderTutorAbout(tutor, content) {
-  content.innerHTML = '<h3>About</h3><p>' + esc(tutor.h || 'Meridian Senior') + '</p><p class="muted">' + (tutor.me ? 'School: ' + esc(tutor.school || '—') + '<br>' : '') + 'Location: ' + esc([tutor.city, tutor.state, tutor.country].filter(Boolean).join(', ') || '—') + '</p><div id="mentorProfileDetails"><p class="muted">Loading guidance background…</p></div><section class="mentor-achievement-showcase"><div class="achievement-section-heading"><div><h3>Achievements and credentials</h3><p class="muted">Reviewed highlights that show experience and milestones.</p></div>' + (tutor.me ? '<button type="button" class="btn ghost" data-achievement-manager>Manage achievements</button>' : '') + '</div><div id="publicMentorAchievements"><p class="muted">Loading achievements…</p></div></section>';
+  content.innerHTML = '<h3>About</h3><p>' + esc(tutor.h || 'Meridian Mentor') + '</p><p class="muted">' + (tutor.me ? 'School: ' + esc(tutor.school || '—') + '<br>' : '') + 'Location: ' + esc([tutor.city, tutor.state, tutor.country].filter(Boolean).join(', ') || '—') + '</p><div id="mentorProfileDetails"><p class="muted">Loading guidance background…</p></div><section class="mentor-achievement-showcase"><div class="achievement-section-heading"><div><h3>Achievements and credentials</h3><p class="muted">Reviewed highlights that show experience and milestones.</p></div>' + (tutor.me ? '<button type="button" class="btn ghost" data-achievement-manager>Manage achievements</button>' : '') + '</div><div id="publicMentorAchievements"><p class="muted">Loading achievements…</p></div></section>';
   var manage = content.querySelector("[data-achievement-manager]");
   if (manage) manage.remove();
   loadMentorProfileDetails(tutor, document.getElementById("mentorProfileDetails"));
@@ -337,7 +337,7 @@ function renderTutorProfilePage() {
   var root = document.getElementById("tutorProfileContent");
   if (!tutor || !root) return;
   var locationText = (tutor.me ? [tutor.school, tutor.city, tutor.state, tutor.country] : [tutor.city, tutor.state, tutor.country]).filter(Boolean).join(" · ");
-  root.innerHTML = '<button type="button" class="btn ghost profile-back" id="profileBack">← Back to Meridian Seniors</button><div class="profile-cover" id="profileCover"></div><section class="profile-head"><div class="av" id="profileAvatar">' + (tutor.avatarUrl ? '<img src="' + esc(tutor.avatarUrl) + '" alt="">' : esc(ini(publicName(tutor.n)))) + '</div><h2>' + esc(tutor.me ? tutor.n : publicName(tutor.n)) + (tutor.verified ? ' <span class="verify-badge">Journey map verified</span>' : tutor.me ? ' <span class="verify-review-state">' + esc(tutor.verificationStatus || "Not verified") + '</span>' : '') + '</h2><div class="profile-meta">Class ' + esc(String(tutor.g || "").replace(/^Class\s*/i, "")) + ' · ' + esc(locationText) + '</div><p>' + esc(tutor.h) + '</p><div class="tags">' + tutor.s.map(function (subject) { return '<span class="tag">' + esc(subject) + '</span>'; }).join("") + '</div><div class="profile-social" id="profileSocialStats"><span>Loading followers…</span></div><button class="btn" id="profileBook">' + (tutor.me ? 'Edit mentor profile' : 'Book a Bearings call') + '</button>' + (tutor.me ? '<div class="profile-appearance"><label class="btn ghost">Change profile photo<input type="file" accept="image/jpeg,image/png,image/webp" data-profile-image="avatar"></label><label class="btn ghost">Change banner<input type="file" accept="image/jpeg,image/png,image/webp" data-profile-image="banner"></label></div>' : '') + '</section><div class="profile-tabs"><button class="btn ghost" data-profile-tab="about" aria-pressed="true">About</button><button class="btn ghost" data-profile-tab="answers" aria-pressed="false">Guidance</button></div><div class="profile-content" id="profileContent"></div>';
+  root.innerHTML = '<button type="button" class="btn ghost profile-back" id="profileBack">← Back to Meridian Mentors</button><div class="profile-cover" id="profileCover"></div><section class="profile-head"><div class="av" id="profileAvatar">' + (tutor.avatarUrl ? '<img src="' + esc(tutor.avatarUrl) + '" alt="">' : esc(ini(publicName(tutor.n)))) + '</div><h2>' + esc(tutor.me ? tutor.n : publicName(tutor.n)) + (tutor.verified ? ' <span class="verify-badge">Journey map verified</span>' : tutor.me ? ' <span class="verify-review-state">' + esc(tutor.verificationStatus || "Not verified") + '</span>' : '') + '</h2><div class="profile-meta">Class ' + esc(String(tutor.g || "").replace(/^Class\s*/i, "")) + ' · ' + esc(locationText) + '</div><p>' + esc(tutor.h) + '</p><div class="tags">' + tutor.s.map(function (subject) { return '<span class="tag">' + esc(subject) + '</span>'; }).join("") + '</div><div class="profile-social" id="profileSocialStats"><span>Loading followers…</span></div><button class="btn" id="profileBook">' + (tutor.me ? 'Edit mentor profile' : 'Book a Bearings call') + '</button>' + (tutor.me ? '<div class="profile-appearance"><label class="btn ghost">Change profile photo<input type="file" accept="image/jpeg,image/png,image/webp" data-profile-image="avatar"></label><label class="btn ghost">Change banner<input type="file" accept="image/jpeg,image/png,image/webp" data-profile-image="banner"></label></div>' : '') + '</section><div class="profile-tabs"><button class="btn ghost" data-profile-tab="about" aria-pressed="true">About</button><button class="btn ghost" data-profile-tab="answers" aria-pressed="false">Guidance</button></div><div class="profile-content" id="profileContent"></div>';
   root.querySelectorAll(".profile-appearance").forEach(function (controls) { controls.remove(); });
   if (!tutor.me) {
     var reportButton = document.createElement("button");
@@ -455,27 +455,27 @@ async function loadTutorDirectory() {
   function showDirectoryError(error) {
     if (requestId !== tutorDirectoryRequestId) return;
     var message = authErrorText(error);
-    if (mentorCount) mentorCount.textContent = "Meridian Seniors could not load";
+    if (mentorCount) mentorCount.textContent = "Meridian Mentors could not load";
     if (mentorGrid) mentorGrid.innerHTML = '<div class="empty"><p>' + esc(message) + '</p><button type="button" class="btn ghost" data-retry-tutor-directory>Try again</button></div>';
   }
   if (!supabaseClient || !user) {
-    if (mentorGrid) mentorGrid.innerHTML = '<div class="empty">Sign in to find Meridian Seniors.</div>';
+    if (mentorGrid) mentorGrid.innerHTML = '<div class="empty">Sign in to find Meridian Mentors.</div>';
     if (mentorCount) mentorCount.textContent = "";
     return;
   }
-  if (mentorGrid && location.hash.replace(/^#/, "") === "home") mentorGrid.innerHTML = '<div class="local-loading">Finding Meridian Seniors…</div>';
+  if (mentorGrid && location.hash.replace(/^#/, "") === "home") mentorGrid.innerHTML = '<div class="local-loading">Finding Meridian Mentors…</div>';
   if (mentorCount) mentorCount.textContent = "Loading Journey maps…";
   try {
-  var result = await withTutorDirectoryTimeout(supabaseClient.rpc("get_verified_tutor_directory", { p_state: null, p_city: null }), "Loading the Senior directory");
+  var result = await withTutorDirectoryTimeout(supabaseClient.rpc("get_verified_tutor_directory", { p_state: null, p_city: null }), "Loading the Mentor directory");
   if (requestId !== tutorDirectoryRequestId) return;
   if (result.error) { showDirectoryError(result.error); return; }
   tutors = (result.data || []).map(function (row) {
     return {
       user_id: row.user_id,
-      n: row.display_name || "Meridian Senior",
-      g: row.grade ? "Class " + row.grade : "Learner · Meridian Senior",
+      n: row.display_name || "Meridian Mentor",
+      g: row.grade ? "Class " + row.grade : "Learner · Meridian Mentor",
       s: row.subjects || [],
-      h: row.headline || "Meridian Senior",
+      h: row.headline || "Meridian Mentor",
       school: row.school || "",
       city: row.city || "",
       state: row.state || "",
@@ -492,7 +492,7 @@ async function loadTutorDirectory() {
       supabaseClient.from("profiles").select("id, avatar_url, profile_banner_url").in("id", directoryIds),
       supabaseClient.from("follows").select("follower_id, following_id").or("follower_id.in.(" + directoryIds.join(",") + "),following_id.in.(" + directoryIds.join(",") + ")"),
       supabaseClient.from("tutor_profiles").select("user_id,session_price_inr").in("user_id", directoryIds),
-    ]), "Loading Senior profile details");
+    ]), "Loading Mentor profile details");
     if (requestId !== tutorDirectoryRequestId) return;
     var metaError = directoryMeta.find(function (item) { return item.error; });
     if (metaError) { showDirectoryError(metaError.error); return; }
@@ -502,14 +502,14 @@ async function loadTutorDirectory() {
       followerCounts[follow.following_id] = (followerCounts[follow.following_id] || 0) + 1;
       followingCounts[follow.follower_id] = (followingCounts[follow.follower_id] || 0) + 1;
     });
-    (directoryMeta[2].data || []).forEach(function (row) { pricesByUser[row.user_id] = Number(row.session_price_inr || 199); });
-    tutors.forEach(function (tutor) { var media = mediaByUser[tutor.user_id] || {}; tutor.avatarUrl = media.avatar_url || ""; tutor.bannerUrl = media.profile_banner_url || ""; tutor.sessionPrice = pricesByUser[tutor.user_id] || 199; tutor.followerCount = followerCounts[tutor.user_id] || 0; tutor.followingCount = followingCounts[tutor.user_id] || 0; });
+    (directoryMeta[2].data || []).forEach(function (row) { pricesByUser[row.user_id] = Number(row.session_price_inr || 149); });
+    tutors.forEach(function (tutor) { var media = mediaByUser[tutor.user_id] || {}; tutor.avatarUrl = media.avatar_url || ""; tutor.bannerUrl = media.profile_banner_url || ""; tutor.sessionPrice = pricesByUser[tutor.user_id] || 149; tutor.followerCount = followerCounts[tutor.user_id] || 0; tutor.followingCount = followingCounts[tutor.user_id] || 0; });
   }
   if (canMentor(user) && !tutors.some(function (tutor) { return tutor.user_id === user.id; })) {
     var ownResults = await withTutorDirectoryTimeout(Promise.all([
       supabaseClient.from("tutor_profiles").select("user_id, headline, subjects, is_available, session_price_inr").eq("user_id", user.id).maybeSingle(),
       supabaseClient.from("tutor_verification_requests").select("status").eq("user_id", user.id).order("submitted_at", { ascending: false }).limit(1),
-    ]), "Loading your Senior profile");
+    ]), "Loading your Mentor profile");
     if (requestId !== tutorDirectoryRequestId) return;
     var ownError = ownResults.find(function (item) { return item.error; });
     if (ownError) { showDirectoryError(ownError.error); return; }
@@ -518,12 +518,12 @@ async function loadTutorDirectory() {
       var ownStatus = (ownResults[1].data || [])[0],
         statusLabel = ownStatus && ownStatus.status === "pending" ? "Pending review" : ownStatus && ownStatus.status === "rejected" ? "Needs resubmission" : "Not verified";
       tutors.push({
-        user_id: own.user_id, n: user.n, g: user.grade ? "Class " + user.grade : "Learner · Meridian Senior",
-        s: own.subjects || [], h: own.headline || "Meridian Senior",
+        user_id: own.user_id, n: user.n, g: user.grade ? "Class " + user.grade : "Learner · Meridian Mentor",
+        s: own.subjects || [], h: own.headline || "Meridian Mentor",
         school: user.location && user.location.school || "", city: user.location && user.location.city || "",
         state: user.location && user.location.state || "", country: user.location && user.location.country || "",
         verified: !!(ownStatus && ownStatus.status === "verified"), verificationStatus: statusLabel,
-        available: !!own.is_available, sessionPrice: Number(own.session_price_inr || 199), c: "#2B4EFF", me: true,
+        available: !!own.is_available, sessionPrice: Number(own.session_price_inr || 149), c: "#2B4EFF", me: true,
         avatarUrl: user.avatarUrl || "", bannerUrl: user.bannerUrl || "",
       });
     }
@@ -923,9 +923,9 @@ function showAuthForm(mode) {
     '<aside class="auth-brand-panel" aria-label="About Meridian"><div class="auth-brand-top"><span class="auth-brand-mark">M</span>Meridian</div>' +
     '<div class="auth-brand-copy"><div class="auth-brand-eyebrow">Learn together, move forward</div><h2>Good guidance starts peer to peer.</h2>' +
     '<p>Meet learners who understand your classes, questions, and goals. Share what you know and get unstuck together.</p>' +
-    '<div class="auth-feature-stack"><div class="auth-feature"><b>◎</b><span><strong>Find a Meridian Senior</strong> who knows your stage</span></div>' +
+    '<div class="auth-feature-stack"><div class="auth-feature"><b>◎</b><span><strong>Find a Meridian Mentor</strong> who knows your stage</span></div>' +
     '<div class="auth-feature"><b>↗</b><span><strong>Ask a doubt</strong> and learn from the community</span></div>' +
-    '<div class="auth-feature"><b>✓</b><span><strong>Book a Bearings call</strong> with a verified Senior</span></div></div></div>' +
+    '<div class="auth-feature"><b>✓</b><span><strong>Book a Bearings call</strong> with a verified Mentor</span></div></div></div>' +
     '<div class="auth-brand-foot">A peer-learning community</div></aside>';
   if (!dlg.open) dlg.showModal();
   document.getElementById("switchAuth").onclick = function () {
@@ -1102,7 +1102,7 @@ function openOnboarding(changeRole) {
   var savedLocation = user.location || {};
   var savedGuidance = user.guidance || {};
   var savedSafety = user.safety || {};
-  var rolePicker = '<fieldset class="role-options"><legend>How do you want to use Meridian?</legend><button type="button" class="role-option' + (selectedRole === "learner" || selectedRole === "student" ? " selected" : "") + '" data-role="learner" aria-pressed="' + (selectedRole === "learner" || selectedRole === "student") + '"><strong>Learner</strong><span>Find a Meridian Senior, ask questions, and get guidance.</span></button><button type="button" class="role-option' + (selectedRole === "mentor" || selectedRole === "tutor" ? " selected" : "") + '" data-role="mentor" aria-pressed="' + (selectedRole === "mentor" || selectedRole === "tutor") + '"><strong>Meridian Senior</strong><span>Share what you know and guide learners in lower classes.</span></button><button type="button" class="role-option' + (selectedRole === "both" ? " selected" : "") + '" data-role="both" aria-pressed="' + (selectedRole === "both") + '"><strong>Both</strong><span>Get guidance from seniors and guide learners in lower classes.</span></button></fieldset>';
+  var rolePicker = '<fieldset class="role-options"><legend>How do you want to use Meridian?</legend><button type="button" class="role-option' + (selectedRole === "learner" || selectedRole === "student" ? " selected" : "") + '" data-role="learner" aria-pressed="' + (selectedRole === "learner" || selectedRole === "student") + '"><strong>Learner</strong><span>Find a Meridian Mentor, ask questions, and get guidance.</span></button><button type="button" class="role-option' + (selectedRole === "mentor" || selectedRole === "tutor" ? " selected" : "") + '" data-role="mentor" aria-pressed="' + (selectedRole === "mentor" || selectedRole === "tutor") + '"><strong>Meridian Mentor</strong><span>Share what you know and guide learners in lower classes.</span></button><button type="button" class="role-option' + (selectedRole === "both" ? " selected" : "") + '" data-role="both" aria-pressed="' + (selectedRole === "both") + '"><strong>Both</strong><span>Get guidance from mentors and guide learners in lower classes.</span></button></fieldset>';
   dbody.innerHTML =
     '<h3 id="dt">Set up your profile</h3><p style="color:var(--muted);margin:6px 0 14px">Add your school, location, and guidance goals so Meridian can help you find the right people.</p>' +
     '<label for="profileName">Name</label><input id="profileName" autocomplete="name" value="' + esc(user.n) + '">' +
@@ -1382,7 +1382,7 @@ async function openTutor() {
     '<label for="mentorNotFit">When you may not be the right person</label><input id="mentorNotFit" maxlength="240" value="' + esc(existing && existing.advises_not || '') + '" placeholder="Be honest about what you have not experienced">' +
     '<label for="mentorLessons">Mistakes and what you would do differently</label><textarea id="mentorLessons" maxlength="500" rows="3" placeholder="Share a useful lesson from your own path">' + esc(existing && existing.lessons_learned || '') + '</textarea>' +
     '<label for="mentorExams">Exams you know <span class="muted">(comma separated)</span></label><input id="mentorExams" maxlength="240" value="' + esc(existing && (existing.guidance_exams || []).join(', ') || '') + '" placeholder="JEE Main, NEET, Olympiads">' +
-    '<label for="mentorPrice">Price for a 30-minute Bearings call</label><select id="mentorPrice">' + [99,149,199,249,299].map(function (price) { return '<option value="' + price + '"' + (Number(existing && existing.session_price_inr || 199) === price ? ' selected' : '') + '>₹' + price + '</option>'; }).join("") + '</select>' +
+    '<label for="mentorPrice">Price for a 30-minute Bearings call</label><select id="mentorPrice">' + [99,149].map(function (price) { return '<option value="' + price + '"' + (Number(existing && existing.session_price_inr || 149) === price ? ' selected' : '') + '>₹' + price + '</option>'; }).join("") + '</select>' +
     '<label for="mentorCap">Maximum sessions in one week</label><select id="mentorCap">' + [4,8,12,16,20,30].map(function (cap) { return '<option value="' + cap + '"' + (Number(existing && existing.weekly_session_cap || 8) === cap ? ' selected' : '') + '>' + cap + ' sessions</option>'; }).join("") + '</select>' +
     '<label for="th">Your experience and how you can help</label><textarea id="th" maxlength="500" rows="3" placeholder="For example: I can share how I built confidence for school debates and prepared for competitions.">' + esc(existing ? existing.headline || "" : "") + '</textarea>' +
     '<section class="journey-editor"><div class="journey-editor-heading"><div><h4>Your journey timeline</h4><p class="muted">Add the choices and stages that could help someone a few steps behind you.</p></div><button type="button" class="btn ghost" id="addJourneyStage">Add stage</button></div><div id="journeyEditorRows">' + (journeyRows.length ? journeyRows.map(journeyMarkup).join('') : journeyMarkup(null)) + '</div></section>' +
@@ -1632,7 +1632,7 @@ function paintRoleUI() {
     if (cards) cards.innerHTML = '<a href="#dashboard"><b>Bookings</b><span>Review learner requests and upcoming sessions.</span></a><a href="#doubts"><b>Guide learners</b><span>Share useful answers with the community.</span></a><a href="#sessions"><b>Sessions</b><span>Open booked chats and session details.</span></a>';
   } else {
     if (title) title.textContent = "Find a mentor who gets it.";
-    if (intro) intro.textContent = "Meridian is a guidance network for learners. Find a Meridian Senior who has been through your stage and get help with what comes next.";
+    if (intro) intro.textContent = "Meridian is a guidance network for learners. Find a Meridian Mentor who has been through your stage and get help with what comes next.";
     if (actions) actions.innerHTML = '<a class="btn" href="#home">Find a mentor</a><a class="btn ghost" href="#doubts">Ask a question</a>';
     if (cards) cards.innerHTML = '<a href="#home"><b>Mentors</b><span>Find verified mentors by subject and location.</span></a><a href="#doubts"><b>Questions</b><span>Ask questions, upvote the best ones, and answer what you know.</span></a><a href="#pricing"><b>Pricing</b><span>Free for learners and mentors. Optional Blue Tick may come later.</span></a>';
   }
@@ -1684,7 +1684,7 @@ function startMentorBooking(tutor) {
   if (!canLearn(user)) { window.alert("Choose Learner or Both in your profile to book a mentor."); return; }
   if (user.safetySchemaAvailable && user.safety && meridianAge(user.safety.date_of_birth) !== null && meridianAge(user.safety.date_of_birth) < 18 && !user.safety.guardian_consent_verified_at) { window.alert("A parent or guardian must confirm consent before bookings unlock. Ask the Meridian safety team for help if you’re waiting."); return; }
   pendingBookingMentorId = tutor.user_id;
-  scheduleMentors = [{ id: tutor.user_id, name: tutor.n || "Verified mentor", price: Number(tutor.sessionPrice || 199) }];
+  scheduleMentors = [{ id: tutor.user_id, name: tutor.n || "Verified mentor", price: Number(tutor.sessionPrice || 149) }];
   scheduleTypes = [];
   scheduleSlots = [];
   selectedScheduleSlotIndex = null;
@@ -1697,7 +1697,7 @@ function renderBookingForm() {
   var root = document.getElementById("bookingForm"); if (!root) return;
   if (!scheduleMentors.length) { root.innerHTML = '<div class="community-empty">No verified mentors are available for booking right now.</div><a class="btn ghost" href="#home">Browse mentors</a>'; return; }
   var selectedMentor = selectedScheduleMentor();
-  root.innerHTML = '<div class="schedule-form"><input id="sessionType" type="hidden"><p class="session-policy-note">One 30-minute Bearings call · Daily 8:00 AM–8:00 PM IST</p><label>What would you like guidance on? <span class="muted">(20–300 characters; keep it focused on learning)</span><textarea id="bookingQuestion" maxlength="300" minlength="20" rows="3" placeholder="For example: I understand the method, but I take too long on algebra questions. How can I improve my speed?" required></textarea></label><label class="session-date-label">Choose a day<input id="sessionDate" type="date" min="' + isoTodayIn("Asia/Kolkata") + '" value="' + isoTodayIn("Asia/Kolkata") + '"></label><div id="sessionDateStrip" class="session-date-strip" aria-label="Choose a day"></div><p id="sessionBookingMessage" class="muted" role="status"></p></div><div id="sessionSlots" class="schedule-slots"><div class="community-empty">Finding open times…</div></div><div class="session-booking-footer"><span class="session-price-note">₹' + esc(selectedMentor && selectedMentor.price || 199) + ' · 30 minutes</span><button class="btn" id="requestSession" type="button" hidden disabled>Continue to secure payment</button></div>';
+  root.innerHTML = '<div class="schedule-form"><input id="sessionType" type="hidden"><p class="session-policy-note">One 30-minute Bearings call · Daily 8:00 AM–8:00 PM IST</p><label>What would you like guidance on? <span class="muted">(20–300 characters; keep it focused on learning)</span><textarea id="bookingQuestion" maxlength="300" minlength="20" rows="3" placeholder="For example: I understand the method, but I take too long on algebra questions. How can I improve my speed?" required></textarea></label><label class="session-date-label">Choose a day<input id="sessionDate" type="date" min="' + isoTodayIn("Asia/Kolkata") + '" value="' + isoTodayIn("Asia/Kolkata") + '"></label><div id="sessionDateStrip" class="session-date-strip" aria-label="Choose a day"></div><p id="sessionBookingMessage" class="muted" role="status"></p></div><div id="sessionSlots" class="schedule-slots"><div class="community-empty">Finding open times…</div></div><div class="session-booking-footer"><span class="session-price-note">₹' + esc(selectedMentor && selectedMentor.price || 149) + ' · 30 minutes</span><button class="btn" id="requestSession" type="button" hidden disabled>Continue to secure payment</button></div>';
   paintSessionDateStrip();
   document.getElementById("sessionDate").onchange = function () { paintSessionDateStrip(); loadSessionSlots(); };
   document.getElementById("sessionDateStrip").onclick = function (event) {
@@ -2138,7 +2138,7 @@ document.getElementById("sessionChatForm").addEventListener("submit", async func
   } finally { sessionChatBusy = false; updateSessionChatComposer(); }
 });
 function scheduleManagerMarkup() {
-  return '<div class="schedule-manage"><div class="social-feed-title"><div><span class="community-kicker">SENIOR TOOLS</span><h2>Unavailable times</h2></div></div><p class="muted">Meridian sets 30-minute Bearings call slots every day from 8:00 AM to 8:00 PM IST. Block any time you cannot meet.</p><form class="schedule-form" data-schedule-form="block"><label>Block from (IST)<input name="starts_at" type="datetime-local" required></label><label>Until (IST)<input name="ends_at" type="datetime-local" required></label><button class="btn" type="submit">Block time</button></form><div id="blockedTimeList" class="schedule-manage-list"></div><div id="scheduleManageMessage" class="social-message" role="status"></div></div>';
+  return '<div class="schedule-manage"><div class="social-feed-title"><div><span class="community-kicker">MENTOR TOOLS</span><h2>Unavailable times</h2></div></div><p class="muted">Meridian sets 30-minute Bearings call slots every day from 8:00 AM to 8:00 PM IST. Block any time you cannot meet.</p><form class="schedule-form" data-schedule-form="block"><label>Block from (IST)<input name="starts_at" type="datetime-local" required></label><label>Until (IST)<input name="ends_at" type="datetime-local" required></label><button class="btn" type="submit">Block time</button></form><div id="blockedTimeList" class="schedule-manage-list"></div><div id="scheduleManageMessage" class="social-message" role="status"></div></div>';
 }
 async function loadMentorScheduleControls() {
   var root=document.getElementById("blockedTimeList"); if(!root||!user)return;
@@ -2184,8 +2184,8 @@ async function loadMeridianFinancialLedger(target, adminView) {
   if (!rows.length) { target.innerHTML = '<p class="muted">No paid bookings are in the ledger yet.</p>'; return; }
   var totals = rows.reduce(function (sum, row) { sum.gross += Number(row.gross_inr || 0); sum.fee += Number(row.platform_fee_inr || 0); sum.mentor += Number(row.mentor_amount_inr || 0); return sum; }, { gross: 0, fee: 0, mentor: 0 });
   var statusNames = { awaiting_capture: "Awaiting payment", captured: "Payment captured · call not completed", waiting_for_completion: "Awaiting call completion", payout_pending: "Ready for manual settlement", paid: "Marked paid", refund_pending: "Refund in progress", refunded: "Refunded", payout_setup_required: "Payout setup needed" };
-  target.innerHTML = '<div class="dash-stats"><div class="dash-stat"><b>₹' + totals.gross.toFixed(2) + '</b><span>Session revenue</span></div><div class="dash-stat"><b>₹' + totals.fee.toFixed(2) + '</b><span>Meridian fee</span></div><div class="dash-stat"><b>₹' + totals.mentor.toFixed(2) + '</b><span>Senior share</span></div></div><div class="session-history-list">' + rows.slice(0, 20).map(function (row) {
-    return '<article class="session-row"><b>' + (adminView ? esc(row.mentor_name || "Meridian Senior") + ' · ' : '') + '₹' + Number(row.gross_inr).toFixed(2) + ' session</b><p>' + esc(sessionTime(row.starts_at, "Asia/Kolkata")) + ' · Meridian ₹' + Number(row.platform_fee_inr).toFixed(2) + ' · Senior ₹' + Number(row.mentor_amount_inr).toFixed(2) + '</p><span class="muted">' + esc(statusNames[row.payout_status] || row.payout_status) + '</span></article>';
+  target.innerHTML = '<div class="dash-stats"><div class="dash-stat"><b>₹' + totals.gross.toFixed(2) + '</b><span>Session revenue</span></div><div class="dash-stat"><b>₹' + totals.fee.toFixed(2) + '</b><span>Meridian fee</span></div><div class="dash-stat"><b>₹' + totals.mentor.toFixed(2) + '</b><span>Mentor share</span></div></div><div class="session-history-list">' + rows.slice(0, 20).map(function (row) {
+    return '<article class="session-row"><b>' + (adminView ? esc(row.mentor_name || "Meridian Mentor") + ' · ' : '') + '₹' + Number(row.gross_inr).toFixed(2) + ' session</b><p>' + esc(sessionTime(row.starts_at, "Asia/Kolkata")) + ' · Meridian ₹' + Number(row.platform_fee_inr).toFixed(2) + ' · Mentor ₹' + Number(row.mentor_amount_inr).toFixed(2) + '</p><span class="muted">' + esc(statusNames[row.payout_status] || row.payout_status) + '</span></article>';
   }).join("") + '</div><p class="muted">Earnings are recorded for manual settlement. Meridian does not send automatic mentor payouts.</p>';
 }
 async function drawTutorDashboard() {
@@ -2292,8 +2292,9 @@ async function drawVerificationAdmin() {
   if (!user || !isVerificationAdmin) { body.innerHTML = '<div class="box">This area is for trusted reviewers only.</div>'; return; }
   body.innerHTML = '<div class="box local-loading">Loading review queue…</div>';
   var result = await supabaseClient.from("tutor_verification_requests").select("id, user_id, submitted_at").eq("status", "pending").order("submitted_at", { ascending: true });
-  if (result.error) { body.innerHTML = '<div class="box err">' + esc(authErrorText(result.error)) + '</div>'; return; }
-  if (!result.data || !result.data.length) { body.innerHTML = '<div class="box">No mentor verification requests waiting.</div>'; await drawGuardianConsentQueue(body); await drawAchievementReviewQueue(body); await drawMeridianReportQueue(body); await drawMeridianFinancialQueue(body); return; }
+  if (result.error) body.innerHTML = '<section class="safety-review-section" id="safety-mentor-verification"><h2>Mentor applications</h2><div class="box err">' + esc(authErrorText(result.error)) + '</div></section>';
+  else if (!result.data || !result.data.length) body.innerHTML = '<section class="safety-review-section" id="safety-mentor-verification"><h2>Mentor applications</h2><div class="box">No mentor verification requests waiting.</div></section>';
+  else {
   var ids = result.data.map(function (r) { return r.user_id; }), reqIds = result.data.map(function (r) { return r.id; });
   var extra = await Promise.all([
     supabaseClient.from("profiles").select("id, display_name, grade").in("id", ids),
@@ -2301,7 +2302,8 @@ async function drawVerificationAdmin() {
     supabaseClient.from("tutor_verification_documents").select("request_id, document_type, storage_path").in("request_id", reqIds),
     supabaseClient.from("tutor_profiles").select("user_id, headline, subjects").in("user_id", ids),
   ]);
-  if (extra.some(function (item) { return item.error; })) { body.innerHTML = '<div class="box err">' + esc(authErrorText(extra.filter(function (item) { return item.error; })[0].error)) + '</div>'; return; }
+  if (extra.some(function (item) { return item.error; })) body.innerHTML = '<section class="safety-review-section" id="safety-mentor-verification"><h2>Mentor applications</h2><div class="box err">' + esc(authErrorText(extra.filter(function (item) { return item.error; })[0].error)) + '</div></section>';
+  else {
   var profiles = {}, locations = {}, docs = {}, tutorProfiles = {};
   (extra[0].data || []).forEach(function (p) { profiles[p.id] = p; });
   (extra[1].data || []).forEach(function (l) { locations[l.user_id] = l; });
@@ -2318,22 +2320,23 @@ async function drawVerificationAdmin() {
     var tp = tutorProfiles[row.user_id] || {}, hasId = items.some(function (d) { return d.document_type === "school_id"; }), hasReceipt = items.some(function (d) { return d.document_type === "fee_receipt"; });
     cards.push('<article class="box"><h3>' + esc(p.display_name || "Learner") + ' · Class ' + esc(String(p.grade || "—")) + '</h3><p class="muted">' + esc([l.school,l.city,l.state,l.country].filter(Boolean).join(" · ") || "Location not set") + '<br>Guidance areas: ' + esc((tp.subjects || []).join(", ") || "Not set") + '<br>Guidance note: ' + esc(tp.headline || "Not set") + '<br>Submitted ' + esc(new Date(row.submitted_at).toLocaleString()) + '</p>' + (links.join("") || '<p class="err">No documents attached.</p>') + '<label>Reviewer note (optional)<input data-review-note="' + esc(row.id) + '" maxlength="500" placeholder="Private note; not shown on the mentor profile"></label><div class="row"><button class="btn" data-review="verified" data-review-id="' + esc(row.id) + '" data-user-id="' + esc(row.user_id) + '" ' + (!(hasId && hasReceipt && Number(p.grade) >= 9 && Number(p.grade) <= 12 && allDocsAvailable) ? 'disabled title="Both documents must be available and class must be 9–12"' : '') + '>Approve and verify</button><button class="btn ghost" data-review="rejected" data-review-id="' + esc(row.id) + '" data-user-id="' + esc(row.user_id) + '">Reject</button></div></article>');
   }
-  body.innerHTML = cards.join("");
+  body.innerHTML = '<section class="safety-review-section" id="safety-mentor-verification"><h2>Mentor applications</h2>' + cards.join("") + '</section>';
+  }
+  }
   await drawGuardianConsentQueue(body);
   await drawAchievementReviewQueue(body);
   await drawMeridianReportQueue(body);
-  await drawMeridianFinancialQueue(body);
 }
 async function drawMeridianFinancialQueue(body) {
   body.querySelectorAll(".meridian-financial-queue").forEach(function (section) { section.remove(); });
   var section = document.createElement("section"); section.className = "box meridian-financial-queue";
-  section.innerHTML = '<h2>Session settlement ledger</h2><p class="muted">Review session price, Meridian fee, Senior share, and payment/refund state. Settlements are manual; no transfer is sent from this page.</p><div data-ledger-content><div class="local-loading">Loading settlement ledger…</div></div>';
+  section.innerHTML = '<h2>Session settlement ledger</h2><p class="muted">Review session price, Meridian fee, Mentor share, and payment/refund state. Settlements are manual; no transfer is sent from this page.</p><div data-ledger-content><div class="local-loading">Loading settlement ledger…</div></div>';
   body.appendChild(section);
   await loadMeridianFinancialLedger(section.querySelector("[data-ledger-content]"), true);
 }
 async function drawGuardianConsentQueue(body) {
   body.querySelectorAll(".guardian-consent-queue").forEach(function (section) { section.remove(); });
-  var section = document.createElement("section"); section.className = "guardian-consent-queue";
+  var section = document.createElement("section"); section.className = "guardian-consent-queue safety-review-section"; section.id = "safety-guardians";
   section.innerHTML = '<h2>Guardian consent checks</h2><p class="muted">Confirm consent privately with the parent or guardian before unlocking bookings for a learner under 18. Do not approve from their self-reported form alone.</p>';
   var result = await supabaseClient.from("meridian_account_safety").select("user_id,date_of_birth,guardian_name,guardian_contact,guardian_contact_type,guardian_consent_verified_at").is("guardian_consent_verified_at", null).not("guardian_contact", "is", null).order("created_at", { ascending: true }).limit(100);
   if (result.error) section.insertAdjacentHTML("beforeend", '<div class="box">Guardian checks could not load: ' + esc(authErrorText(result.error)) + '</div>');
@@ -2352,7 +2355,7 @@ async function drawGuardianConsentQueue(body) {
 async function drawMeridianReportQueue(body) {
   body.querySelectorAll(".meridian-report-queue").forEach(function (section) { section.remove(); });
   var result = await supabaseClient.from("reports").select("id,reporter_id,reported_user_id,post_id,doubt_id,reason,details,status,severity,is_auto_flagged,created_at").eq("status", "new").order("created_at", { ascending: true }).limit(100);
-  var section = document.createElement("section"); section.className = "meridian-report-queue";
+  var section = document.createElement("section"); section.className = "meridian-report-queue safety-review-section"; section.id = "safety-reports";
   section.innerHTML = '<h2>Community safety reports</h2><p class="muted">Review reports and apply a proportionate action. Suspensions expire after 24 hours by default.</p>';
   if (result.error) section.insertAdjacentHTML("beforeend", '<div class="box">Reports could not load: ' + esc(authErrorText(result.error)) + '</div>');
   else if (!result.data || !result.data.length) section.insertAdjacentHTML("beforeend", '<div class="box">No new reports.</div>');
@@ -2371,7 +2374,7 @@ async function drawAchievementReviewQueue(body) {
   var result = await supabaseClient.from("mentor_achievements")
     .select("id,user_id,category,title,issuer,achievement_year,public_summary,evidence_path,public_evidence_path,created_at")
     .eq("status", "pending").order("created_at", { ascending: true });
-  var section = document.createElement("section"); section.className = "achievement-review-queue";
+  var section = document.createElement("section"); section.className = "achievement-review-queue safety-review-section"; section.id = "safety-achievements";
   if (result.error) { section.innerHTML = '<h2>Achievement review</h2><p class="muted">Run the latest Meridian database migration to enable this review queue.</p>'; body.appendChild(section); return; }
   section.innerHTML = '<h2>Achievement review</h2><p class="muted">Review the private evidence. Only approve an optional public file if it has no sensitive details.</p>';
   if (!result.data || !result.data.length) { section.insertAdjacentHTML("beforeend", '<div class="box">No achievement submissions waiting.</div>'); body.appendChild(section); return; }
@@ -2386,11 +2389,24 @@ async function drawAchievementReviewQueue(body) {
   }
   body.appendChild(section);
 }
+var safetyReviewJumps = document.querySelector(".safety-review-jumps");
+if (safetyReviewJumps) safetyReviewJumps.addEventListener("click", function (event) {
+  var jump = event.target.closest("[data-review-jump]");
+  var target = jump && document.getElementById(jump.dataset.reviewJump);
+  if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+});
 document.getElementById("verificationAdminBody").addEventListener("click", async function (event) {
   var guardianButton = event.target.closest("[data-guardian-consent]");
   if (guardianButton) {
     if (!isVerificationAdmin) return;
-    if (!window.confirm("Have you personally confirmed consent with this learner’s parent or guardian? This unlocks bookings for the minor.")) return;
+    var consentDialog = document.getElementById("guardianConsentConfirmDialog");
+    if (!consentDialog) return;
+    consentDialog.returnValue = "";
+    var guardianConfirmed = await new Promise(function (resolve) {
+      consentDialog.addEventListener("close", function () { resolve(consentDialog.returnValue === "confirmed"); }, { once: true });
+      consentDialog.showModal();
+    });
+    if (!guardianConfirmed) return;
     guardianButton.disabled = true;
     var consent = await supabaseClient.from("meridian_account_safety").update({ guardian_consent_verified_at: new Date().toISOString() }).eq("user_id", guardianButton.dataset.guardianConsent).is("guardian_consent_verified_at", null);
     if (consent.error) { window.alert(authErrorText(consent.error)); guardianButton.disabled = false; return; }
@@ -2970,7 +2986,7 @@ var routes = ["home", "feed", "profile", "doubts", "sessions", "pricing", "me", 
     me: "My page",
     settings: "Settings",
     dashboard: "Tutor dashboard",
-    verification: "Tutor verification review",
+    verification: "Safety review",
   };
 function route() {
   var h = location.hash.replace("#", "");
@@ -2991,6 +3007,7 @@ function route() {
   if (h === "verification" && (!user || !isVerificationAdmin)) h = "home";
   curRoute = h;
   document.body.classList.toggle("home-feed", h === "feed");
+  document.body.classList.toggle("safety-reviewer-portal", h === "verification" && isVerificationAdmin);
   document.querySelectorAll("[data-v]").forEach(function (el) {
     el.hidden = el.dataset.v.split(" ").indexOf(h) < 0;
   });
