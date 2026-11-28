@@ -1,13 +1,9 @@
 import { adminClient, caller, handleOptions, json } from "../_shared/meridian.ts";
 
 type SessionRow = {
-  id: string;
+  session_id: string;
   status: string;
   payment_status: string;
-};
-
-type FinancialRow = {
-  session_id: string;
   payout_status: string;
 };
 
@@ -35,37 +31,10 @@ async function removePrefix(db: ReturnType<typeof adminClient>, bucket: string, 
   }
 }
 
-async function listAccountSessions(db: ReturnType<typeof adminClient>, userId: string): Promise<SessionRow[]> {
-  const sessions: SessionRow[] = [];
-  for (let offset = 0; ; offset += 500) {
-    const { data, error } = await db.from("peer_sessions")
-      .select("id,status,payment_status")
-      .or(`learner_id.eq.${userId},mentor_id.eq.${userId}`)
-      .range(offset, offset + 499);
-    if (error) throw new Error(`Could not check your bookings before deletion: ${error.message}`);
-    sessions.push(...(data || []) as SessionRow[]);
-    if (!data || data.length < 500) break;
-  }
-  return sessions;
-}
-
-async function listSessionFinancials(db: ReturnType<typeof adminClient>, sessionIds: string[]): Promise<FinancialRow[]> {
-  const rows: FinancialRow[] = [];
-  for (let start = 0; start < sessionIds.length; start += 100) {
-    const { data, error } = await db.from("meridian_session_financials")
-      .select("session_id,payout_status")
-      .in("session_id", sessionIds.slice(start, start + 100));
-    if (error) throw new Error(`Could not check session settlements before deletion: ${error.message}`);
-    rows.push(...(data || []) as FinancialRow[]);
-  }
-  return rows;
-}
-
-function hasUnresolvedSession(sessions: SessionRow[], financials: FinancialRow[]) {
-  const payouts = new Map(financials.map((row) => [row.session_id, row.payout_status]));
+function hasUnresolvedSession(sessions: SessionRow[]) {
   return sessions.some((session) => {
     const payment = session.payment_status;
-    const payout = payouts.get(session.id);
+    const payout = session.payout_status;
     if (["pending", "confirmed"].includes(session.status)) return true;
     if (["held", "refund_pending", "credit_pending"].includes(payment)) return true;
     if (payment === "captured" && payout !== "paid") return true;
@@ -88,10 +57,16 @@ Deno.serve(async (req) => {
     }
 
     const db = adminClient();
-    const sessions = await listAccountSessions(db, user.id);
-    const sessionIds = sessions.map((session) => session.id);
-    const financials = sessionIds.length ? await listSessionFinancials(db, sessionIds) : [];
-    if (hasUnresolvedSession(sessions, financials)) {
+    // Use the privileged, narrowly scoped RPC instead of querying peer_sessions
+    // directly. This still works when table grants/RLS intentionally block reads.
+    const { data: sessions, error: sessionCheckError } = await db.rpc(
+      "meridian_account_deletion_check",
+      { p_user_id: user.id },
+    );
+    if (sessionCheckError) throw new Error(`Could not check your bookings before deletion: ${sessionCheckError.message}`);
+    const sessionRows = (sessions || []) as SessionRow[];
+    const sessionIds = sessionRows.map((session) => session.session_id);
+    if (hasUnresolvedSession(sessionRows)) {
       return json(409, { error: "First cancel or complete active calls and resolve any pending refund or mentor payout. Your account has not been deleted." });
     }
 
