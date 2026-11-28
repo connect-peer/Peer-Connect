@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="utf-8" />
     <meta
@@ -10,7 +10,7 @@
     <meta name="description" content="Meridian helps learners find their bearings with guidance from someone who has been there.">
     <meta name="application-name" content="Meridian">
     <meta name="apple-mobile-web-app-title" content="Meridian">
-    <meta name="theme-color" content="#FAF8F2">
+    <meta name="theme-color" content="#0B0B0C">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -1493,27 +1493,27 @@ dialog, .profile-image-viewer {
 :root,
 :root[data-theme="dark"],
 :root[data-theme="light"] {
-  color-scheme: light;
-  --bg: #FAF8F2;
-  --surface: #fffefa;
-  --ink: #111111;
-  --muted: #5A5A5A;
-  --line: #111111;
+  color-scheme: dark;
+  --bg: #0B0B0C;
+  --surface: #151518;
+  --ink: #F4F1E8;
+  --muted: #B8B4AA;
+  --line: #F4F1E8;
   --brand: #FFE94A;
   --brand-ink: #111111;
   --gold: #FFE94A;
-  --green: #1F9D55;
-  --soft: #fff5a8;
-  --paper-grid: #E6E1D3;
-  --academic: #2447D6;
-  --skill: #E5322D;
-  --glass-edge: #111111;
-  --glass: #fffefa;
+  --green: #57D68A;
+  --soft: #302B15;
+  --paper-grid: #252525;
+  --academic: #8FA5FF;
+  --skill: #FF7773;
+  --glass-edge: #F4F1E8;
+  --glass: #18181b;
   color: var(--ink);
   background: var(--bg);
   font-family: Inter, Arial, sans-serif;
 }
-html { color-scheme: light; background: var(--bg); scroll-padding-top: 84px; }
+html { color-scheme: dark; background: var(--bg); scroll-padding-top: 84px; }
 body {
   min-height: 100vh;
   padding-bottom: 0;
@@ -1565,11 +1565,11 @@ footer .wrap { padding-block: 24px; }
 }
 .card, .mentor-card, .mentor-guidance-card, .community-question, .me-profile-hero, .me-detail-panel, .me-control-panel, .journey-edit-row, .mentor-results-grid > *, .mentor-detail-list > div { border: 1.5px solid var(--ink); border-radius: 0; background: var(--surface); color: var(--ink); }
 .homecards a::after, .social-avatar::after { display: none !important; }
-.cover, .profile-cover, .me-cover { background-color: var(--brand); }
+.cover, .profile-cover, .me-cover { background-color: var(--brand); background-image: none; }
 .auth-screen, dialog.auth-screen, .auth-form-panel, .auth-brand-panel { border-color: var(--ink); border-radius: 0; background: var(--bg); color: var(--ink); }
-.auth-form-panel input, .auth-screen input { border-color: var(--ink); border-radius: 0; background: #fffefa; color: var(--ink); }
-.auth-feature, .auth-feature b, .auth-brand-mark { border: 1.5px solid var(--ink); border-radius: 0; background: #fffefa; color: var(--ink); }
-.mentor-card-kicker, .mentor-booking-cta > span, .profile-tabs .btn, .app-version { border: 1.5px solid var(--ink); border-radius: 0; background: #fffefa; color: var(--ink); }
+.auth-form-panel input, .auth-screen input { border-color: var(--ink); border-radius: 0; background: #18181b; color: var(--ink); }
+.auth-feature, .auth-feature b, .auth-brand-mark { border: 1.5px solid var(--ink); border-radius: 0; background: #18181b; color: var(--ink); }
+.mentor-card-kicker, .mentor-booking-cta > span, .profile-tabs .btn, .app-version { border: 1.5px solid var(--ink); border-radius: 0; background: #18181b; color: var(--ink); }
 .tutor-online { border: 1.5px solid var(--ink); border-radius: 0; background: var(--green); }
 .profile-close { border: 1.5px solid var(--ink); border-radius: 0; background: var(--brand); color: var(--ink); }
 .profile-tabs, .social-feed-tabs { border-color: var(--ink); }
@@ -1577,27 +1577,27 @@ footer .wrap { padding-block: 24px; }
 .homecards a:hover, .card:hover { transform: none; border-color: var(--ink); }
 .btn, button.btn, .btn.ghost, .btn.secondary, .btn.danger {
   display: inline-flex; min-height: 44px; align-items: center; justify-content: center; gap: 8px;
-  padding: 10px 18px; border: 1.5px solid var(--ink); border-radius: 0; background: #fffefa; color: var(--ink);
+  padding: 10px 18px; border: 1.5px solid var(--ink); border-radius: 0; background: #18181b; color: var(--ink);
   font: 600 15px/1.25 Inter, sans-serif; text-decoration: none; cursor: pointer; transition: background-color .12s ease, color .12s ease;
 }
 .btn:not(.ghost), .btn.primary, #gsign { background: var(--brand); color: var(--ink); }
-.btn.ghost, .btn.secondary { background: #fffefa; color: var(--ink); }
-.btn:hover:not(:disabled), .btn.ghost:hover:not(:disabled) { transform: none; box-shadow: none; background: var(--ink); color: #fffefa; }
+.btn.ghost, .btn.secondary { background: #18181b; color: var(--ink); }
+.btn:hover:not(:disabled), .btn.ghost:hover:not(:disabled) { transform: none; box-shadow: none; background: var(--ink); color: #18181b; }
 .btn.danger, .session-chat-cancel { border-color: var(--skill); background: var(--skill); color: #fff; }
 .btn:disabled { opacity: .55; }
 input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), textarea, select {
-  min-height: 46px; max-width: 100%; border: 1.5px solid var(--ink); border-radius: 0; background: #fffefa; color: var(--ink); padding: 11px 13px; font: 400 16px/1.4 Inter, sans-serif;
+  min-height: 46px; max-width: 100%; border: 1.5px solid var(--ink); border-radius: 0; background: #18181b; color: var(--ink); padding: 11px 13px; font: 400 16px/1.4 Inter, sans-serif;
 }
 textarea { min-height: 100px; resize: vertical; }
 input::placeholder, textarea::placeholder { color: var(--muted); opacity: 1; }
 input[type="checkbox"], input[type="radio"] { accent-color: var(--academic); }
 :focus-visible { outline: 3px solid var(--academic); outline-offset: 3px; }
 .tags span, .tag, .goal-checkbox-grid label, .profile-choice span {
-  display: inline-flex; min-height: 34px; align-items: center; padding: 6px 10px; border: 1.5px solid var(--academic); border-radius: 0; background: #fffefa; color: var(--academic); font-size: 13px; font-weight: 700; text-transform: uppercase;
+  display: inline-flex; min-height: 34px; align-items: center; padding: 6px 10px; border: 1.5px solid var(--academic); border-radius: 0; background: #18181b; color: var(--academic); font-size: 13px; font-weight: 700; text-transform: uppercase;
 }
 .tags span[data-kind="skill"], .tag.skill, .skill-tag { border-color: var(--skill); color: var(--skill); }
 .verified-stamp, .mentor-badge, .best {
-  display: inline-flex; width: fit-content; align-items: center; border: 1.5px solid var(--green); color: var(--green); background: #fffefa; padding: 5px 8px; font-size: 12px; font-weight: 700; text-transform: uppercase;
+  display: inline-flex; width: fit-content; align-items: center; border: 1.5px solid var(--green); color: var(--green); background: #18181b; padding: 5px 8px; font-size: 12px; font-weight: 700; text-transform: uppercase;
 }
 .verified-stamp { transform: rotate(-4deg); }
 .community-kicker, .stat-label, small { color: var(--muted); font-size: 12px; font-weight: 700; text-transform: uppercase; }
@@ -1611,7 +1611,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--academic); }
 dialog, .session-chat-dialog, .session-booking-dialog, .meridian-notification-dialog { max-width: min(720px, calc(100vw - 28px)); max-height: min(90dvh, 860px); padding: 0; border: 1.5px solid var(--ink); border-radius: 0; background: var(--bg); color: var(--ink); }
 dialog::backdrop, .session-chat-dialog::backdrop, .session-booking-dialog::backdrop { background: rgba(17,17,17,.58); backdrop-filter: none; }
 .session-chat-head, .booking-dialog-head { background: var(--bg); border-bottom: 1.5px solid var(--ink); }
-.session-chat-close { width: 44px; height: 44px; border: 1.5px solid var(--ink); border-radius: 0; background: #fffefa; color: var(--ink); }
+.session-chat-close { width: 44px; height: 44px; border: 1.5px solid var(--ink); border-radius: 0; background: #18181b; color: var(--ink); }
 .startup-loader { background: var(--bg); background-image: linear-gradient(to right, var(--paper-grid) 1px, transparent 1px), linear-gradient(to bottom, var(--paper-grid) 1px, transparent 1px); background-size: 24px 24px; }
 .startup-brand { color: var(--ink); font-family: "Space Grotesk", sans-serif; }
 .startup-brand>i { background: var(--brand); }
@@ -1621,9 +1621,9 @@ dialog::backdrop, .session-chat-dialog::backdrop, .session-booking-dialog::backd
 .local-loading { min-height: 88px; border: 1.5px solid var(--ink); background: var(--surface); color: var(--muted); }
 .local-loading::before { width: 22px; height: 22px; border: 2px solid var(--ink); border-top-color: var(--skill); border-radius: 0; }
 .community-empty, .doubt-empty, .empty-state { padding: 24px; border: 1.5px dashed var(--ink); background: var(--surface); color: var(--muted); text-align: center; }
-.error-state { padding: 16px; border: 1.5px solid var(--skill); background: #fffefa; color: var(--skill); }
-.skeleton { min-height: 18px; border: 1px solid var(--paper-grid); background: #eeeadd; }
-.skeleton::after { content: ""; display: block; width: 46%; height: 100%; min-height: inherit; background: #e6e1d3; }
+.error-state { padding: 16px; border: 1.5px solid var(--skill); background: #18181b; color: var(--skill); }
+.skeleton { min-height: 18px; border: 1px solid var(--paper-grid); background: #252525; }
+.skeleton::after { content: ""; display: block; width: 46%; height: 100%; min-height: inherit; background: #383838; }
 .tabbar { display: none; }
 @media (max-width: 900px) {
   .wrap, .hero, .social-home, [data-v] > .wrap { width: min(100% - 32px, 1440px); }
