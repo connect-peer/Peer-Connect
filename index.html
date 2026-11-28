@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
   <head>
     <meta charset="utf-8" />
     <meta
@@ -10,7 +10,10 @@
     <meta name="description" content="Meridian helps learners find their bearings with guidance from someone who has been there.">
     <meta name="application-name" content="Meridian">
     <meta name="apple-mobile-web-app-title" content="Meridian">
-    <meta name="theme-color" content="#0b1226">
+    <meta name="theme-color" content="#FAF8F2">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
 :root {
   --bg: #f3f6fb;
@@ -1485,6 +1488,177 @@ dialog, .profile-image-viewer {
 .local-loading { display:flex;align-items:center;gap:12px;min-height:100px;justify-content:center;color:var(--muted); }
 .local-loading::before { content:"";width:20px;height:20px;border:2px solid rgba(255,255,255,.16);border-top-color:#f4b4d2;border-radius:50%;animation:peer-spin .8s linear infinite; }
 @media(max-width:700px) { .settings-page-grid { grid-template-columns:1fr; } .settings-history-panel { grid-column:auto; } .meridian-matches { padding:16px; } .meridian-match-grid { grid-template-columns:1fr; } .mentor-detail-list,.mentor-results-grid,.journey-edit-grid { grid-template-columns:1fr; } .journey-editor-heading { align-items:stretch;flex-direction:column; } }
+
+/* Meridian notebook system — shared shell and component foundation. */
+:root,
+:root[data-theme="dark"],
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #FAF8F2;
+  --surface: #fffefa;
+  --ink: #111111;
+  --muted: #5A5A5A;
+  --line: #111111;
+  --brand: #FFE94A;
+  --brand-ink: #111111;
+  --gold: #FFE94A;
+  --green: #1F9D55;
+  --soft: #fff5a8;
+  --paper-grid: #E6E1D3;
+  --academic: #2447D6;
+  --skill: #E5322D;
+  --glass-edge: #111111;
+  --glass: #fffefa;
+  color: var(--ink);
+  background: var(--bg);
+  font-family: Inter, Arial, sans-serif;
+}
+html { color-scheme: light; background: var(--bg); scroll-padding-top: 84px; }
+body {
+  min-height: 100vh;
+  padding-bottom: 0;
+  color: var(--ink);
+  background-color: var(--bg);
+  background-image: linear-gradient(to right, var(--paper-grid) 1px, transparent 1px), linear-gradient(to bottom, var(--paper-grid) 1px, transparent 1px);
+  background-size: 24px 24px;
+  background-attachment: fixed;
+  font: 400 16px/1.55 Inter, Arial, sans-serif;
+}
+*, *::before, *::after { border-radius: 0 !important; box-shadow: none !important; text-shadow: none !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+::selection { background: var(--brand); color: var(--ink); }
+h1, h2, h3, h4, .logo, .homecards b, .role-option strong { font-family: "Space Grotesk", Inter, sans-serif; font-weight: 700; letter-spacing: -.035em; }
+h1 { font-size: clamp(34px, 5vw, 56px); line-height: 1.04; }
+h2 { font-size: clamp(26px, 3vw, 38px); line-height: 1.12; }
+p, label, input, textarea, select, button, a { font-family: Inter, Arial, sans-serif; }
+small, .community-kicker, .app-version, .journey-year, .meridian-match-rating, .tag, .tags span, .mentor-badge, .verified-stamp, .stat-label {
+  font-family: "DotGothic16", "Space Mono", monospace;
+  letter-spacing: .035em;
+}
+.wrap { width: min(100% - 40px, 1440px); max-width: 1440px; margin-inline: auto; padding-inline: 0; }
+header {
+  position: sticky; top: 0; z-index: 20; color: var(--ink);
+  background: var(--bg); border-bottom: 1.5px solid var(--ink);
+}
+header .wrap { min-height: 72px; height: auto; width: 100%; max-width: none; padding: 10px clamp(16px, 3vw, 48px); gap: 24px; }
+header .logo { font: 700 23px/1 "Space Grotesk", sans-serif; gap: 10px; }
+.logo i, .startup-brand>i { width: 28px; height: 28px; flex: 0 0 28px; border: 1.5px solid var(--ink); background: var(--brand); }
+.logo i::after { inset: 6px; border: 2px solid var(--ink); }
+header nav { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 4px 18px; overflow: visible; white-space: normal; }
+header nav > a.h { display: inline-flex; min-height: 44px; align-items: center; padding: 8px 4px; border-bottom: 2px solid transparent; color: var(--ink); font-size: 15px; font-weight: 600; }
+header nav > a.h:hover, header nav > a.h[aria-current="page"] { color: var(--ink); background: transparent; border-bottom-color: var(--ink); }
+header nav [data-nav="pricing"] { display: none; }
+.app-layout { display: block; min-height: calc(100vh - 72px); }
+.app-rail { display: none !important; }
+#top { width: 100%; min-width: 0; }
+footer { margin: 0; border-top: 1.5px solid var(--ink); background: var(--bg); color: var(--muted); }
+footer .wrap { padding-block: 24px; }
+.hero, .social-home, [data-v] > .wrap { width: min(100% - 40px, 1440px); max-width: 1440px; margin-inline: auto; }
+.hero { padding-block: clamp(34px, 6vw, 76px) 36px; }
+.hero h1, section h1, section > .wrap > h2 { text-shadow: none; }
+.hero h1 mark, h1 mark, h2 mark, .highlight-word { color: inherit; background: linear-gradient(transparent 58%, var(--brand) 58%); padding-inline: .04em; }
+.box, .card, .plan, .post, .composer, .dash-stat, .doubt-side-card, .social-side-card, .social-composer, .social-post, .mentor-guidance-card, .mentor-guidance-details, .mentor-journey, .mentor-results, .mentor-result-card, .journey-editor, .journey-edit-row, .app-rail-note {
+  border: 1.5px solid var(--ink); border-radius: 0; background: var(--surface); color: var(--ink); padding: 20px;
+}
+.box, .plan, .dash-stat { max-width: none; }
+.homecards a, .role-option, .goal-checkbox-grid label, .profile-choice span, .schedule-slot, .session-date, .session-chat-message, .session-chat-state, .session-chat-pdf, .social-side-card, .community-empty, .doubt-empty {
+  border: 1.5px solid var(--ink); border-radius: 0; background: var(--surface); color: var(--ink);
+}
+.card, .mentor-card, .mentor-guidance-card, .community-question, .me-profile-hero, .me-detail-panel, .me-control-panel, .journey-edit-row, .mentor-results-grid > *, .mentor-detail-list > div { border: 1.5px solid var(--ink); border-radius: 0; background: var(--surface); color: var(--ink); }
+.homecards a::after, .social-avatar::after { display: none !important; }
+.cover, .profile-cover, .me-cover { background-color: var(--brand); }
+.auth-screen, dialog.auth-screen, .auth-form-panel, .auth-brand-panel { border-color: var(--ink); border-radius: 0; background: var(--bg); color: var(--ink); }
+.auth-form-panel input, .auth-screen input { border-color: var(--ink); border-radius: 0; background: #fffefa; color: var(--ink); }
+.auth-feature, .auth-feature b, .auth-brand-mark { border: 1.5px solid var(--ink); border-radius: 0; background: #fffefa; color: var(--ink); }
+.mentor-card-kicker, .mentor-booking-cta > span, .profile-tabs .btn, .app-version { border: 1.5px solid var(--ink); border-radius: 0; background: #fffefa; color: var(--ink); }
+.tutor-online { border: 1.5px solid var(--ink); border-radius: 0; background: var(--green); }
+.profile-close { border: 1.5px solid var(--ink); border-radius: 0; background: var(--brand); color: var(--ink); }
+.profile-tabs, .social-feed-tabs { border-color: var(--ink); }
+.homecards a { padding: 20px; }
+.homecards a:hover, .card:hover { transform: none; border-color: var(--ink); }
+.btn, button.btn, .btn.ghost, .btn.secondary, .btn.danger {
+  display: inline-flex; min-height: 44px; align-items: center; justify-content: center; gap: 8px;
+  padding: 10px 18px; border: 1.5px solid var(--ink); border-radius: 0; background: #fffefa; color: var(--ink);
+  font: 600 15px/1.25 Inter, sans-serif; text-decoration: none; cursor: pointer; transition: background-color .12s ease, color .12s ease;
+}
+.btn:not(.ghost), .btn.primary, #gsign { background: var(--brand); color: var(--ink); }
+.btn.ghost, .btn.secondary { background: #fffefa; color: var(--ink); }
+.btn:hover:not(:disabled), .btn.ghost:hover:not(:disabled) { transform: none; box-shadow: none; background: var(--ink); color: #fffefa; }
+.btn.danger, .session-chat-cancel { border-color: var(--skill); background: var(--skill); color: #fff; }
+.btn:disabled { opacity: .55; }
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), textarea, select {
+  min-height: 46px; max-width: 100%; border: 1.5px solid var(--ink); border-radius: 0; background: #fffefa; color: var(--ink); padding: 11px 13px; font: 400 16px/1.4 Inter, sans-serif;
+}
+textarea { min-height: 100px; resize: vertical; }
+input::placeholder, textarea::placeholder { color: var(--muted); opacity: 1; }
+input[type="checkbox"], input[type="radio"] { accent-color: var(--academic); }
+:focus-visible { outline: 3px solid var(--academic); outline-offset: 3px; }
+.tags span, .tag, .goal-checkbox-grid label, .profile-choice span {
+  display: inline-flex; min-height: 34px; align-items: center; padding: 6px 10px; border: 1.5px solid var(--academic); border-radius: 0; background: #fffefa; color: var(--academic); font-size: 13px; font-weight: 700; text-transform: uppercase;
+}
+.tags span[data-kind="skill"], .tag.skill, .skill-tag { border-color: var(--skill); color: var(--skill); }
+.verified-stamp, .mentor-badge, .best {
+  display: inline-flex; width: fit-content; align-items: center; border: 1.5px solid var(--green); color: var(--green); background: #fffefa; padding: 5px 8px; font-size: 12px; font-weight: 700; text-transform: uppercase;
+}
+.verified-stamp { transform: rotate(-4deg); }
+.community-kicker, .stat-label, small { color: var(--muted); font-size: 12px; font-weight: 700; text-transform: uppercase; }
+.muted, .sub2, .sub, .social-post-time, .session-row p { color: var(--muted); }
+.social-home { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 24px; padding: 30px 0 56px; }
+.social-composer, .social-post, .social-side-card { padding: 20px; }
+.social-avatar, .me-avatar, .profile-avatar, .mentor-avatar { border: 1.5px solid var(--ink); border-radius: 0; background: var(--brand); color: var(--ink); }
+.social-avatar img, .social-preview img, .social-post-media img, .social-post-media video { border-radius: 0; }
+.schedule-slot, .session-date { min-height: 44px; padding: 10px 14px; cursor: pointer; }
+.schedule-slot.selected, .session-date.selected, .role-option.selected, .role-option[aria-pressed="true"] { border-color: var(--ink); background: var(--brand); color: var(--ink); box-shadow: none; }
+dialog, .session-chat-dialog, .session-booking-dialog, .meridian-notification-dialog { max-width: min(720px, calc(100vw - 28px)); max-height: min(90dvh, 860px); padding: 0; border: 1.5px solid var(--ink); border-radius: 0; background: var(--bg); color: var(--ink); }
+dialog::backdrop, .session-chat-dialog::backdrop, .session-booking-dialog::backdrop { background: rgba(17,17,17,.58); backdrop-filter: none; }
+.session-chat-head, .booking-dialog-head { background: var(--bg); border-bottom: 1.5px solid var(--ink); }
+.session-chat-close { width: 44px; height: 44px; border: 1.5px solid var(--ink); border-radius: 0; background: #fffefa; color: var(--ink); }
+.startup-loader { background: var(--bg); background-image: linear-gradient(to right, var(--paper-grid) 1px, transparent 1px), linear-gradient(to bottom, var(--paper-grid) 1px, transparent 1px); background-size: 24px 24px; }
+.startup-brand { color: var(--ink); font-family: "Space Grotesk", sans-serif; }
+.startup-brand>i { background: var(--brand); }
+.startup-brand>i::after { border-radius: 0; border-color: var(--ink); }
+.startup-spinner { width: 24px; height: 24px; border: 2px solid var(--line); border-top-color: var(--skill); border-radius: 0; }
+.startup-caption { color: var(--muted); font: 500 16px Inter, sans-serif; letter-spacing: 0; }
+.local-loading { min-height: 88px; border: 1.5px solid var(--ink); background: var(--surface); color: var(--muted); }
+.local-loading::before { width: 22px; height: 22px; border: 2px solid var(--ink); border-top-color: var(--skill); border-radius: 0; }
+.community-empty, .doubt-empty, .empty-state { padding: 24px; border: 1.5px dashed var(--ink); background: var(--surface); color: var(--muted); text-align: center; }
+.error-state { padding: 16px; border: 1.5px solid var(--skill); background: #fffefa; color: var(--skill); }
+.skeleton { min-height: 18px; border: 1px solid var(--paper-grid); background: #eeeadd; }
+.skeleton::after { content: ""; display: block; width: 46%; height: 100%; min-height: inherit; background: #e6e1d3; }
+.tabbar { display: none; }
+@media (max-width: 900px) {
+  .wrap, .hero, .social-home, [data-v] > .wrap { width: min(100% - 32px, 1440px); }
+  header .wrap { align-items: flex-start; flex-direction: column; gap: 8px; padding-block: 12px; }
+  header nav { width: 100%; justify-content: flex-start; overflow: visible; }
+  header nav > a.h { display: inline-flex; }
+  header nav #btnTutor { display: none; }
+  .social-home { grid-template-columns: minmax(0, 1fr); }
+  .social-sidebar { display: none; }
+}
+@media (max-width: 640px) {
+  html { scroll-padding-top: 12px; }
+  body { padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px)); }
+  header { position: relative; }
+  header .wrap { min-height: 58px; flex-direction: row; align-items: center; }
+  header nav { width: auto; flex: 0 0 auto; }
+  header nav > a.h, header nav #btnTutor, header nav .meridian-notification-trigger { display: none !important; }
+  header nav #gsign { min-height: 42px; padding: 8px 11px; }
+  .tabbar {
+    display: flex; position: fixed; inset: auto 0 0; z-index: 100;
+    justify-content: space-around; gap: 0; padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
+    border-top: 1.5px solid var(--ink); background: var(--bg); color: var(--ink);
+  }
+  .tabbar a { display: inline-flex; flex: 1 1 20%; min-height: 48px; align-items: center; justify-content: center; padding: 8px 4px; border: 0; border-radius: 0; color: var(--ink); font: 600 13px Inter, sans-serif; text-decoration: none; }
+  .tabbar a[aria-current="page"] { border: 0; border-bottom: 3px solid var(--ink); background: var(--brand); color: var(--ink); }
+  .tabbar [data-nav="feed"] { order: 1; }
+  .tabbar [data-nav="home"] { order: 2; }
+  .tabbar [data-nav="sessions"] { order: 3; }
+  .tabbar [data-nav="doubts"] { order: 4; }
+  .tabbar [data-nav="me"] { order: 5; }
+  .tabbar [data-nav="pricing"], .tabbar [data-nav="settings"], .tabbar [data-nav="verification"], .tabbar [data-nav="dashboard"] { display: none !important; }
+  .hero, .social-home, [data-v] > .wrap { width: min(100% - 28px, 1440px); }
+  .social-home { padding-top: 20px; }
+  footer { padding-bottom: 8px; }
+}
 </style>
   </head>
   <body>
@@ -1492,10 +1666,10 @@ dialog, .profile-image-viewer {
       <div class="wrap">
         <a class="logo" href="#home" aria-label="Meridian home"><i></i>Meridian <span class="app-version" id="appVersion">v2.4.0</span></a>
         <nav>
-          <a class="h" data-nav="home" data-workspace-nav="learner" href="#home">Find a Senior</a
+          <a class="h" data-nav="home" data-workspace-nav="learner" href="#home">Find</a
           ><a class="h tutor-only" data-role-nav="tutor" data-workspace-nav="mentor" data-nav="dashboard" href="#dashboard" hidden>Dashboard</a
           ><a class="h" data-nav="sessions" href="#sessions">Bearings calls</a
-          ><a class="h" data-nav="feed" href="#feed">Feed</a
+          ><a class="h" data-nav="feed" href="#feed">Home</a
           ><a class="h admin-only" data-nav="verification" href="#verification" hidden>Meridian Admin</a
           ><a class="h" data-nav="doubts" href="#doubts">Doubts</a
           ><a class="h" data-nav="me" href="#me">My page</a
@@ -1733,10 +1907,10 @@ dialog, .profile-image-viewer {
     </div>
 
     <nav class="tabbar" aria-label="Main">
-      <a data-workspace-nav="learner" data-nav="home" href="#home">Mentors</a
+      <a data-workspace-nav="learner" data-nav="home" href="#home">Find</a
       ><a class="tutor-only" data-role-nav="tutor" data-workspace-nav="mentor" data-nav="dashboard" href="#dashboard" hidden>Dashboard</a
       ><a data-nav="sessions" href="#sessions">Bearings</a
-      ><a data-nav="feed" href="#feed">Feed</a
+      ><a data-nav="feed" href="#feed">Home</a
       ><a class="admin-only" data-nav="verification" href="#verification" hidden>Admin</a
       ><a data-nav="doubts" href="#doubts">Doubts</a
       ><a data-nav="me" href="#me">Me</a
