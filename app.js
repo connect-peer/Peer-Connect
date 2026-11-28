@@ -35,6 +35,7 @@ var active = "All",
   query = "",
   tutorState = "",
   tutorCity = "";
+var tutorDirectoryRequestId = 0;
 var activeTutorProfile = null;
 var pendingBookingMentorId = "";
 function canMentor(account) { return !!account && ["mentor", "both", "tutor"].indexOf(account.role) >= 0; }
@@ -215,6 +216,8 @@ document.getElementById("tutorCityFilter").addEventListener("change", function (
   draw();
 });
 grid.addEventListener("click", async function (e) {
+  var retryDirectory = e.target.closest("[data-retry-tutor-directory]");
+  if (retryDirectory) { e.stopPropagation(); loadTutorDirectory(); return; }
   if (e.target.closest("[data-edit-tutor-card]")) { e.stopPropagation(); openTutor(); return; }
   var book = e.target.closest("[data-book-mentor]");
   if (book) {
@@ -434,16 +437,35 @@ async function uploadProfileImage(file, kind) {
   if (ownTutor) { if (kind === "avatar") ownTutor.avatarUrl = url; else ownTutor.bannerUrl = url; draw(); }
 }
 
+function withTutorDirectoryTimeout(promise, label) {
+  var timer;
+  return Promise.race([
+    promise,
+    new Promise(function (_, reject) {
+      timer = setTimeout(function () { reject(new Error(label + " took too long. Check your connection and try again.")); }, 20000);
+    }),
+  ]).finally(function () { clearTimeout(timer); });
+}
 async function loadTutorDirectory() {
-  if (!supabaseClient || !user) return;
+  var requestId = ++tutorDirectoryRequestId;
   var mentorGrid = document.getElementById("grid"), mentorCount = document.getElementById("count");
-  if (mentorGrid && location.hash.replace(/^#/, "") === "home") mentorGrid.innerHTML = '<div class="local-loading">Finding Meridian Seniors…</div>';
-  if (mentorCount) mentorCount.textContent = "Loading Journey maps…";
-  var result = await supabaseClient.rpc("get_verified_tutor_directory", { p_state: null, p_city: null });
-  if (result.error) {
-    document.getElementById("count").textContent = authErrorText(result.error);
+  function showDirectoryError(error) {
+    if (requestId !== tutorDirectoryRequestId) return;
+    var message = authErrorText(error);
+    if (mentorCount) mentorCount.textContent = "Meridian Seniors could not load";
+    if (mentorGrid) mentorGrid.innerHTML = '<div class="empty"><p>' + esc(message) + '</p><button type="button" class="btn ghost" data-retry-tutor-directory>Try again</button></div>';
+  }
+  if (!supabaseClient || !user) {
+    if (mentorGrid) mentorGrid.innerHTML = '<div class="empty">Sign in to find Meridian Seniors.</div>';
+    if (mentorCount) mentorCount.textContent = "";
     return;
   }
+  if (mentorGrid && location.hash.replace(/^#/, "") === "home") mentorGrid.innerHTML = '<div class="local-loading">Finding Meridian Seniors…</div>';
+  if (mentorCount) mentorCount.textContent = "Loading Journey maps…";
+  try {
+  var result = await withTutorDirectoryTimeout(supabaseClient.rpc("get_verified_tutor_directory", { p_state: null, p_city: null }), "Loading the Senior directory");
+  if (requestId !== tutorDirectoryRequestId) return;
+  if (result.error) { showDirectoryError(result.error); return; }
   tutors = (result.data || []).map(function (row) {
     return {
       user_id: row.user_id,
@@ -463,11 +485,14 @@ async function loadTutorDirectory() {
   });
   if (tutors.length) {
     var directoryIds = tutors.map(function (tutor) { return tutor.user_id; });
-    var directoryMeta = await Promise.all([
+    var directoryMeta = await withTutorDirectoryTimeout(Promise.all([
       supabaseClient.from("profiles").select("id, avatar_url, profile_banner_url").in("id", directoryIds),
       supabaseClient.from("follows").select("follower_id, following_id").or("follower_id.in.(" + directoryIds.join(",") + "),following_id.in.(" + directoryIds.join(",") + ")"),
       supabaseClient.from("tutor_profiles").select("user_id,session_price_inr").in("user_id", directoryIds),
-    ]);
+    ]), "Loading Senior profile details");
+    if (requestId !== tutorDirectoryRequestId) return;
+    var metaError = directoryMeta.find(function (item) { return item.error; });
+    if (metaError) { showDirectoryError(metaError.error); return; }
     var mediaByUser = {}, followerCounts = {}, followingCounts = {}, pricesByUser = {};
     (directoryMeta[0].data || []).forEach(function (profile) { mediaByUser[profile.id] = profile; });
     (directoryMeta[1].data || []).forEach(function (follow) {
@@ -478,10 +503,13 @@ async function loadTutorDirectory() {
     tutors.forEach(function (tutor) { var media = mediaByUser[tutor.user_id] || {}; tutor.avatarUrl = media.avatar_url || ""; tutor.bannerUrl = media.profile_banner_url || ""; tutor.sessionPrice = pricesByUser[tutor.user_id] || 199; tutor.followerCount = followerCounts[tutor.user_id] || 0; tutor.followingCount = followingCounts[tutor.user_id] || 0; });
   }
   if (canMentor(user) && !tutors.some(function (tutor) { return tutor.user_id === user.id; })) {
-    var ownResults = await Promise.all([
+    var ownResults = await withTutorDirectoryTimeout(Promise.all([
       supabaseClient.from("tutor_profiles").select("user_id, headline, subjects, is_available, session_price_inr").eq("user_id", user.id).maybeSingle(),
       supabaseClient.from("tutor_verification_requests").select("status").eq("user_id", user.id).order("submitted_at", { ascending: false }).limit(1),
-    ]);
+    ]), "Loading your Senior profile");
+    if (requestId !== tutorDirectoryRequestId) return;
+    var ownError = ownResults.find(function (item) { return item.error; });
+    if (ownError) { showDirectoryError(ownError.error); return; }
     var own = ownResults[0].data;
     if (own) {
       var ownStatus = (ownResults[1].data || [])[0],
@@ -506,6 +534,9 @@ async function loadTutorDirectory() {
   drawTutorLocationFilters();
   draw();
   loadMeridianMatches();
+  } catch (error) {
+    showDirectoryError(error);
+  }
 }
 
 async function loadMeridianMatches() {
