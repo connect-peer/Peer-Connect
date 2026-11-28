@@ -63,6 +63,8 @@ In **Supabase → Edge Functions → Secrets**, set `RAZORPAY_KEY_ID`, `RAZORPAY
 
 Guardian consent currently requires the Meridian safety team to contact the guardian privately and mark the check in the reviewer area. No guardian email is sent by the app. Do not send minors’ personal data to an email or payment provider until Meridian has selected and approved that provider. Live payments/video require provider accounts, deployment secrets, and end-to-end checks; they are not usable until those are configured.
 
+Guardian email matching is enforced by `meridian_guardian_account_policy.sql`, which should be run after `supabase_meridian_safety_moderation.sql`. A guardian email linked to a normal Meridian learner or mentor cannot be approved for consent or used to unlock a new booking. Authorized staff can be allowlisted in the private `meridian_staff_accounts` table; existing `verification_admins` accounts are automatically treated as admins/reviewers for this check, regardless of their learner/mentor profile role. Changing guardian details clears the old consent approval and returns the learner to the review queue.
+
 ## Main files
 
 - `index.html`: Meridian pages, styles, navigation, and dialogs.
