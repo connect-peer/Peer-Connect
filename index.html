@@ -1460,6 +1460,23 @@ dialog, .profile-image-viewer {
 .journey-edit-grid { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-items:end; }
 .journey-edit-grid label { margin:0; }
 .profile-choice-grid { display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 18px; }
+.profile-dialog #dbody { box-sizing:border-box; max-width:100%; }
+.profile-dialog #dbody > * { min-width:0; max-width:100%; }
+.profile-dialog #dbody > input:not([type=checkbox]), .profile-dialog #dbody > select, .profile-dialog #dbody > textarea { box-sizing:border-box; width:100%; }
+.profile-dialog #dbody > .sp, .profile-dialog #dbody > .profile-choice-grid { display:flex; flex-wrap:wrap; max-width:100%; }
+.profile-dialog #dbody .guidance-custom > div { flex-wrap:wrap; }
+.profile-dialog #dbody .guidance-custom input { flex:1 1 220px; }
+.profile-dialog #dbody .row { display:flex; flex-wrap:wrap; gap:10px; }
+.profile-dialog #dbody .row > .btn { flex:1 1 180px; min-width:0; }
+.profile-other-answer { display:none; min-width:0; margin:12px 0 16px; }
+.profile-other-answer[hidden] { display:none !important; }
+.profile-other-answer > span { display:block; margin:0 0 7px; color:var(--ink); font-weight:600; }
+.profile-other-answer input { box-sizing:border-box; width:100%; min-width:0; min-height:46px; padding:10px 12px; border:1.5px solid var(--line); border-radius:0; background:var(--bg); color:var(--ink); font:inherit; }
+.profile-goal-group:has(input[type="checkbox"][value="Other"]:checked) > .profile-other-answer { display:block; }
+.profile-choice-grid:has(input[type="checkbox"][value="other"]:checked) + .mentor-other-answer,
+.profile-choice-grid:has(input[type="checkbox"][value="Other"]:checked) + .mentor-other-answer { display:block; }
+.profile-other-answer input:focus-visible { outline:2px solid #ffe94a; outline-offset:2px; }
+.profile-dialog { width:min(900px,calc(100% - 32px)); max-width:900px; }
 .profile-choice { margin:0!important;cursor:pointer; }
 .profile-choice input { position:absolute;opacity:0;pointer-events:none; }
 .profile-choice span { display:inline-flex;padding:9px 13px;border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.035);color:var(--muted); }
@@ -2264,8 +2281,10 @@ dialog.setup-dialog #dbody { display: block; width: 100%; height: 100%; min-heig
 .profile-step-segments { display: grid; gap: 7px; margin-top: 10px; }
 .profile-step-segment { height: 8px; border: 1px solid #5e5e5e; background: #111; }
 .profile-step-segment.is-done { border-color: #ffe94a; background: #ffe94a; }
-.profile-step-panels { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; }
-.profile-step-panel { width: 100%; height: 100%; overflow: hidden; }
+.profile-step-panels { position: relative; flex: 1 1 auto; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.profile-step-panel { position: relative; width: 100%; min-height: 100%; height: auto; overflow: visible; padding: 0 8px 10px 0; }
+.profile-step-panel[hidden] { display: none !important; }
+.profile-step-main #saveProfile[hidden] { display: none !important; }
 .profile-step-panel[hidden], .profile-step-complete[hidden] { display: none !important; }
 .profile-step-panel h1, .profile-step-complete h1 { max-width: 13ch; margin: 0 0 14px; color: #f7f7f7; font-size: clamp(28px, 4vw, 44px); line-height: 1.08; letter-spacing: -.04em; }
 .profile-step-panel h1:focus, .profile-step-complete h1:focus { outline: 0; }
@@ -2332,6 +2351,8 @@ dialog.setup-dialog #dbody { display: block; width: 100%; height: 100%; min-heig
   dialog.setup-dialog #dbody { display: block; }
   .profile-stepper { display: block; }
   .profile-step-main { height: 100%; padding: max(24px, env(safe-area-inset-top)) 22px calc(88px + env(safe-area-inset-bottom)); }
+  .profile-step-panels { min-height: 0; overflow-x: hidden; overflow-y: auto; }
+  .profile-step-panel { min-height: 100%; height: auto; padding-right: 2px; }
   .profile-step-brand { display: none; }
   .profile-step-close { top: max(12px, env(safe-area-inset-top)); right: 14px; }
   .profile-step-top { margin-right: 48px; }
