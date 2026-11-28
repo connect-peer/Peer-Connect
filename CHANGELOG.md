@@ -1,5 +1,26 @@
 # Changelog
 
+## [2.5.0](https://github.com/connect-peer/Peer-Connect/compare/v2.4.0...v2.5.0) (2026-11-28)
+
+
+### Features
+
+* learner guidance profile ([af8c2d7](https://github.com/connect-peer/Peer-Connect/commit/af8c2d7e8b838069091f756398641479c3f8ed15))
+* new ui ([7d605a7](https://github.com/connect-peer/Peer-Connect/commit/7d605a700f9143785641e55321e92483a5aaa69b))
+
+
+### Bug Fixes
+
+* loading ([f47f2c1](https://github.com/connect-peer/Peer-Connect/commit/f47f2c14b00d41b8323945cab7cad230126d9314))
+* ui ([0a012c3](https://github.com/connect-peer/Peer-Connect/commit/0a012c313495c57fa75bcb71d5df5d8f30322da7))
+* ui ([521d02d](https://github.com/connect-peer/Peer-Connect/commit/521d02d2e4ea704ef8079c705b7fc5174b73e26e))
+* ui ([293d319](https://github.com/connect-peer/Peer-Connect/commit/293d319708cdc8dd3572881eb21b63daa975ccba))
+* ui ([4729e2a](https://github.com/connect-peer/Peer-Connect/commit/4729e2a6d44aa026829bbc3811ccb1e608276889))
+* ui ([ad44484](https://github.com/connect-peer/Peer-Connect/commit/ad4448400603fab1b6ac015a8b8c83861bbc470b))
+* ui ([1115940](https://github.com/connect-peer/Peer-Connect/commit/1115940e74e7dc3ec408402fc1479d5bc08ec14d))
+* UI ([b4ad890](https://github.com/connect-peer/Peer-Connect/commit/b4ad890d9fabce005b5668ab7010fe2224399d53))
+* UI ([7eb2d92](https://github.com/connect-peer/Peer-Connect/commit/7eb2d9234a251201df44f5dc9ff1c0cd41b4acb8))
+
 ## [2.4.0](https://github.com/connect-peer/Peer-Connect/compare/v2.3.0...v2.4.0) (2026-11-25)
 
 
