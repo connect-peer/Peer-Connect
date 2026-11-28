@@ -1,6 +1,6 @@
 # Contributing changes
 
-Peer Connect uses automatic semantic versioning through Conventional Commits.
+Meridian uses automatic semantic versioning through Conventional Commits.
 Push changes to `main` using one of these commit message types:
 
 - `fix: ...` for a bug fix (patch release, for example 1.0.0 → 1.0.1)

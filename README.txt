@@ -1,8 +1,11 @@
-Peer Connect update
+Meridian project notes
 
-Included files:
-- app.js: account modes, profile follow controls, media upload, and mentor verification UI
-- index.html: always-dark theme and learner/mentor labels
-- peer_connect_profiles_roles_followers.sql: database migration applied to the connected Supabase project
+The app is a static HTML/CSS/JavaScript site hosted on GitHub Pages and uses
+Supabase for authentication and data. Keep the browser configuration limited to
+the publishable Supabase key. Never commit a service-role key or provider secret.
 
-Replace the matching app.js and index.html in your project. Keep the SQL file in your repository for schema history; the migration has already been applied to the connected Supabase project.
+Current source files include index.html, app.js, supabase-config.js, and
+version.json. Database migration files are kept in this repository; run only
+the migrations required by your current project, in the documented order.
+
+Brand promise: Find your bearings. Ask someone who's been there.

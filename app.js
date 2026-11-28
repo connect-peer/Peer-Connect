@@ -1,14 +1,14 @@
 /*
- * Peer Connect app.js
+ * Meridian app.js
  * ------------------------------------------------------------
- * All behavior lives in this file. There is no framework and no build step.
+ * Meridian runs as a static HTML/CSS/JavaScript app with no build step.
  * Supabase handles Auth, profiles, verified tutors, private verification files,
  * bookings, doubts, and answers.
  *
  * Map of this file (search for these names):
  *   STATE        tutors, posts, user, mine, fSub, fSort, openR
  *   TUTORS PAGE  drawChips(), draw()
- *   PRICING      Student/tutor free; optional one-time tutor Blue Tick is planned
+ *   PRICING      Learner and Meridian Senior plans
  *   SIGN IN      paintSign(), openSign()    (Supabase email and Google Auth)
  *   TUTOR FORM   openTutor()                (creates a tutor profile)
  *   DOUBTS PAGE  who(), hasBlue(), postHtml(), drawFeed()
@@ -40,7 +40,7 @@ var pendingBookingMentorId = "";
 function canMentor(account) { return !!account && ["mentor", "both", "tutor"].indexOf(account.role) >= 0; }
 function canLearn(account) { return !!account && ["learner", "both", "student"].indexOf(account.role) >= 0; }
 function normalizeRole(role) { return role === "student" ? "learner" : role === "tutor" ? "mentor" : role; }
-function accountTypeLabel(role) { return role === "both" ? "Learner + Mentor" : canMentor({ role: role }) ? "Mentor" : "Learner"; }
+function accountTypeLabel(role) { return role === "both" ? "Learner + Meridian Senior" : canMentor({ role: role }) ? "Meridian Senior" : "Learner"; }
 var grid = document.getElementById("grid"),
   chips = document.getElementById("chips");
 function ini(n) {
@@ -51,10 +51,48 @@ function ini(n) {
     })
     .join("");
 }
+function publicName(name) {
+  var parts = String(name || "Meridian Senior").trim().split(/\s+/).filter(Boolean);
+  if (parts.length < 2) return parts[0] || "Meridian Senior";
+  return parts[0] + " " + parts[parts.length - 1].charAt(0).toUpperCase() + ".";
+}
 function esc(s) {
   return s.replace(/[&<>"]/g, function (c) {
     return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
   });
+}
+function meridianHasPrivateContact(value) {
+  var text = String(value || "").toLowerCase()
+    .replace(/\s+at\s+/g, "@")
+    .replace(/\s+dot\s+/g, ".")
+    .replace(/\b(zero|oh)\b/g, "0").replace(/\bone\b/g, "1")
+    .replace(/\b(two|to|too)\b/g, "2").replace(/\b(three)\b/g, "3")
+    .replace(/\b(four|for)\b/g, "4").replace(/\bfive\b/g, "5")
+    .replace(/\bsix\b/g, "6").replace(/\bseven\b/g, "7")
+    .replace(/\beight\b/g, "8").replace(/\bnine\b/g, "9");
+  return /[a-z0-9._%+-]+\s*@\s*[a-z0-9.-]+\s*\.\s*[a-z]{2,}/i.test(text)
+    || /(?:https?:\/\/|www\.|instagram|telegram|snapchat|discord|whatsapp|facebook|t\.me|@[a-z0-9_]{2,})/i.test(text)
+    || /(?:\+?\d[\s().-]*){10,13}/.test(text.replace(/\D/g, ""));
+}
+function meridianContactWarning(value) {
+  if (!meridianHasPrivateContact(value)) return false;
+  if (user && supabaseClient) supabaseClient.from("reports").insert({ reporter_id: user.id, reported_user_id: user.id, reason: "contact_info", details: "Meridian safety filter blocked content containing possible private contact information.", status: "new" });
+  return true;
+}
+function meridianAge(dateValue) {
+  if (!dateValue) return null;
+  var birth = new Date(String(dateValue).slice(0,10) + "T00:00:00"), today = new Date();
+  return today.getFullYear() - birth.getFullYear() - (today < new Date(today.getFullYear(), birth.getMonth(), birth.getDate()) ? 1 : 0);
+}
+async function submitMeridianReport(target) {
+  if (!user) { openSign(); return; }
+  var reason = window.prompt("What should Meridian review?\n1 — Harassment or bullying\n2 — Contact details or privacy\n3 — Unsafe or inappropriate content\n4 — Spam or something else");
+  if (reason === null) return;
+  var labels = { "1": "harassment", "2": "privacy", "3": "unsafe_content", "4": "other" };
+  reason = labels[reason.trim()];
+  if (!reason) { window.alert("Choose 1, 2, 3, or 4."); return; }
+  var result = await supabaseClient.from("reports").insert({ reporter_id: user.id, reported_user_id: target.userId || null, post_id: target.postId || null, doubt_id: target.doubtId || null, reason: reason, details: target.details || null, status: "new" });
+  if (result.error) window.alert(authErrorText(result.error)); else window.alert("Thanks. Your report was sent privately to the Meridian review team.");
 }
 function drawChips() {
   chips.innerHTML = subjects
@@ -73,39 +111,59 @@ function drawChips() {
 }
 function draw() {
   var list = tutors.filter(function (t) {
+    if (user && canLearn(user) && !t.me) {
+      var mentorGrade = Number(String(t.g || "").replace(/\D/g, ""));
+      if (!mentorGrade || mentorGrade - Number(user.grade || 0) < 1 || mentorGrade - Number(user.grade || 0) > 3) return false;
+    }
     var okS = active === "All" || t.s.indexOf(active) > -1;
-    var hay = (t.n + " " + t.h + " " + t.s.join(" ") + " " + [t.school, t.city, t.state, t.country].filter(Boolean).join(" ")).toLowerCase();
+    var hay = (t.n + " " + t.h + " " + t.s.join(" ") + " " + [t.city, t.state, t.country].filter(Boolean).join(" ")).toLowerCase();
     return okS && hay.indexOf(query.toLowerCase()) > -1 &&
       (!tutorState || t.state === tutorState) && (!tutorCity || t.city === tutorCity);
   });
-  list.sort(function (a, b) {
-    return (b.blue ? 1 : 0) - (a.blue ? 1 : 0);
+  var guidance = user && user.guidance;
+  list.forEach(function (mentor) {
+    mentor.matchScore = 0; mentor.matchReason = "";
+    if (!guidance || mentor.me) return;
+    var matchedSubjects = (guidance.help_subjects || []).filter(function (subject) { return (mentor.s || []).some(function (area) { return area.toLowerCase() === subject.toLowerCase(); }); });
+    var goalText = [guidance.target_exam || "", guidance.goal_decision || ""].join(" ").toLowerCase();
+    var goalMatch = goalText && (mentor.s || []).some(function (area) { return goalText.indexOf(area.toLowerCase()) >= 0; });
+    var score = matchedSubjects.length * 30 + (goalMatch ? 20 : 0);
+    var delta = Number(String(mentor.g || "").replace(/\D/g, "")) - Number(user.grade || 0);
+    score += delta === 1 ? 18 : delta === 2 ? 12 : 6;
+    if (user.location && mentor.city && user.location.city && mentor.city.toLowerCase() === user.location.city.toLowerCase()) score += 10;
+    else if (user.location && mentor.state && user.location.state && mentor.state.toLowerCase() === user.location.state.toLowerCase()) score += 5;
+    mentor.matchScore = score;
+    mentor.matchReason = matchedSubjects.length ? "Matches your " + matchedSubjects.join(" and ") + " goals" : goalMatch ? "Relevant to your guidance goal" : delta === 1 ? "One class ahead of you" : "A Senior in your next classes";
   });
-  document.getElementById("count").textContent = list.length + (list.length === 1 ? " verified mentor" : " verified mentors");
+  list.sort(function (a, b) {
+    return (b.matchScore || 0) - (a.matchScore || 0) || (b.blue ? 1 : 0) - (a.blue ? 1 : 0);
+  });
+  document.getElementById("count").textContent = list.length + (list.length === 1 ? " verified Meridian Senior" : " verified Meridian Seniors");
   if (!list.length) {
     grid.innerHTML = tutors.length
-      ? '<div class="empty">No mentors match. Try another subject or a shorter search.</div>'
-      : '<div class="empty">No mentor profiles have been approved for search yet.</div>';
+      ? '<div class="empty">No Meridian Seniors match. Try another area or a shorter search.</div>'
+      : '<div class="empty">No Journey maps have been approved for discovery yet.</div>';
     return;
   }
   grid.innerHTML = list
     .map(function (t) {
       var i = tutors.indexOf(t);
       return (
-        '<article class="card" data-profile-index="' + i + '" tabindex="0" aria-label="View ' + esc(t.n) + ' mentor profile"><div class="cover mentor-card-cover" style="--c:' +
+        '<article class="card" data-profile-index="' + i + '" tabindex="0" aria-label="View ' + esc(t.me ? t.n : publicName(t.n)) + ' Journey map"><div class="cover mentor-card-cover" style="--c:' +
         t.c +
-        '">' + (t.bannerUrl ? '<img class="mentor-banner-img" src="' + esc(t.bannerUrl) + '" alt="" loading="lazy">' : '') + '<span class="mentor-card-kicker">Verified mentor</span></div><div class="body">' +
+        '">' + (t.bannerUrl ? '<img class="mentor-banner-img" src="' + esc(t.bannerUrl) + '" alt="" loading="lazy">' : '') + '<span class="mentor-card-kicker">Journey map</span></div><div class="body">' +
         '<div class="av">' +
         (t.avatarUrl ? '<img src="' + esc(t.avatarUrl) + '" alt="">' : ini(t.n)) +
         "</div>" +
         '<h3><span class="tutor-name">' +
-        esc(t.n) +
+        esc(t.me ? t.n : publicName(t.n)) +
         (t.blue ? BT : "") +
         (t.verified ? ' <span class="verify-badge">Verified</span>' : t.me ? ' <span class="verify-review-state">' + esc(t.verificationStatus || "Not verified") + '</span>' : '') +
         '</span>' + (t.verified && t.available ? '<span class="tutor-online" title="Available"></span>' : '') + '</h3>' +
         '<div class="sub">' +
-        esc(t.g) + " · " + esc(t.h) + '<br>' + esc([t.school, t.city, t.state].filter(Boolean).join(" · ")) +
+        esc(t.g) + " · " + esc(t.h) + '<br>' + esc([t.city, t.state].filter(Boolean).join(" · ")) +
         "</div>" +
+        (guidance && !t.me && list.indexOf(t) < 3 ? '<p class="muted mentor-match-reason">Suggested for you · ' + esc(t.matchReason) + '</p>' : '') +
         '<div class="tags">' +
         t.s
           .map(function (s) {
@@ -115,7 +173,7 @@ function draw() {
         "</div>" +
         (t.me
           ? '<button class="btn ghost" data-edit-tutor-card>Edit profile</button>'
-          : '<div class="mentor-booking-cta"><span>Free · 30 min</span><button class="btn" data-book-mentor="' + esc(t.user_id) + '">Book now</button></div>') +
+          : '<div class="mentor-booking-cta"><span>30 min · ₹' + esc(t.sessionPrice || 199) + '</span><button class="btn" data-book-mentor="' + esc(t.user_id) + '">Book a Bearings call</button></div>') +
         "</div></article>"
       );
     })
@@ -162,7 +220,7 @@ grid.addEventListener("click", async function (e) {
   if (book) {
     e.stopPropagation();
     if (!user) { openSign(); return; }
-    if (!canLearn(user)) { document.getElementById("count").textContent = "Choose Learner or Both in your profile to book a mentor."; return; }
+    if (!canLearn(user)) { document.getElementById("count").textContent = "Switch to Learner or Both to book a Meridian Senior."; return; }
     startMentorBooking(tutors[Number(book.closest("[data-profile-index]").dataset.profileIndex)]);
     return;
   }
@@ -203,10 +261,35 @@ async function loadMentorAchievementShowcase(tutor, target) {
   target.innerHTML = cards.join("");
 }
 function renderTutorAbout(tutor, content) {
-  content.innerHTML = '<h3>About</h3><p>' + esc(tutor.h || 'Peer Connect mentor') + '</p><p class="muted">School: ' + esc(tutor.school || '—') + '<br>Location: ' + esc([tutor.city, tutor.state, tutor.country].filter(Boolean).join(', ') || '—') + '</p><section class="mentor-achievement-showcase"><div class="achievement-section-heading"><div><h3>Achievements and credentials</h3><p class="muted">Reviewed highlights that show experience and milestones.</p></div>' + (tutor.me ? '<button type="button" class="btn ghost" data-achievement-manager>Manage achievements</button>' : '') + '</div><div id="publicMentorAchievements"><p class="muted">Loading achievements…</p></div></section>';
+  content.innerHTML = '<h3>About</h3><p>' + esc(tutor.h || 'Meridian Senior') + '</p><p class="muted">' + (tutor.me ? 'School: ' + esc(tutor.school || '—') + '<br>' : '') + 'Location: ' + esc([tutor.city, tutor.state, tutor.country].filter(Boolean).join(', ') || '—') + '</p><div id="mentorProfileDetails"><p class="muted">Loading guidance background…</p></div><section class="mentor-achievement-showcase"><div class="achievement-section-heading"><div><h3>Achievements and credentials</h3><p class="muted">Reviewed highlights that show experience and milestones.</p></div>' + (tutor.me ? '<button type="button" class="btn ghost" data-achievement-manager>Manage achievements</button>' : '') + '</div><div id="publicMentorAchievements"><p class="muted">Loading achievements…</p></div></section>';
   var manage = content.querySelector("[data-achievement-manager]");
   if (manage) manage.remove();
+  loadMentorProfileDetails(tutor, document.getElementById("mentorProfileDetails"));
   loadMentorAchievementShowcase(tutor, document.getElementById("publicMentorAchievements"));
+}
+async function loadMentorProfileDetails(tutor, target) {
+  if (!tutor || !target) return;
+  var queries = tutor.me ? [
+    supabaseClient.from("tutor_profiles").select("guidance_strengths,guidance_goals,guidance_exams,guidance_languages,board,city_tier,study_style,advises_best,advises_not,lessons_learned").eq("user_id", tutor.user_id).maybeSingle(),
+    supabaseClient.from("meridian_mentor_journey").select("stage_year,stage,choice,why,completed_at").eq("user_id", tutor.user_id).order("position"),
+    supabaseClient.from("meridian_mentor_results").select("id,exam,score_low,score_high,score_unit,result_year,safe_summary,status").eq("user_id", tutor.user_id).order("result_year", { ascending: false }),
+  ] : [
+    supabaseClient.rpc("meridian_public_profile_details", { p_user_id: tutor.user_id }),
+    supabaseClient.rpc("meridian_public_journey", { p_user_id: tutor.user_id }),
+    supabaseClient.rpc("meridian_public_results", { p_user_id: tutor.user_id }),
+  ];
+  var results = await Promise.all(queries), details = results[0].data && (Array.isArray(results[0].data) ? results[0].data[0] : results[0].data), journey = results[1].data || [], scores = results[2].data || [];
+  if (results[0].error && /permission denied|does not exist|could not find/i.test(authErrorText(results[0].error))) {
+    target.innerHTML = '<p class="muted">Guidance background appears here after the Meridian profile migration is applied.</p>'; return;
+  }
+  var parts = [];
+  if (details) {
+    var chips = function (title, values) { return values && values.length ? '<div class="mentor-detail-group"><b>' + title + '</b><div class="tags">' + values.map(function (value) { return '<span class="tag">' + esc(value) + '</span>'; }).join("") + '</div></div>' : ''; };
+    parts.push('<section class="mentor-guidance-details"><h3>Guidance background</h3>' + chips("Strongest areas", details.guidance_strengths) + chips("Goals", (details.guidance_goals || []).map(function (value) { var choice = learnerGoalDecisionChoices.find(function (item) { return item[0] === value; }); return choice ? choice[1] : value; })) + chips("Exams", details.guidance_exams) + chips("Languages", details.guidance_languages) + '<dl class="mentor-detail-list">' + (details.board ? '<div><dt>Board</dt><dd>' + esc(details.board) + '</dd></div>' : '') + (details.study_style ? '<div><dt>Study style</dt><dd>' + esc(details.study_style.replaceAll("_", " ")) + '</dd></div>' : '') + (details.advises_best ? '<div><dt>Best guidance for</dt><dd>' + esc(details.advises_best) + '</dd></div>' : '') + (details.advises_not ? '<div><dt>When another guide may fit better</dt><dd>' + esc(details.advises_not) + '</dd></div>' : '') + (details.lessons_learned ? '<div><dt>A lesson from the journey</dt><dd>' + esc(details.lessons_learned) + '</dd></div>' : '') + '</dl></section>');
+  }
+  if (journey.length) parts.push('<section class="mentor-journey"><h3>Journey map</h3><ol>' + journey.map(function (stage) { return '<li><div class="journey-year">' + esc(stage.stage_year) + '</div><div><b>' + esc(stage.stage) + '</b><p>' + esc(stage.choice) + '</p><p class="muted">' + esc(stage.why) + '</p></div></li>'; }).join("") + '</ol></section>');
+  if (scores.length) parts.push('<section class="mentor-results"><h3>Exam results</h3><div class="mentor-results-grid">' + scores.map(function (row) { var visible = tutor.me || row.status === undefined || row.status === "approved"; return visible ? '<article class="mentor-result-card"><span>' + esc(row.exam) + ' · ' + esc(row.result_year) + '</span><b>' + (row.score_low === row.score_high ? esc(row.score_low) : esc(row.score_low) + '–' + esc(row.score_high)) + ' ' + esc(row.score_unit.replaceAll("_", " ")) + '</b><p>' + esc(row.safe_summary) + '</p>' + (tutor.me && row.status !== "approved" ? '<small class="muted">' + esc(row.status === "rejected" ? "Needs changes" : "Private · waiting for review") + '</small>' : '') + '</article>' : ''; }).join("") + '</div></section>');
+  target.innerHTML = parts.join("") || '<p class="muted">This guide has not added their background yet.</p>';
 }
 function enableProfileImageView(element, imageUrl, label) {
   if (!element || !imageUrl) return;
@@ -247,15 +330,39 @@ function renderTutorProfilePage() {
   var tutor = activeTutorProfile;
   var root = document.getElementById("tutorProfileContent");
   if (!tutor || !root) return;
-  var locationText = [tutor.school, tutor.city, tutor.state, tutor.country].filter(Boolean).join(" · ");
-  root.innerHTML = '<button type="button" class="btn ghost profile-back" id="profileBack">← Back to mentors</button><div class="profile-cover" id="profileCover"></div><section class="profile-head"><div class="av" id="profileAvatar">' + (tutor.avatarUrl ? '<img src="' + esc(tutor.avatarUrl) + '" alt="">' : esc(ini(tutor.n))) + '</div><h2>' + esc(tutor.n) + (tutor.verified ? ' <span class="verify-badge">Verified</span>' : tutor.me ? ' <span class="verify-review-state">' + esc(tutor.verificationStatus || "Not verified") + '</span>' : '') + '</h2><div class="profile-meta">Class ' + esc(String(tutor.g || "").replace(/^Class\s*/i, "")) + ' · ' + esc(locationText) + '</div><p>' + esc(tutor.h) + '</p><div class="tags">' + tutor.s.map(function (subject) { return '<span class="tag">' + esc(subject) + '</span>'; }).join("") + '</div><div class="profile-social" id="profileSocialStats"><span>Loading followers…</span></div><button class="btn" id="profileBook">' + (tutor.me ? 'Edit mentor profile' : 'Book a session') + '</button>' + (tutor.me ? '<div class="profile-appearance"><label class="btn ghost">Change profile photo<input type="file" accept="image/jpeg,image/png,image/webp" data-profile-image="avatar"></label><label class="btn ghost">Change banner<input type="file" accept="image/jpeg,image/png,image/webp" data-profile-image="banner"></label></div>' : '') + '</section><div class="profile-tabs"><button class="btn ghost" data-profile-tab="about" aria-pressed="true">About</button><button class="btn ghost" data-profile-tab="answers" aria-pressed="false">Answers</button></div><div class="profile-content" id="profileContent"></div>';
+  var locationText = (tutor.me ? [tutor.school, tutor.city, tutor.state, tutor.country] : [tutor.city, tutor.state, tutor.country]).filter(Boolean).join(" · ");
+  root.innerHTML = '<button type="button" class="btn ghost profile-back" id="profileBack">← Back to Meridian Seniors</button><div class="profile-cover" id="profileCover"></div><section class="profile-head"><div class="av" id="profileAvatar">' + (tutor.avatarUrl ? '<img src="' + esc(tutor.avatarUrl) + '" alt="">' : esc(ini(publicName(tutor.n)))) + '</div><h2>' + esc(tutor.me ? tutor.n : publicName(tutor.n)) + (tutor.verified ? ' <span class="verify-badge">Journey map verified</span>' : tutor.me ? ' <span class="verify-review-state">' + esc(tutor.verificationStatus || "Not verified") + '</span>' : '') + '</h2><div class="profile-meta">Class ' + esc(String(tutor.g || "").replace(/^Class\s*/i, "")) + ' · ' + esc(locationText) + '</div><p>' + esc(tutor.h) + '</p><div class="tags">' + tutor.s.map(function (subject) { return '<span class="tag">' + esc(subject) + '</span>'; }).join("") + '</div><div class="profile-social" id="profileSocialStats"><span>Loading followers…</span></div><button class="btn" id="profileBook">' + (tutor.me ? 'Edit mentor profile' : 'Book a Bearings call') + '</button>' + (tutor.me ? '<div class="profile-appearance"><label class="btn ghost">Change profile photo<input type="file" accept="image/jpeg,image/png,image/webp" data-profile-image="avatar"></label><label class="btn ghost">Change banner<input type="file" accept="image/jpeg,image/png,image/webp" data-profile-image="banner"></label></div>' : '') + '</section><div class="profile-tabs"><button class="btn ghost" data-profile-tab="about" aria-pressed="true">About</button><button class="btn ghost" data-profile-tab="answers" aria-pressed="false">Guidance</button></div><div class="profile-content" id="profileContent"></div>';
   root.querySelectorAll(".profile-appearance").forEach(function (controls) { controls.remove(); });
+  if (!tutor.me) {
+    var reportButton = document.createElement("button");
+    reportButton.type = "button"; reportButton.className = "btn ghost"; reportButton.textContent = "Report profile";
+    reportButton.addEventListener("click", function () { submitMeridianReport({ userId: tutor.user_id }); });
+    root.querySelector(".profile-head").appendChild(reportButton);
+    var blockButton = document.createElement("button");
+    blockButton.type = "button"; blockButton.className = "btn ghost"; blockButton.textContent = "Block profile";
+    blockButton.addEventListener("click", async function () {
+      if (!user) { openSign(); return; }
+      if (!window.confirm("Block this Meridian account? They will not be able to book you or message you in a session.")) return;
+      var blocked = await supabaseClient.from("meridian_user_blocks").insert({ blocker_id: user.id, blocked_id: tutor.user_id });
+      if (blocked.error) window.alert(/duplicate key/i.test(blocked.error.message) ? "This account is already blocked." : authErrorText(blocked.error));
+      else blockButton.textContent = "Profile blocked";
+    });
+    root.querySelector(".profile-head").appendChild(blockButton);
+  }
   renderTutorAbout(tutor, document.getElementById("profileContent"));
   var cover = document.getElementById("profileCover");
   if (tutor.bannerUrl) cover.style.backgroundImage = 'url("' + tutor.bannerUrl.replace(/["\\\\]/g, "") + '")';
   enableProfileImageView(cover, tutor.bannerUrl, "profile banner");
   enableProfileImageView(document.getElementById("profileAvatar"), tutor.avatarUrl, "profile photo");
   loadProfileSocial(tutor);
+  if (user && tutor.verified && supabaseClient) {
+    supabaseClient.rpc("meridian_mentor_rating", { p_mentor_id: tutor.user_id }).then(function (rating) {
+      if (rating.error || !rating.data || !rating.data.length || rating.data[0].rating === null) return;
+      var badge = document.createElement("p"); badge.className = "profile-rating muted";
+      badge.textContent = "★ " + rating.data[0].rating + " · " + rating.data[0].review_count + " learner reviews";
+      var profileMeta = root.querySelector(".profile-meta"); if (profileMeta) profileMeta.after(badge);
+    });
+  }
   root.querySelectorAll("[data-profile-image]").forEach(function (input) {
     input.onchange = async function () { if (input.files[0]) await uploadProfileImage(input.files[0], input.dataset.profileImage); };
   });
@@ -263,7 +370,7 @@ function renderTutorProfilePage() {
   document.getElementById("profileBook").onclick = async function () {
     if (tutor.me) { location.hash = "settings"; return; }
     if (!user) { openSign(); return; }
-    if (!canLearn(user)) { document.getElementById("profileContent").textContent = "Choose Learner or Both in your profile to book a session."; return; }
+    if (!canLearn(user)) { document.getElementById("profileContent").textContent = "Switch to Learner or Both to book a Bearings call."; return; }
     startMentorBooking(tutor);
   };
   var socialRoot = document.getElementById("profileSocialStats");
@@ -312,7 +419,7 @@ async function uploadProfileImage(file, kind) {
   var ext = file.name.split(".").pop().toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
   var path = user.id + "/" + kind + "-" + Date.now() + "." + ext;
   var upload = await supabaseClient.storage.from("profile-media").upload(path, file, { contentType: file.type, upsert: false });
-  if (upload.error) { window.alert(authErrorText(upload.error) + " — run the Peer Connect profile media SQL first."); return; }
+  if (upload.error) { window.alert(authErrorText(upload.error) + " — run the Meridian profile media migration first."); return; }
   var url = supabaseClient.storage.from("profile-media").getPublicUrl(path).data.publicUrl;
   var field = kind === "avatar" ? "avatar_url" : "profile_banner_url";
   var update = await supabaseClient.from("profiles").update({ [field]: url }).eq("id", user.id);
@@ -330,8 +437,8 @@ async function uploadProfileImage(file, kind) {
 async function loadTutorDirectory() {
   if (!supabaseClient || !user) return;
   var mentorGrid = document.getElementById("grid"), mentorCount = document.getElementById("count");
-  if (mentorGrid && location.hash.replace(/^#/, "") === "home") mentorGrid.innerHTML = '<div class="local-loading">Finding verified mentors…</div>';
-  if (mentorCount) mentorCount.textContent = "Loading mentor profiles…";
+  if (mentorGrid && location.hash.replace(/^#/, "") === "home") mentorGrid.innerHTML = '<div class="local-loading">Finding Meridian Seniors…</div>';
+  if (mentorCount) mentorCount.textContent = "Loading Journey maps…";
   var result = await supabaseClient.rpc("get_verified_tutor_directory", { p_state: null, p_city: null });
   if (result.error) {
     document.getElementById("count").textContent = authErrorText(result.error);
@@ -340,10 +447,10 @@ async function loadTutorDirectory() {
   tutors = (result.data || []).map(function (row) {
     return {
       user_id: row.user_id,
-      n: row.display_name || "Peer Connect tutor",
-      g: row.grade ? "Class " + row.grade : "Student tutor",
+      n: row.display_name || "Meridian Senior",
+      g: row.grade ? "Class " + row.grade : "Learner · Meridian Senior",
       s: row.subjects || [],
-      h: row.headline || "Peer tutor",
+      h: row.headline || "Meridian Senior",
       school: row.school || "",
       city: row.city || "",
       state: row.state || "",
@@ -359,18 +466,20 @@ async function loadTutorDirectory() {
     var directoryMeta = await Promise.all([
       supabaseClient.from("profiles").select("id, avatar_url, profile_banner_url").in("id", directoryIds),
       supabaseClient.from("follows").select("follower_id, following_id").or("follower_id.in.(" + directoryIds.join(",") + "),following_id.in.(" + directoryIds.join(",") + ")"),
+      supabaseClient.from("tutor_profiles").select("user_id,session_price_inr").in("user_id", directoryIds),
     ]);
-    var mediaByUser = {}, followerCounts = {}, followingCounts = {};
+    var mediaByUser = {}, followerCounts = {}, followingCounts = {}, pricesByUser = {};
     (directoryMeta[0].data || []).forEach(function (profile) { mediaByUser[profile.id] = profile; });
     (directoryMeta[1].data || []).forEach(function (follow) {
       followerCounts[follow.following_id] = (followerCounts[follow.following_id] || 0) + 1;
       followingCounts[follow.follower_id] = (followingCounts[follow.follower_id] || 0) + 1;
     });
-    tutors.forEach(function (tutor) { var media = mediaByUser[tutor.user_id] || {}; tutor.avatarUrl = media.avatar_url || ""; tutor.bannerUrl = media.profile_banner_url || ""; tutor.followerCount = followerCounts[tutor.user_id] || 0; tutor.followingCount = followingCounts[tutor.user_id] || 0; });
+    (directoryMeta[2].data || []).forEach(function (row) { pricesByUser[row.user_id] = Number(row.session_price_inr || 199); });
+    tutors.forEach(function (tutor) { var media = mediaByUser[tutor.user_id] || {}; tutor.avatarUrl = media.avatar_url || ""; tutor.bannerUrl = media.profile_banner_url || ""; tutor.sessionPrice = pricesByUser[tutor.user_id] || 199; tutor.followerCount = followerCounts[tutor.user_id] || 0; tutor.followingCount = followingCounts[tutor.user_id] || 0; });
   }
   if (canMentor(user) && !tutors.some(function (tutor) { return tutor.user_id === user.id; })) {
     var ownResults = await Promise.all([
-      supabaseClient.from("tutor_profiles").select("user_id, headline, subjects, is_available").eq("user_id", user.id).maybeSingle(),
+      supabaseClient.from("tutor_profiles").select("user_id, headline, subjects, is_available, session_price_inr").eq("user_id", user.id).maybeSingle(),
       supabaseClient.from("tutor_verification_requests").select("status").eq("user_id", user.id).order("submitted_at", { ascending: false }).limit(1),
     ]);
     var own = ownResults[0].data;
@@ -378,12 +487,12 @@ async function loadTutorDirectory() {
       var ownStatus = (ownResults[1].data || [])[0],
         statusLabel = ownStatus && ownStatus.status === "pending" ? "Pending review" : ownStatus && ownStatus.status === "rejected" ? "Needs resubmission" : "Not verified";
       tutors.push({
-        user_id: own.user_id, n: user.n, g: user.grade ? "Class " + user.grade : "Student tutor",
-        s: own.subjects || [], h: own.headline || "Peer tutor",
+        user_id: own.user_id, n: user.n, g: user.grade ? "Class " + user.grade : "Learner · Meridian Senior",
+        s: own.subjects || [], h: own.headline || "Meridian Senior",
         school: user.location && user.location.school || "", city: user.location && user.location.city || "",
         state: user.location && user.location.state || "", country: user.location && user.location.country || "",
         verified: !!(ownStatus && ownStatus.status === "verified"), verificationStatus: statusLabel,
-        available: !!own.is_available, c: "#2B4EFF", me: true,
+        available: !!own.is_available, sessionPrice: Number(own.session_price_inr || 199), c: "#2B4EFF", me: true,
         avatarUrl: user.avatarUrl || "", bannerUrl: user.bannerUrl || "",
       });
     }
@@ -396,6 +505,42 @@ async function loadTutorDirectory() {
   drawChips();
   drawTutorLocationFilters();
   draw();
+  loadMeridianMatches();
+}
+
+async function loadMeridianMatches() {
+  var panel = document.getElementById("matchedMentors"), target = document.getElementById("matchedMentorList");
+  if (!panel || !target || !user || !user.guidance || !supabaseClient) { if (panel) panel.hidden = true; return; }
+  panel.hidden = false;
+  target.innerHTML = '<div class="local-loading">Finding guides for your next step…</div>';
+  // Matching weights are enforced by the database so clients cannot alter rankings.
+  var response = await supabaseClient.rpc("meridian_match_candidates");
+  if (response.error) {
+    panel.hidden = true;
+    if (!/permission denied|does not exist|could not find/i.test(authErrorText(response.error))) console.warn("Meridian matching is unavailable:", response.error.message);
+    return;
+  }
+  var candidates = (response.data || []).map(function (row) {
+    return { result: row, mentor: tutors.find(function (item) { return item.user_id === row.mentor_id; }) };
+  }).filter(function (row) { return !!row.mentor; });
+  if (!candidates.length) { panel.hidden = true; return; }
+  target.innerHTML = candidates.map(function (item) {
+    var mentor = item.mentor, result = item.result;
+    return '<article class="meridian-match-card"><div class="meridian-match-person">' + (mentor.avatarUrl ? '<img src="' + esc(mentor.avatarUrl) + '" alt="" loading="lazy">' : '<span>' + esc(ini(publicName(mentor.n))) + '</span>') + '<div><h3>' + esc(publicName(mentor.n)) + '</h3><p class="muted">Class ' + esc(String(mentor.g || "").replace(/^Class\s*/i, "")) + ' · ' + esc([mentor.city, mentor.state].filter(Boolean).join(", ")) + '</p></div></div><p>' + esc(result.why_matched || "A verified guide for the stage you are working through.") + '</p>' + (result.rating !== null && result.rating !== undefined ? '<div class="meridian-match-rating">★ ' + esc(Number(result.rating).toFixed(1)) + ' <span class="muted">(' + esc(result.review_count) + ' reviews)</span></div>' : '') + '<div class="meridian-match-actions"><button type="button" class="btn ghost" data-match-open="' + esc(mentor.user_id) + '">View journey</button><button type="button" class="btn" data-match-book="' + esc(mentor.user_id) + '">Book a Bearings call</button></div></article>';
+  }).join("");
+  target.onclick = async function (event) {
+    var button = event.target.closest("[data-match-open],[data-match-book]");
+    if (!button) return;
+    var mentorId = button.dataset.matchOpen || button.dataset.matchBook;
+    var mentor = tutors.find(function (item) { return item.user_id === mentorId; });
+    if (!mentor) return;
+    button.disabled = true;
+    await supabaseClient.rpc("meridian_log_match_event", { p_mentor_id: mentorId, p_event: "clicked" });
+    button.disabled = false;
+    if (button.hasAttribute("data-match-open")) showTutorProfile(mentor);
+    else if (!canLearn(user)) window.alert("Switch to Learner or Both to book a guide.");
+    else startMentorBooking(mentor);
+  };
 }
 
 drawChips();
@@ -413,14 +558,63 @@ var user = null,
 var isVerificationAdmin = false;
 var studentEntryPending = true;
 var activeWorkspace = "learner";
+var meridianNotificationDialog = document.getElementById("meridianNotificationDialog");
+async function refreshMeridianNotificationCount() {
+  var badge = document.getElementById("meridianNotificationCount");
+  if (!badge || !user || !supabaseClient) { if (badge) badge.textContent = ""; return; }
+  var result = await supabaseClient.from("meridian_notifications").select("id", { count: "exact", head: true }).eq("user_id", user.id).is("read_at", null);
+  badge.textContent = result.error || !result.count ? "" : String(Math.min(result.count, 99));
+}
+async function loadMeridianNotifications() {
+  var list = document.getElementById("meridianNotificationList");
+  if (!list || !user || !supabaseClient) return;
+  list.innerHTML = '<div class="local-loading">Loading your updates…</div>';
+  var result = await supabaseClient.from("meridian_notifications").select("id,type,title,message,created_at,read_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(30);
+  if (result.error) { list.innerHTML = '<div class="community-empty">Notifications are unavailable. Run the latest Meridian database migration.</div>'; return; }
+  await refreshMeridianNotificationCount();
+  if (!result.data || !result.data.length) { list.innerHTML = '<div class="community-empty">You’re all caught up. Booking updates will appear here.</div>'; return; }
+  list.innerHTML = result.data.map(function (item) {
+    return '<button type="button" class="meridian-notification-item' + (item.read_at ? '' : ' unread') + '" data-meridian-notification="' + esc(item.id) + '"><b>' + esc(item.title || "Meridian update") + '</b><span>' + esc(item.message || "Open Bearings calls for details.") + '</span><span>' + esc(relativeTime(item.created_at)) + '</span></button>';
+  }).join("");
+}
+var meridianNotificationBell = document.getElementById("meridianNotificationBell");
+if (meridianNotificationBell) meridianNotificationBell.addEventListener("click", async function () {
+  if (!user || !meridianNotificationDialog) return;
+  meridianNotificationDialog.showModal();
+  await loadMeridianNotifications();
+});
+window.addEventListener("focus", refreshMeridianNotificationCount);
+document.addEventListener("visibilitychange", function () { if (!document.hidden) refreshMeridianNotificationCount(); });
+var meridianNotificationClose = document.getElementById("meridianNotificationClose");
+if (meridianNotificationClose) meridianNotificationClose.addEventListener("click", function () { if (meridianNotificationDialog) meridianNotificationDialog.close(); });
+var meridianNotificationList = document.getElementById("meridianNotificationList");
+if (meridianNotificationList) meridianNotificationList.addEventListener("click", async function (event) {
+  var item = event.target.closest("[data-meridian-notification]");
+  if (!item || !user || !supabaseClient) return;
+  await supabaseClient.from("meridian_notifications").update({ read_at: new Date().toISOString() }).eq("id", item.dataset.meridianNotification).eq("user_id", user.id);
+  if (meridianNotificationDialog) meridianNotificationDialog.close();
+  location.hash = "#sessions";
+  await refreshMeridianNotificationCount();
+});
 function hideStartupLoader() {
   var loader = document.getElementById("startupLoader");
   if (loader) window.setTimeout(function () { loader.classList.add("is-done"); }, 220);
 }
-function workspaceStorageKey() { return "peerConnectWorkspace:" + (user && user.id || "guest"); }
+function workspaceStorageKey() { return "meridianWorkspace:" + (user && user.id || "guest"); }
 function applyWorkspacePreference() {
   if (!user || normalizeRole(user.role) !== "both") { activeWorkspace = canMentor(user) && !canLearn(user) ? "mentor" : "learner"; return; }
-  try { activeWorkspace = window.localStorage.getItem(workspaceStorageKey()) === "mentor" ? "mentor" : "learner"; } catch (_workspaceError) { activeWorkspace = "learner"; }
+  try {
+    var savedWorkspace = window.localStorage.getItem(workspaceStorageKey());
+    if (!savedWorkspace) {
+      var legacyWorkspaceKey = "peerConnectWorkspace:" + user.id;
+      savedWorkspace = window.localStorage.getItem(legacyWorkspaceKey);
+      if (savedWorkspace) {
+        window.localStorage.setItem(workspaceStorageKey(), savedWorkspace);
+        window.localStorage.removeItem(legacyWorkspaceKey);
+      }
+    }
+    activeWorkspace = savedWorkspace === "mentor" ? "mentor" : "learner";
+  } catch (_workspaceError) { activeWorkspace = "learner"; }
 }
 function switchWorkspace() {
   if (!user || normalizeRole(user.role) !== "both") return;
@@ -460,7 +654,7 @@ async function restoreAuthSession() {
       refresh_token: refreshToken,
     });
     if (restored.error) {
-      console.error("Could not restore Peer Connect session:", restored.error.message);
+      console.error("Could not restore Meridian session:", restored.error.message);
       dbody.innerHTML = '<h3 id="dt">Google sign-in did not finish</h3><p class="muted">Please start sign-in again. If it keeps happening, send us the error: ' + esc(restored.error.message) + '</p><button class="btn" id="retryAuth">Try again</button>';
       if (!dlg.open) dlg.showModal();
       document.getElementById("retryAuth").onclick = function () { dlg.close(); openSign(); };
@@ -470,7 +664,7 @@ async function restoreAuthSession() {
     return restored.data.session;
   }
   var current = await supabaseClient.auth.getSession();
-  if (current.error) console.error("Could not restore Peer Connect session:", current.error.message);
+  if (current.error) console.error("Could not restore Meridian session:", current.error.message);
   return current.data.session;
 }
 
@@ -514,6 +708,9 @@ async function syncAuthUser(authUser) {
   var guidanceResult = supabaseClient ? await supabaseClient.from("learner_guidance_profiles")
     .select("goal_decision, board, target_exam, help_subjects, preferred_languages, city_tier")
     .eq("user_id", authUser.id).maybeSingle() : null;
+  var safetyResult = supabaseClient ? await supabaseClient.from("meridian_account_safety")
+    .select("date_of_birth, guardian_name, guardian_contact, guardian_contact_type, guardian_consent_verified_at, mentor_cleared_for_minors")
+    .eq("user_id", authUser.id).maybeSingle() : null;
   if (profileResult && profileResult.error) {
     showProfileLoadError(profileResult.error);
     return;
@@ -526,6 +723,10 @@ async function syncAuthUser(authUser) {
     showProfileLoadError(guidanceResult.error);
     return;
   }
+  if (safetyResult && safetyResult.error && safetyResult.error.code !== "42P01" && safetyResult.error.code !== "PGRST205" && !/could not find the table.*meridian_account_safety/i.test(authErrorText(safetyResult.error))) {
+    showProfileLoadError(safetyResult.error);
+    return;
+  }
   user = {
     id: authUser.id,
     n: name,
@@ -536,6 +737,8 @@ async function syncAuthUser(authUser) {
     bannerUrl: profileResult && profileResult.data ? profileResult.data.profile_banner_url : null,
     location: locationResult && !locationResult.error ? locationResult.data : null,
     guidance: guidanceResult && !guidanceResult.error ? guidanceResult.data : null,
+    safety: safetyResult && !safetyResult.error ? safetyResult.data : null,
+    safetySchemaAvailable: !!(safetyResult && !safetyResult.error),
   };
   applyWorkspacePreference();
   var adminResult = await supabaseClient.from("verification_admins").select("user_id").eq("user_id", user.id).maybeSingle();
@@ -558,7 +761,7 @@ function missingProfileLocation(location) {
   });
 }
 function profileNeedsSetup(account) {
-  return !!account && (!account.role || !account.grade || missingProfileLocation(account.location) || (canLearn(account) && !account.guidance));
+  return !!account && (!account.role || !account.grade || missingProfileLocation(account.location) || (canLearn(account) && !account.guidance) || (account.safetySchemaAvailable && !account.safety));
 }
 
 function showProfileLoadError(error) {
@@ -568,7 +771,7 @@ function showProfileLoadError(error) {
   var detail = permissionError
     ? 'Supabase is blocking access to your saved profile. In Supabase, open SQL Editor and run the profile setup and learner goals SQL files from your project, then return here and choose Try again.'
     : authErrorText(error);
-  dbody.innerHTML = '<h3 id="dt">Couldn’t load your saved profile</h3><p class="muted">Peer Connect could not read your account setup, so it won’t ask you to fill it in again until the read works.</p><div class="err" id="profileLoadErr" role="alert">' + esc(detail) + '</div><div class="row"><button class="btn ghost" id="retryProfileLoad">Try again</button><button class="btn" id="profileErrorSignOut">Sign out</button></div>';
+  dbody.innerHTML = '<h3 id="dt">Couldn’t load your saved profile</h3><p class="muted">Meridian could not read your account setup, so it won’t ask you to fill it in again until the read works.</p><div class="err" id="profileLoadErr" role="alert">' + esc(detail) + '</div><div class="row"><button class="btn ghost" id="retryProfileLoad">Try again</button><button class="btn" id="profileErrorSignOut">Sign out</button></div>';
   if (!dlg.open) dlg.showModal();
   document.getElementById("retryProfileLoad").onclick = async function () {
     dlg.close();
@@ -680,15 +883,15 @@ function showAuthForm(mode) {
     '<p class="note auth-switch">' +
     (signingUp
       ? 'Already have an account? <button class="text-button" id="switchAuth">Sign in</button>'
-      : 'New to Peer Connect? <button class="text-button" id="switchAuth">Create an account</button>') +
+      : 'New to Meridian? <button class="text-button" id="switchAuth">Create an account</button>') +
     (signingUp ? "" : '<br><button class="text-button" id="forgotPassword">Forgot password?</button>') +
     '</p></section>' +
-    '<aside class="auth-brand-panel" aria-label="About Peer Connect"><div class="auth-brand-top"><span class="auth-brand-mark">P</span>Peer Connect</div>' +
+    '<aside class="auth-brand-panel" aria-label="About Meridian"><div class="auth-brand-top"><span class="auth-brand-mark">M</span>Meridian</div>' +
     '<div class="auth-brand-copy"><div class="auth-brand-eyebrow">Learn together, move forward</div><h2>Good guidance starts peer to peer.</h2>' +
     '<p>Meet learners who understand your classes, questions, and goals. Share what you know and get unstuck together.</p>' +
-    '<div class="auth-feature-stack"><div class="auth-feature"><b>◎</b><span><strong>Find a mentor</strong> who knows your subject</span></div>' +
+    '<div class="auth-feature-stack"><div class="auth-feature"><b>◎</b><span><strong>Find a Meridian Senior</strong> who knows your stage</span></div>' +
     '<div class="auth-feature"><b>↗</b><span><strong>Ask a doubt</strong> and learn from the community</span></div>' +
-    '<div class="auth-feature"><b>✓</b><span><strong>Book a session</strong> with a verified mentor</span></div></div></div>' +
+    '<div class="auth-feature"><b>✓</b><span><strong>Book a Bearings call</strong> with a verified Senior</span></div></div></div>' +
     '<div class="auth-brand-foot">A peer-learning community</div></aside>';
   if (!dlg.open) dlg.showModal();
   document.getElementById("switchAuth").onclick = function () {
@@ -784,7 +987,7 @@ function openSign() {
   if (user) {
     dlg.classList.remove("auth-screen", "setup-dialog");
     dbody.innerHTML =
-      '<h3 id="dt">Your Peer Connect account</h3><p style="color:var(--muted)">' +
+      '<h3 id="dt">Your Meridian account</h3><p style="color:var(--muted)">' +
       esc(user.n) +
       "<br>" +
       esc(user.e) +
@@ -864,7 +1067,8 @@ function openOnboarding(changeRole) {
   var selectedRole = normalizeRole(user.role) || (changeRole ? "" : "learner");
   var savedLocation = user.location || {};
   var savedGuidance = user.guidance || {};
-  var rolePicker = '<fieldset class="role-options"><legend>How do you want to use Meridian?</legend><button type="button" class="role-option' + (selectedRole === "learner" || selectedRole === "student" ? " selected" : "") + '" data-role="learner" aria-pressed="' + (selectedRole === "learner" || selectedRole === "student") + '"><strong>Learner</strong><span>Find mentors, ask questions, and get guidance.</span></button><button type="button" class="role-option' + (selectedRole === "mentor" || selectedRole === "tutor" ? " selected" : "") + '" data-role="mentor" aria-pressed="' + (selectedRole === "mentor" || selectedRole === "tutor") + '"><strong>Mentor</strong><span>Share what you know and guide learners in lower classes.</span></button><button type="button" class="role-option' + (selectedRole === "both" ? " selected" : "") + '" data-role="both" aria-pressed="' + (selectedRole === "both") + '"><strong>Both</strong><span>Get guidance from seniors and mentor learners in lower classes.</span></button></fieldset>';
+  var savedSafety = user.safety || {};
+  var rolePicker = '<fieldset class="role-options"><legend>How do you want to use Meridian?</legend><button type="button" class="role-option' + (selectedRole === "learner" || selectedRole === "student" ? " selected" : "") + '" data-role="learner" aria-pressed="' + (selectedRole === "learner" || selectedRole === "student") + '"><strong>Learner</strong><span>Find a Meridian Senior, ask questions, and get guidance.</span></button><button type="button" class="role-option' + (selectedRole === "mentor" || selectedRole === "tutor" ? " selected" : "") + '" data-role="mentor" aria-pressed="' + (selectedRole === "mentor" || selectedRole === "tutor") + '"><strong>Meridian Senior</strong><span>Share what you know and guide learners in lower classes.</span></button><button type="button" class="role-option' + (selectedRole === "both" ? " selected" : "") + '" data-role="both" aria-pressed="' + (selectedRole === "both") + '"><strong>Both</strong><span>Get guidance from seniors and guide learners in lower classes.</span></button></fieldset>';
   dbody.innerHTML =
     '<h3 id="dt">Set up your profile</h3><p style="color:var(--muted);margin:6px 0 14px">Add your school, location, and guidance goals so Meridian can help you find the right people.</p>' +
     '<label for="profileName">Name</label><input id="profileName" autocomplete="name" value="' + esc(user.n) + '">' +
@@ -876,6 +1080,7 @@ function openOnboarding(changeRole) {
     '<label for="profileCity">City</label><input id="profileCity" maxlength="100" autocomplete="address-level2" value="' + esc(savedLocation.city || "") + '">' +
     '<label for="profileState">State</label><input id="profileState" maxlength="100" autocomplete="address-level1" value="' + esc(savedLocation.state || "") + '">' +
     '<label for="profileCountry">Country</label><input id="profileCountry" maxlength="100" autocomplete="country-name" value="' + esc(savedLocation.country || "") + '">' +
+    (user.safetySchemaAvailable ? '<label for="profileDob">Date of birth</label><input id="profileDob" type="date" max="' + new Date().toISOString().slice(0,10) + '" required value="' + esc(savedSafety.date_of_birth || "") + '"><div id="guardianFields"' + ((savedSafety.guardian_contact && !savedSafety.guardian_consent_verified_at) ? '' : ' hidden') + '><p class="muted">Learners under 18 need a parent or guardian to confirm consent before bookings unlock.</p><label for="guardianName">Parent or guardian name</label><input id="guardianName" maxlength="120" value="' + esc(savedSafety.guardian_name || '') + '"><label for="guardianEmail">Parent or guardian email</label><input id="guardianEmail" type="email" autocomplete="email" maxlength="254" value="' + esc(savedSafety.guardian_contact_type === 'email' ? savedSafety.guardian_contact : '') + '"></div>' : '') +
     rolePicker + '<div id="learnerGoalFields" class="learner-goal-fields"><h4>Your guidance goals</h4><p class="muted">Tell us what you’re working toward. You can update this any time.</p>' +
     '<label for="learnerGoalDecision">What would you like guidance with?</label><select id="learnerGoalDecision" required><option value="">Choose a goal</option>' + learnerGoalDecisionChoices.map(function (item) { return '<option value="' + item[0] + '"' + (savedGuidance.goal_decision === item[0] ? ' selected' : '') + '>' + esc(item[1]) + '</option>'; }).join("") + '</select>' +
     '<label for="learnerBoard">Your board</label><select id="learnerBoard" required><option value="">Choose your board</option>' + learnerBoardChoices.map(function (item) { return '<option' + (savedGuidance.board === item ? ' selected' : '') + '>' + esc(item) + '</option>'; }).join("") + '</select>' +
@@ -888,6 +1093,14 @@ function openOnboarding(changeRole) {
   dlg.dataset.setupRequired = String(setupRequired);
   if (!dlg.open) dlg.showModal();
   var goalFields = document.getElementById("learnerGoalFields");
+  var birthInput = document.getElementById("profileDob"), guardianFields = document.getElementById("guardianFields");
+  function updateGuardianVisibility() {
+    if (!birthInput || !guardianFields) return;
+    var birth = new Date(birthInput.value + "T00:00:00"), today = new Date();
+    var age = today.getFullYear() - birth.getFullYear() - (today < new Date(today.getFullYear(), birth.getMonth(), birth.getDate()) ? 1 : 0);
+    guardianFields.hidden = !birthInput.value || age >= 18;
+  }
+  if (birthInput) birthInput.addEventListener("change", updateGuardianVisibility);
   function updateGoalVisibility() { goalFields.hidden = !canLearn({ role: selectedRole }); }
   updateGoalVisibility();
   document.getElementById("cancelProfile").onclick = function () { dlg.close(); };
@@ -918,6 +1131,7 @@ function openOnboarding(changeRole) {
     var city = document.getElementById("profileCity").value.trim();
     var state = document.getElementById("profileState").value.trim();
     var country = document.getElementById("profileCountry").value.trim();
+    var birthDate = birthInput ? birthInput.value : "", guardianName = document.getElementById("guardianName") ? document.getElementById("guardianName").value.trim() : "", guardianEmail = document.getElementById("guardianEmail") ? document.getElementById("guardianEmail").value.trim() : "";
     var needsLearnerGoals = canLearn({ role: selectedRole });
     var guidance = needsLearnerGoals ? {
       goal_decision: document.getElementById("learnerGoalDecision").value,
@@ -933,6 +1147,12 @@ function openOnboarding(changeRole) {
       return;
     }
     if (grade < 9 || grade > 12) { message.textContent = "Choose a class from 9 to 12."; return; }
+    if (user.safetySchemaAvailable) {
+      if (!birthDate) { message.textContent = "Add your date of birth to continue."; return; }
+      var dob = new Date(birthDate + "T00:00:00"), nowDate = new Date(), age = nowDate.getFullYear() - dob.getFullYear() - (nowDate < new Date(nowDate.getFullYear(), dob.getMonth(), dob.getDate()) ? 1 : 0);
+      if (age < 14) { message.textContent = "Meridian is available to learners aged 14 and over. Please check back when you are 14."; return; }
+      if (age < 18 && (!guardianName || !guardianEmail)) { message.textContent = "A parent or guardian name and email are required for learners under 18."; return; }
+    }
     if (needsLearnerGoals && (!guidance.goal_decision || !guidance.board || guidance.preferred_languages.length < 1 || guidance.help_subjects.length > 3)) {
       message.textContent = "Choose a guidance goal, your board, and at least one preferred language. Choose no more than three subjects.";
       return;
@@ -947,12 +1167,12 @@ function openOnboarding(changeRole) {
     if (saved.error && saved.error.code === "PGRST202") {
       var profileSave = await supabaseClient.from("profiles").update({ display_name: name, grade: grade, role: selectedRole }).eq("id", user.id).select("id").maybeSingle();
       if (profileSave.error || !profileSave.data) {
-        message.textContent = authErrorText(profileSave.error || { message: "Your account profile was not found." }) + " — run peer_connect_profile_setup_fix.sql in Supabase SQL Editor.";
+        message.textContent = authErrorText(profileSave.error || { message: "Your account profile was not found." }) + " — check the profile setup migration listed in the Meridian setup guide.";
         saveButton.disabled = false; saveButton.textContent = "Continue"; return;
       }
       var locationSave = await supabaseClient.from("profile_locations").upsert({ user_id: user.id, school: school, city: city, state: state, country: country });
       if (locationSave.error) {
-        message.textContent = authErrorText(locationSave.error) + " — run peer_connect_profile_setup_fix.sql in Supabase SQL Editor.";
+        message.textContent = authErrorText(locationSave.error) + " — check the profile setup migration listed in the Meridian setup guide.";
         saveButton.disabled = false; saveButton.textContent = "Continue"; return;
       }
     } else if (saved.error) {
@@ -962,10 +1182,15 @@ function openOnboarding(changeRole) {
     if (needsLearnerGoals) {
       var guidanceSave = await supabaseClient.from("learner_guidance_profiles").upsert({ user_id: user.id, ...guidance }, { onConflict: "user_id" });
       if (guidanceSave.error) {
-        message.textContent = authErrorText(guidanceSave.error) + " — run supabase_meridian_learner_goals.sql in Supabase SQL Editor first.";
+        message.textContent = authErrorText(guidanceSave.error) + " — run supabase_meridian_safety_moderation.sql in Supabase SQL Editor first.";
         saveButton.disabled = false; saveButton.textContent = "Continue"; return;
       }
       user.guidance = guidance;
+    }
+    if (user.safetySchemaAvailable) {
+      var safetySave = await supabaseClient.from("meridian_account_safety").upsert({ user_id: user.id, date_of_birth: birthDate, guardian_name: guardianName || null, guardian_contact: guardianEmail || null, guardian_contact_type: guardianEmail ? "email" : null }, { onConflict: "user_id" });
+      if (safetySave.error) { message.textContent = authErrorText(safetySave.error); saveButton.disabled = false; saveButton.textContent = "Continue"; return; }
+      user.safety = { date_of_birth: birthDate, guardian_name: guardianName || null, guardian_contact: guardianEmail || null, guardian_contact_type: guardianEmail ? "email" : null, guardian_consent_verified_at: savedSafety.guardian_consent_verified_at || null, mentor_cleared_for_minors: savedSafety.mentor_cleared_for_minors || false };
     }
     user.n = name;
     user.grade = grade;
@@ -991,12 +1216,12 @@ paintSign();
 
 if (
   window.supabase &&
-  window.STUDYLINK_SUPABASE_URL &&
-  window.STUDYLINK_SUPABASE_PUBLISHABLE_KEY
+  window.MERIDIAN_SUPABASE_URL &&
+  window.MERIDIAN_SUPABASE_PUBLISHABLE_KEY
 ) {
   supabaseClient = window.supabase.createClient(
-    window.STUDYLINK_SUPABASE_URL,
-    window.STUDYLINK_SUPABASE_PUBLISHABLE_KEY,
+    window.MERIDIAN_SUPABASE_URL,
+    window.MERIDIAN_SUPABASE_PUBLISHABLE_KEY,
     {
       auth: {
         autoRefreshToken: true,
@@ -1028,7 +1253,7 @@ if (
     }
     hideStartupLoader();
   }).catch(function (error) {
-    console.error("Could not restore Peer Connect session:", error.message);
+    console.error("Could not restore Meridian session:", error.message);
     if (!user) showAuthForm("signin");
     hideStartupLoader();
   });
@@ -1069,22 +1294,34 @@ async function openTutor() {
     openOnboarding(true);
     return;
   }
-  var existing = await supabaseClient.from("tutor_profiles")
-    .select("user_id, headline, subjects, is_available")
+  var existingResult = await supabaseClient.from("tutor_profiles")
+    .select("*")
     .eq("user_id", user.id)
     .maybeSingle();
-  if (existing.data) {
+  if (existingResult.error) { window.alert(authErrorText(existingResult.error) + " — run the updated Meridian migration in Supabase first."); return; }
+  var existing = existingResult.data;
+  if (existing) {
     mine = true;
   }
-  if (mine && !existing.data) {
+  if (mine && !existing) {
     location.hash = "dashboard";
     return;
   }
-  var pick = existing.data ? (existing.data.subjects || []).slice() : [];
+  var pick = existing ? (existing.subjects || []).slice() : [];
+  var journeyResult = await supabaseClient.from("meridian_mentor_journey").select("stage_year,stage,choice,why,completed_at").eq("user_id", user.id).order("position");
+  if (journeyResult.error) { window.alert(authErrorText(journeyResult.error) + " — run the updated Meridian migration in Supabase first."); return; }
+  var journeyRows = journeyResult.data || [];
+  var selectedStrengths = (existing && existing.guidance_strengths && existing.guidance_strengths.length ? existing.guidance_strengths : pick.slice(0,3)).slice();
+  var selectedLanguages = existing && existing.guidance_languages ? existing.guidance_languages.slice() : [];
+  var selectedGoals = existing && existing.guidance_goals ? existing.guidance_goals.slice() : [];
   var guidanceChoices = allGuidanceAreas.slice();
   pick.forEach(function (area) { if (guidanceChoices.indexOf(area) < 0) guidanceChoices.push(area); });
+  var mentorLanguages = ["English","Hindi","Bengali","Gujarati","Kannada","Malayalam","Marathi","Odia","Punjabi","Tamil","Telugu","Urdu"];
+  var guidanceGoals = learnerGoalDecisionChoices.map(function (item) { return { value:item[0], label:item[1] }; });
+  var optionGroup = function (key, options, selected) { return '<div class="profile-choice-grid" data-profile-array="' + key + '">' + options.map(function (option) { var value=typeof option === "string" ? option : option.value, label=typeof option === "string" ? option : option.label; return '<label class="profile-choice"><input type="checkbox" value="' + esc(value) + '"' + (selected.indexOf(value)>=0 ? ' checked' : '') + '><span>' + esc(label) + '</span></label>'; }).join("") + '</div>'; };
+  var journeyMarkup = function (row) { row=row||{}; return '<article class="journey-edit-row"><div class="journey-edit-grid"><label>Year<input data-journey-year type="number" min="2000" max="' + new Date().getFullYear() + '" value="' + esc(String(row.stage_year||'')) + '" placeholder="2025"></label><label>Stage<input data-journey-stage maxlength="80" value="' + esc(row.stage||'') + '" placeholder="Class 11 PCM"></label><label>What you chose<input data-journey-choice maxlength="180" value="' + esc(row.choice||'') + '" placeholder="Started JEE preparation"></label><label>Why / what changed<textarea data-journey-why maxlength="280" rows="2" placeholder="One thing you learned that could help someone behind you">' + esc(row.why||'') + '</textarea></label><label>Finished this stage<input data-journey-completed type="date" value="' + esc(row.completed_at||'') + '"></label><button type="button" class="btn ghost" data-journey-remove>Remove stage</button></div></article>'; };
   dbody.innerHTML =
-    '<h3 id="dt">' + (existing.data ? "Edit your mentor profile" : "Set up your mentor profile") + '</h3><p style="color:var(--muted);margin:6px 0 0">Your class is saved as Class ' + esc(String(user.grade || "—")) + '.</p>' +
+    '<h3 id="dt">' + (existing ? "Edit your mentor profile" : "Set up your mentor profile") + '</h3><p style="color:var(--muted);margin:6px 0 0">Your class is saved as Class ' + esc(String(user.grade || "—")) + '.</p>' +
     '<label for="tn">Name</label><input id="tn" placeholder="Full name" autocomplete="name" value="' +
     (user ? esc(user.n) : "") +
     '">' +
@@ -1101,10 +1338,23 @@ async function openTutor() {
       })
       .join("") +
     '</div><div class="guidance-custom"><label for="customGuidance">Add another area</label><div><input id="customGuidance" maxlength="60" placeholder="For example: guitar, public speaking, NTSE"><button type="button" class="btn ghost" id="addGuidance">Add area</button></div></div>' +
-    '<label for="th">Your experience and how you can help</label><textarea id="th" maxlength="240" rows="3" placeholder="For example: I can share how I built confidence for school debates and prepared for competitions.">' + esc(existing.data ? existing.data.headline || "" : "") + '</textarea>' +
+    '<h4>What guidance can you give?</h4><label>Your strongest areas <span class="muted">(choose up to 3)</span></label>' + optionGroup("strengths", guidanceChoices, selectedStrengths) +
+    '<label>Goals you have experience with</label>' + optionGroup("goals", guidanceGoals, selectedGoals) +
+    '<label>Languages you can guide in <span class="muted">(choose at least 1)</span></label>' + optionGroup("languages", mentorLanguages, selectedLanguages) +
+    '<label for="mentorBoard">Board</label><select id="mentorBoard"><option value="">Choose your board</option>' + ["CBSE","ICSE","State board","Other"].map(function (board) { return '<option' + (existing && existing.board === board ? ' selected' : '') + '>' + board + '</option>'; }).join("") + '</select>' +
+    '<label for="mentorCityTier">City type</label><select id="mentorCityTier"><option value="">Prefer not to say</option>' + [["tier_1","Tier 1"],["tier_2","Tier 2"],["tier_3","Tier 3"],["other","Other / not sure"]].map(function (item) { return '<option value="' + item[0] + '"' + (existing && existing.city_tier === item[0] ? ' selected' : '') + '>' + item[1] + '</option>'; }).join("") + '</select>' +
+    '<label for="mentorStudyStyle">Study style</label><select id="mentorStudyStyle"><option value="">Choose if you want</option>' + [["self_study","Mostly self-study"],["coaching","Coaching"],["mixed","A mix of both"]].map(function (item) { return '<option value="' + item[0] + '"' + (existing && existing.study_style === item[0] ? ' selected' : '') + '>' + item[1] + '</option>'; }).join("") + '</select>' +
+    '<label for="mentorBest">Best guidance for</label><input id="mentorBest" maxlength="240" value="' + esc(existing && existing.advises_best || '') + '" placeholder="The choices or problems you can help someone think through">' +
+    '<label for="mentorNotFit">When you may not be the right person</label><input id="mentorNotFit" maxlength="240" value="' + esc(existing && existing.advises_not || '') + '" placeholder="Be honest about what you have not experienced">' +
+    '<label for="mentorLessons">Mistakes and what you would do differently</label><textarea id="mentorLessons" maxlength="500" rows="3" placeholder="Share a useful lesson from your own path">' + esc(existing && existing.lessons_learned || '') + '</textarea>' +
+    '<label for="mentorExams">Exams you know <span class="muted">(comma separated)</span></label><input id="mentorExams" maxlength="240" value="' + esc(existing && (existing.guidance_exams || []).join(', ') || '') + '" placeholder="JEE Main, NEET, Olympiads">' +
+    '<label for="mentorPrice">Price for a 30-minute Bearings call</label><select id="mentorPrice">' + [99,149,199,249,299].map(function (price) { return '<option value="' + price + '"' + (Number(existing && existing.session_price_inr || 199) === price ? ' selected' : '') + '>₹' + price + '</option>'; }).join("") + '</select>' +
+    '<label for="mentorCap">Maximum sessions in one week</label><select id="mentorCap">' + [4,8,12,16,20,30].map(function (cap) { return '<option value="' + cap + '"' + (Number(existing && existing.weekly_session_cap || 8) === cap ? ' selected' : '') + '>' + cap + ' sessions</option>'; }).join("") + '</select>' +
+    '<label for="th">Your experience and how you can help</label><textarea id="th" maxlength="500" rows="3" placeholder="For example: I can share how I built confidence for school debates and prepared for competitions.">' + esc(existing ? existing.headline || "" : "") + '</textarea>' +
+    '<section class="journey-editor"><div class="journey-editor-heading"><div><h4>Your journey timeline</h4><p class="muted">Add the choices and stages that could help someone a few steps behind you.</p></div><button type="button" class="btn ghost" id="addJourneyStage">Add stage</button></div><div id="journeyEditorRows">' + (journeyRows.length ? journeyRows.map(journeyMarkup).join('') : journeyMarkup(null)) + '</div></section>' +
     '<div class="err" id="err" role="alert"></div>' +
-    '<div class="row"><button class="btn ghost" id="cx">Cancel</button><button class="btn" id="ok">' + (existing.data ? "Save profile" : "Create profile") + '</button></div>' +
-    '<div class="note">Your profile appears in mentor search after school verification. Bio and guidance-area edits do not restart review; changes to your verified name, class, or school do.</div>';
+    '<div class="row"><button class="btn ghost" id="cx">Cancel</button><button class="btn" id="ok">' + (existing ? "Save profile" : "Create profile") + '</button></div>' +
+    '<div class="note">Your profile appears in mentor search after school verification. Guidance-area and timeline edits do not restart review; changes to your verified name, class, or school do.</div>';
   dlg.showModal();
   document.getElementById("cx").onclick = function () {
     dlg.close();
@@ -1138,6 +1388,18 @@ async function openTutor() {
     var chip = document.createElement("button"); chip.type = "button"; chip.className = "chip"; chip.dataset.sub = area; chip.setAttribute("aria-pressed", "true"); chip.textContent = area;
     document.getElementById("sp").appendChild(chip); input.value = ""; error.textContent = "";
   };
+  document.getElementById("addJourneyStage").onclick = function () {
+    var rows = document.getElementById("journeyEditorRows");
+    if (rows.querySelectorAll(".journey-edit-row").length >= 12) { document.getElementById("err").textContent = "Add up to 12 journey stages."; return; }
+    rows.insertAdjacentHTML("beforeend", journeyMarkup(null));
+  };
+  document.getElementById("journeyEditorRows").addEventListener("click", function (event) {
+    var remove = event.target.closest("[data-journey-remove]");
+    if (!remove) return;
+    var rows = document.getElementById("journeyEditorRows");
+    if (rows.querySelectorAll(".journey-edit-row").length === 1) rows.innerHTML = journeyMarkup(null);
+    else remove.closest(".journey-edit-row").remove();
+  });
   document.getElementById("ok").onclick = async function () {
     var n = document.getElementById("tn").value.trim(),
       h = document.getElementById("th").value.trim(),
@@ -1155,31 +1417,72 @@ async function openTutor() {
       er.textContent = "Add a short note about your experience and how you can help.";
       return;
     }
+    var selectedValues = function (key) { return Array.from(dbody.querySelectorAll('[data-profile-array="' + key + '"] input:checked')).map(function (input) { return input.value; }); };
+    var strengths = selectedValues("strengths"), goals = selectedValues("goals"), languages = selectedValues("languages");
+    if (!strengths.length || strengths.length > 3) { er.textContent = "Choose 1–3 areas where you feel strongest."; return; }
+    if (!languages.length) { er.textContent = "Choose at least one language you can guide in."; return; }
+    var journey = Array.from(dbody.querySelectorAll(".journey-edit-row")).map(function (row) {
+      return {
+        stage_year: row.querySelector("[data-journey-year]").value,
+        stage: row.querySelector("[data-journey-stage]").value.trim(),
+        choice: row.querySelector("[data-journey-choice]").value.trim(),
+        why: row.querySelector("[data-journey-why]").value.trim(),
+        completed_at: row.querySelector("[data-journey-completed]").value || null,
+      };
+    }).filter(function (stage) { return stage.stage || stage.choice || stage.why || stage.stage_year; });
+    if (journey.length > 12 || journey.some(function (stage) { return !stage.stage_year || !stage.stage || !stage.choice || stage.why.length < 5; })) {
+      er.textContent = "Finish each journey stage with its year, stage, choice, and a short lesson, or remove the empty row."; return;
+    }
+    var profileText = [h, document.getElementById("mentorBest").value, document.getElementById("mentorNotFit").value, document.getElementById("mentorLessons").value, document.getElementById("mentorExams").value].join(" ");
+    if (meridianContactWarning(profileText)) { er.textContent = "Remove phone numbers, email addresses, links, and social handles from your profile."; return; }
+    var exams = document.getElementById("mentorExams").value.split(",").map(function (item) { return item.trim(); }).filter(Boolean).slice(0, 12);
+    var price = Number(document.getElementById("mentorPrice").value), weeklyCap = Number(document.getElementById("mentorCap").value);
+    var mentorData = {
+      user_id: user.id,
+      headline: h,
+      subjects: pick,
+      skills: strengths,
+      experience: h,
+      guidance_strengths: strengths,
+      guidance_goals: goals,
+      guidance_exams: exams,
+      guidance_languages: languages,
+      board: document.getElementById("mentorBoard").value || null,
+      city_tier: document.getElementById("mentorCityTier").value || null,
+      study_style: document.getElementById("mentorStudyStyle").value || null,
+      advises_best: document.getElementById("mentorBest").value.trim() || null,
+      advises_not: document.getElementById("mentorNotFit").value.trim() || null,
+      lessons_learned: document.getElementById("mentorLessons").value.trim() || null,
+      weekly_session_cap: weeklyCap,
+      session_price_inr: price,
+      is_available: existing ? existing.is_available : true,
+    };
+    var saveButton = document.getElementById("ok");
+    saveButton.disabled = true; saveButton.textContent = "Saving profile…";
     var profileResult = await supabaseClient
       .from("profiles")
       .update({ display_name: n })
       .eq("id", user.id);
     if (profileResult.error) {
       er.textContent = authErrorText(profileResult.error);
+      saveButton.disabled = false; saveButton.textContent = existing ? "Save profile" : "Create profile";
       return;
     }
-    var tutorResult = await supabaseClient.from("tutor_profiles").upsert({
-      user_id: user.id,
-      headline: h,
-      subjects: pick,
-      skills: pick,
-      experience: h,
-      is_available: existing.data ? existing.data.is_available : true,
-    });
+    var tutorResult = await supabaseClient.from("tutor_profiles").upsert(mentorData, { onConflict: "user_id" });
     if (tutorResult.error) {
       er.textContent = authErrorText(tutorResult.error);
+      saveButton.disabled = false; saveButton.textContent = existing ? "Save profile" : "Create profile";
+      return;
+    }
+    var journeySave = await supabaseClient.rpc("meridian_save_journey", { p_stages: journey });
+    if (journeySave.error) {
+      er.textContent = authErrorText(journeySave.error) + " — your profile is saved, but the journey timeline needs the latest Meridian migration.";
+      saveButton.disabled = false; saveButton.textContent = existing ? "Save profile" : "Create profile";
       return;
     }
     user.n = n;
     paintSign();
     mine = true;
-    user.n = n;
-    paintSign();
     dlg.close();
     await loadTutorDirectory();
     location.hash = "dashboard";
@@ -1196,7 +1499,7 @@ async function loadOwnMentorAchievements(target) {
   var result = await supabaseClient.from("mentor_achievements")
     .select("id,category,title,issuer,achievement_year,public_summary,public_evidence_path,status,evidence_path")
     .eq("user_id", user.id).order("created_at", { ascending: false });
-  if (result.error) { target.innerHTML = '<p class="muted">Achievement tools need the mentor achievements SQL migration.</p>'; return; }
+  if (result.error) { target.innerHTML = '<p class="muted">Achievement tools need the latest Meridian database migration.</p>'; return; }
   var rows = result.data || [];
   target.innerHTML = rows.length ? rows.map(function (row) {
     return '<article class="mentor-achievement-item"><div><b>' + esc(row.title) + '</b><span class="achievement-status">' + esc(achievementStatusLabel(row.status)) + '</span><p class="muted">' + esc(row.category) + (row.issuer ? ' · ' + esc(row.issuer) : '') + (row.achievement_year ? ' · ' + esc(String(row.achievement_year)) : '') + '</p></div><button type="button" class="btn ghost" data-delete-achievement="' + esc(row.id) + '" data-evidence-path="' + esc(row.evidence_path) + '" data-public-path="' + esc(row.public_evidence_path || '') + '">Remove</button></article>';
@@ -1251,7 +1554,7 @@ function openMentorAchievementForm() {
       achievement_year: yearValue ? Number(yearValue) : null, public_summary: summary,
       evidence_path: evidencePath, public_evidence_path: publicPath, status: "pending",
     });
-    if (inserted.error) { error.textContent = authErrorText(inserted.error) + " — run the mentor achievements SQL migration first."; button.disabled = false; button.textContent = "Send for review"; return; }
+    if (inserted.error) { error.textContent = authErrorText(inserted.error) + " — run the latest Meridian database migration first."; button.disabled = false; button.textContent = "Send for review"; return; }
     var uploadedPaths = [];
     var files = [{ file: evidence, path: evidencePath }]; if (publicCopy) files.push({ file: publicCopy, path: publicPath });
     for (var i = 0; i < files.length; i++) {
@@ -1270,6 +1573,9 @@ function openMentorAchievementForm() {
 function paintRoleUI() {
   var isTutor = canMentor(user);
   var isSignedIn = !!user;
+  var notificationBell = document.getElementById("meridianNotificationBell");
+  if (notificationBell) notificationBell.hidden = !isSignedIn;
+  if (isSignedIn) refreshMeridianNotificationCount();
   var isBoth = !!user && normalizeRole(user.role) === "both";
   document.querySelectorAll('[data-role-nav="tutor"]').forEach(function (el) { el.hidden = !isTutor || (isBoth && activeWorkspace !== "mentor"); });
   document.querySelectorAll('[data-workspace-nav="learner"]').forEach(function (el) { el.hidden = isTutor && (!isBoth || activeWorkspace !== "learner"); });
@@ -1292,7 +1598,7 @@ function paintRoleUI() {
     if (cards) cards.innerHTML = '<a href="#dashboard"><b>Bookings</b><span>Review learner requests and upcoming sessions.</span></a><a href="#doubts"><b>Guide learners</b><span>Share useful answers with the community.</span></a><a href="#sessions"><b>Sessions</b><span>Open booked chats and session details.</span></a>';
   } else {
     if (title) title.textContent = "Find a mentor who gets it.";
-    if (intro) intro.textContent = "Peer Connect is a learning network for your school. Find mentors, ask questions, and learn from people who know your topics.";
+    if (intro) intro.textContent = "Meridian is a guidance network for learners. Find a Meridian Senior who has been through your stage and get help with what comes next.";
     if (actions) actions.innerHTML = '<a class="btn" href="#home">Find a mentor</a><a class="btn ghost" href="#doubts">Ask a question</a>';
     if (cards) cards.innerHTML = '<a href="#home"><b>Mentors</b><span>Find verified mentors by subject and location.</span></a><a href="#doubts"><b>Questions</b><span>Ask questions, upvote the best ones, and answer what you know.</span></a><a href="#pricing"><b>Pricing</b><span>Free for learners and mentors. Optional Blue Tick may come later.</span></a>';
   }
@@ -1342,8 +1648,9 @@ function startMentorBooking(tutor) {
   if (!tutor || !tutor.user_id) return;
   if (!user) { openSign(); return; }
   if (!canLearn(user)) { window.alert("Choose Learner or Both in your profile to book a mentor."); return; }
+  if (user.safetySchemaAvailable && user.safety && meridianAge(user.safety.date_of_birth) !== null && meridianAge(user.safety.date_of_birth) < 18 && !user.safety.guardian_consent_verified_at) { window.alert("A parent or guardian must confirm consent before bookings unlock. Ask the Meridian safety team for help if you’re waiting."); return; }
   pendingBookingMentorId = tutor.user_id;
-  scheduleMentors = [{ id: tutor.user_id, name: tutor.n || "Verified mentor" }];
+  scheduleMentors = [{ id: tutor.user_id, name: tutor.n || "Verified mentor", price: Number(tutor.sessionPrice || 199) }];
   scheduleTypes = [];
   scheduleSlots = [];
   selectedScheduleSlotIndex = null;
@@ -1355,7 +1662,8 @@ function startMentorBooking(tutor) {
 function renderBookingForm() {
   var root = document.getElementById("bookingForm"); if (!root) return;
   if (!scheduleMentors.length) { root.innerHTML = '<div class="community-empty">No verified mentors are available for booking right now.</div><a class="btn ghost" href="#home">Browse mentors</a>'; return; }
-  root.innerHTML = '<div class="schedule-form"><input id="sessionType" type="hidden"><p class="session-policy-note">30-minute learning chat · Daily 8:00 AM–8:00 PM IST</p><label class="session-date-label">Choose a day<input id="sessionDate" type="date" min="' + isoTodayIn("Asia/Kolkata") + '" value="' + isoTodayIn("Asia/Kolkata") + '"></label><div id="sessionDateStrip" class="session-date-strip" aria-label="Choose a day"></div><p id="sessionBookingMessage" class="muted" role="status"></p></div><div id="sessionSlots" class="schedule-slots"><div class="community-empty">Finding company-set times…</div></div><div class="session-booking-footer"><span class="session-free-note">Peer Connect sessions are free</span><button class="btn" id="requestSession" type="button" hidden disabled>Request booking</button></div>';
+  var selectedMentor = selectedScheduleMentor();
+  root.innerHTML = '<div class="schedule-form"><input id="sessionType" type="hidden"><p class="session-policy-note">One 30-minute Bearings call · Daily 8:00 AM–8:00 PM IST</p><label>What would you like guidance on? <span class="muted">(20–300 characters; keep it focused on learning)</span><textarea id="bookingQuestion" maxlength="300" minlength="20" rows="3" placeholder="For example: I understand the method, but I take too long on algebra questions. How can I improve my speed?" required></textarea></label><label class="session-date-label">Choose a day<input id="sessionDate" type="date" min="' + isoTodayIn("Asia/Kolkata") + '" value="' + isoTodayIn("Asia/Kolkata") + '"></label><div id="sessionDateStrip" class="session-date-strip" aria-label="Choose a day"></div><p id="sessionBookingMessage" class="muted" role="status"></p></div><div id="sessionSlots" class="schedule-slots"><div class="community-empty">Finding open times…</div></div><div class="session-booking-footer"><span class="session-price-note">₹' + esc(selectedMentor && selectedMentor.price || 199) + ' · 30 minutes</span><button class="btn" id="requestSession" type="button" hidden disabled>Continue to secure payment</button></div>';
   paintSessionDateStrip();
   document.getElementById("sessionDate").onchange = function () { paintSessionDateStrip(); loadSessionSlots(); };
   document.getElementById("sessionDateStrip").onclick = function (event) {
@@ -1377,14 +1685,53 @@ function renderBookingForm() {
     }
     var request = event.target.closest("#requestSession");
     if (!request || selectedScheduleSlotIndex === null || !scheduleSlotsContext) return;
-    request.disabled = true; request.textContent = "Sending booking request…";
+    var question = document.getElementById("bookingQuestion"), questionText = question ? question.value.trim() : "", status = document.getElementById("sessionBookingMessage");
+    if (questionText.length < 20 || questionText.length > 300) { if (status) status.textContent = "Add a learning question between 20 and 300 characters."; if (question) question.focus(); return; }
+    if (meridianContactWarning(questionText)) { if (status) status.textContent = "For safety, remove phone numbers, emails, links, and social handles. Ask your learning question without private contact details."; if (question) question.focus(); return; }
+    request.disabled = true; request.textContent = "Preparing secure payment…";
     var chosen = scheduleSlots[selectedScheduleSlotIndex];
-    var result = await supabaseClient.from("peer_sessions").insert({ connection_id: null, session_type_id: scheduleSlotsContext.typeId, learner_id: user.id, mentor_id: scheduleSlotsContext.mentorId, starts_at: chosen.starts_at, ends_at: chosen.ends_at, timezone: chosen.timezone, status: "pending" });
-    var status = document.getElementById("sessionBookingMessage");
-    if (result.error) { if (status) status.textContent = authErrorText(result.error); request.disabled = false; request.textContent = "Request booking"; }
-    else { selectedScheduleSlotIndex = null; if (status) status.textContent = "Booking request sent. The mentor must confirm it before the chat session is booked."; await loadSessionSlots(); await loadPeerSessionList(); }
+    var result = await supabaseClient.from("peer_sessions").insert({ connection_id: null, session_type_id: scheduleSlotsContext.typeId, learner_id: user.id, mentor_id: scheduleSlotsContext.mentorId, starts_at: chosen.starts_at, ends_at: chosen.ends_at, timezone: chosen.timezone, learner_note: questionText, status: "pending" }).select("id,price_inr").single();
+    if (result.error) { if (status) status.textContent = authErrorText(result.error); request.disabled = false; request.textContent = "Continue to secure payment"; return; }
+    var orderResult = await supabaseClient.functions.invoke("meridian-create-order", { body: { sessionId: result.data.id } });
+    if (orderResult.error || !orderResult.data) {
+      await supabaseClient.rpc("meridian_abandon_unpaid_booking", { p_session_id: result.data.id });
+      if (status) status.textContent = orderResult.error ? authErrorText(orderResult.error) : "Secure payments are not set up yet. Please try again later.";
+      request.disabled = false; request.textContent = "Continue to secure payment"; await loadSessionSlots(); return;
+    }
+    if (status) status.textContent = "Choose a payment method. Your booking will be sent to the mentor after payment is verified.";
+    openMeridianCheckout(orderResult.data, result.data.id, request, status);
   };
   loadSessionTypes();
+}
+function openMeridianCheckout(order, sessionId, button, status) {
+  var start = function () {
+    var checkout = new window.Razorpay({
+      key: order.keyId, amount: order.amount, currency: order.currency || "INR", name: "Meridian",
+      description: "30-minute guidance call", order_id: order.orderId,
+      theme: { color: "#d878b1" },
+      handler: async function (payment) {
+        if (status) status.textContent = "Verifying payment securely…";
+        var verified = await supabaseClient.functions.invoke("meridian-verify-payment", { body: { sessionId: sessionId, paymentId: payment.razorpay_payment_id, orderId: payment.razorpay_order_id, signature: payment.razorpay_signature } });
+        if (verified.error || verified.data && verified.data.error) { if (status) status.textContent = verified.data && verified.data.error || "Payment verification is still processing. Check your sessions in a moment."; button.disabled = false; return; }
+        if (status) status.textContent = "Payment verified. Your booking request has been sent to the mentor.";
+        selectedScheduleSlotIndex = null; button.textContent = "Payment verified"; button.disabled = true;
+        await loadSessionSlots(); await loadPeerSessionList();
+      },
+      modal: { ondismiss: async function () {
+        if (status) status.textContent = "Checkout closed. The unpaid slot will be released shortly; you can choose another time.";
+        button.disabled = false; button.textContent = "Continue to secure payment";
+        await supabaseClient.rpc("meridian_abandon_unpaid_booking", { p_session_id: sessionId });
+        await loadSessionSlots();
+      } },
+    });
+    checkout.on("payment.failed", function (failure) { if (status) status.textContent = failure.error && failure.error.description || "Payment was not completed. Choose another payment method or try again."; button.disabled = false; });
+    checkout.open();
+  };
+  if (window.Razorpay) { start(); return; }
+  var script = document.querySelector('script[data-meridian-razorpay]');
+  if (!script) { script = document.createElement("script"); script.src = "https://checkout.razorpay.com/v1/checkout.js"; script.dataset.meridianRazorpay = "true"; document.head.appendChild(script); }
+  script.addEventListener("load", start, { once: true });
+  script.addEventListener("error", async function () { if (status) status.textContent = "Secure checkout could not load. Please try again."; button.disabled = false; await supabaseClient.rpc("meridian_abandon_unpaid_booking", { p_session_id: sessionId }); }, { once: true });
 }
 function selectedScheduleMentor() {
   return scheduleMentors.find(function (mentor) { return mentor.id === pendingBookingMentorId; }) || null;
@@ -1412,16 +1759,21 @@ async function loadSessionSlots() {
   slotsRoot.innerHTML = '<div class="local-loading">Finding open times…</div>';
   var result = await supabaseClient.rpc("get_peer_session_slots", { p_mentor_id: mentor.id, p_session_type_id: type.id, p_from: dateInput.value, p_days: 1 });
   if (result.error) { slotsRoot.innerHTML = '<div class="community-empty">' + esc(authErrorText(result.error)) + '</div>'; return; }
-  scheduleSlots = result.data || [];
+  scheduleSlots = (result.data || []).filter(function (slot) {
+    var parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(slot.starts_at));
+    var hour = Number(parts.find(function (part) { return part.type === "hour"; }).value);
+    return hour >= 8 && hour < 20;
+  });
   scheduleSlotsContext = { mentorId: mentor.id, typeId: type.id };
   slotsRoot.innerHTML = scheduleSlots.length ? scheduleSlots.map(function (slot, index) { return '<button class="schedule-slot" type="button" data-session-slot="' + index + '">' + esc(sessionClock(slot.starts_at, slot.timezone)) + '</button>'; }).join("") : '<div class="community-empty">No open times on this day. Pick another date or check back later.</div>';
 }
 function peerSessionRowMarkup(row) {
   var learner = relationRow(row.learner), mentor = relationRow(row.mentor);
-  var isMentor = row.mentor_id === user.id, actions = "", chatControl = "", now = Date.now();
+  var isMentor = row.mentor_id === user.id, actions = "", chatControl = "", videoControl = "", now = Date.now();
   if (isMentor && row.status === "pending") actions = '<button class="btn" data-session-action="confirmed" data-session-id="' + esc(row.id) + '">Confirm</button><button class="btn ghost" data-session-action="declined" data-session-id="' + esc(row.id) + '">Decline</button>';
   if (isMentor && row.status === "confirmed") actions = '<button class="btn" data-session-action="completed" data-session-id="' + esc(row.id) + '">Mark completed</button><button class="btn ghost" data-session-action="no_show" data-session-id="' + esc(row.id) + '">Mark no-show</button>';
   var starts = new Date(row.starts_at).getTime(), ends = new Date(row.ends_at).getTime();
+  if (row.status === "confirmed" && row.payment_status === "captured" && now >= starts - 5 * 60 * 1000 && now < ends) videoControl = '<button class="btn" data-video-session="' + esc(row.id) + '" data-video-peer="' + esc(isMentor ? row.learner_id : row.mentor_id) + '">Join video</button>';
   if (row.status === "confirmed") {
     if (now >= ends) chatControl = '<button class="btn ghost" data-session-chat="' + esc(row.id) + '">View chat history</button>';
     else if (now >= starts) chatControl = '<button class="btn" data-session-chat="' + esc(row.id) + '">Open session chat</button>';
@@ -1429,12 +1781,77 @@ function peerSessionRowMarkup(row) {
   } else if (["completed", "no_show", "cancelled"].includes(row.status) && starts <= now) {
     chatControl = '<button class="btn ghost" data-session-chat="' + esc(row.id) + '">View chat history</button>';
   } else if (row.status === "pending") chatControl = '<span class="session-chat-locked">Chat opens after the mentor confirms</span>';
-  return '<article class="session-row"><b>30-minute session · ' + esc(row.status.replace("_", " ")) + '</b><p>' + esc(isMentor ? (learner.display_name || "Learner") : (mentor.display_name || "Mentor")) + ' · ' + esc(sessionTime(row.starts_at, row.timezone)) + '</p>' + (row.learner_note ? '<p>Note: ' + esc(row.learner_note) + '</p>' : '') + ((actions || chatControl) ? '<div class="session-actions">' + actions + chatControl + '</div>' : '') + '</article>';
+  if (!isMentor && row.status === "completed" && ends <= now) chatControl += '<button class="btn ghost" data-session-feedback="' + esc(row.id) + '">Rate guidance</button>';
+  return '<article class="session-row"><b>30-minute Bearings call · ' + esc(row.status.replace("_", " ")) + '</b><p>' + esc(isMentor ? (learner.display_name || "Learner") : (mentor.display_name || "Mentor")) + ' · ' + esc(sessionTime(row.starts_at, row.timezone)) + '</p>' + (row.learner_note ? '<p>Guidance question: ' + esc(row.learner_note) + '</p>' : '') + ((actions || chatControl || videoControl) ? '<div class="session-actions">' + actions + chatControl + videoControl + '</div>' : '') + '</article>';
 }
+function askMeridianDeclineReason() {
+  var answer = window.prompt("Why can’t you accept this Bearings call? Enter 1, 2, 3, or 4.\n1 — No longer available\n2 — Schedule conflict\n3 — Not a good guidance match\n4 — Other");
+  if (answer === null) return null;
+  return ({ "1": "unavailable", "2": "schedule_conflict", "3": "not_a_match", "4": "other" })[answer.trim()] || "";
+}
+var meridianVideoState = null;
+async function openMeridianVideo(sessionId, peerId) {
+  if (!user) { openSign(); return; }
+  var dialog = document.getElementById("meridianVideoDialog"), peersRoot = document.getElementById("meridianVideoPeers");
+  if (!dialog || meridianVideoState) return;
+  dialog.dataset.sessionId = sessionId; dialog.dataset.peerId = peerId || "";
+  dialog.showModal(); peersRoot.innerHTML = '<p class="meridian-video-status">Preparing your private call…</p>';
+  try {
+    var room = await supabaseClient.functions.invoke("meridian-create-room", { body: { sessionId: sessionId } });
+    if (room.error || !room.data || room.data.error) throw new Error(room.data && room.data.error || authErrorText(room.error));
+    var token = await supabaseClient.functions.invoke("meridian-video-token", { body: { sessionId: sessionId } });
+    if (token.error || !token.data || token.data.error) throw new Error(token.data && token.data.error || authErrorText(token.error));
+    var sdk = await import("https://cdn.skypack.dev/@100mslive/hms-video-store@0.15.4");
+    var manager = new sdk.HMSReactiveStore(); manager.triggerOnSubscribe();
+    var store = manager.getStore(), actions = manager.getHMSActions(), tiles = new Map();
+    meridianVideoState = { actions: actions, store: store, tiles: tiles, sdk: sdk };
+    peersRoot.innerHTML = "";
+    function renderPeers() {
+      var peers = store.getState(sdk.selectPeers) || [];
+      tiles.forEach(function (tile, peerId) { if (!peers.some(function (peer) { return peer.id === peerId; })) { tile.unsubscribe(); if (tile.trackId) actions.detachVideo(tile.trackId, tile.video); tile.root.remove(); tiles.delete(peerId); } });
+      peers.forEach(function (peer) {
+        if (tiles.has(peer.id)) return;
+        var root = document.createElement("article"), video = document.createElement("video"), name = document.createElement("b");
+        root.className = "meridian-video-tile"; video.autoplay = true; video.playsInline = true; video.muted = !!peer.isLocal;
+        name.textContent = peer.name || (peer.isLocal ? "You" : "Learner"); root.append(video, name); peersRoot.append(root);
+        var tile = { root: root, video: video, trackId: null, unsubscribe: null };
+        tile.unsubscribe = store.subscribe(function (track) { var next = track && track.id || null; if (next === tile.trackId) return; if (tile.trackId) actions.detachVideo(tile.trackId, video); if (next) actions.attachVideo(next, video); tile.trackId = next; }, sdk.selectVideoTrackByPeerID(peer.id));
+        tiles.set(peer.id, tile);
+      });
+      if (!peers.length) peersRoot.innerHTML = '<p class="meridian-video-status">Waiting for the other person to join. Your camera and microphone start off.</p>';
+    }
+    var unsubscribePeers = store.subscribe(renderPeers, sdk.selectPeers);
+    meridianVideoState.unsubscribePeers = unsubscribePeers;
+    await actions.join({ userName: token.data.userName || user.n || "Meridian member", authToken: token.data.authToken, settings: { isAudioMuted: true, isVideoMuted: true } });
+    document.getElementById("meridianVideoTitle").textContent = "Bearings call · " + (user.n || "Meridian");
+  } catch (error) {
+    peersRoot.innerHTML = '<p class="meridian-video-status">' + esc(error.message || "Could not connect to the call.") + '</p>';
+    if (meridianVideoState) { try { await meridianVideoState.actions.leave(); } catch (_) {} meridianVideoState = null; }
+  }
+}
+async function leaveMeridianVideo() {
+  if (meridianVideoState) {
+    var state = meridianVideoState; meridianVideoState = null;
+    try { await state.actions.leave(); } catch (_) {}
+    if (state.unsubscribePeers) state.unsubscribePeers();
+    state.tiles.forEach(function (tile) { tile.unsubscribe(); if (tile.trackId) state.actions.detachVideo(tile.trackId, tile.video); });
+  }
+  document.getElementById("meridianVideoPeers").innerHTML = "";
+  if (document.getElementById("meridianVideoDialog").open) document.getElementById("meridianVideoDialog").close();
+}
+document.getElementById("meridianVideoClose").addEventListener("click", leaveMeridianVideo);
+document.getElementById("meridianLeaveVideo").addEventListener("click", leaveMeridianVideo);
+document.getElementById("meridianReportVideo").addEventListener("click", function () {
+  var dialog = document.getElementById("meridianVideoDialog");
+  submitMeridianReport({ userId: dialog.dataset.peerId || null, details: "Report submitted during Bearings call " + (dialog.dataset.sessionId || "") });
+});
+document.getElementById("meridianVideoDialog").addEventListener("cancel", function (event) { event.preventDefault(); leaveMeridianVideo(); });
+document.getElementById("meridianMuteAudio").addEventListener("click", async function () { if (!meridianVideoState) return; var enabled = !meridianVideoState.store.getState(meridianVideoState.sdk.selectIsLocalAudioEnabled); await meridianVideoState.actions.setLocalAudioEnabled(enabled); this.textContent = enabled ? "Mute microphone" : "Turn microphone on"; });
+document.getElementById("meridianMuteVideo").addEventListener("click", async function () { if (!meridianVideoState) return; var enabled = !meridianVideoState.store.getState(meridianVideoState.sdk.selectIsLocalVideoEnabled); await meridianVideoState.actions.setLocalVideoEnabled(enabled); this.textContent = enabled ? "Turn camera off" : "Turn camera on"; });
 async function loadPeerSessionList() {
   var root = document.getElementById("sessionList"); if (!root || !user) return;
   root.innerHTML = '<div class="local-loading">Loading your sessions…</div>';
-  var result = await supabaseClient.from("peer_sessions").select("id,connection_id,session_type_id,learner_id,mentor_id,starts_at,ends_at,timezone,status,learner_note,mentor_note,learner:profiles!peer_sessions_learner_id_fkey(display_name),mentor:profiles!peer_sessions_mentor_id_fkey(display_name)").order("starts_at", { ascending: true }).limit(100);
+  var result = await supabaseClient.from("peer_sessions").select("id,connection_id,session_type_id,learner_id,mentor_id,starts_at,ends_at,timezone,status,learner_note,mentor_note,payment_status,learner:profiles!peer_sessions_learner_id_fkey(display_name),mentor:profiles!peer_sessions_mentor_id_fkey(display_name)").order("starts_at", { ascending: true }).limit(100);
   if (result.error) { root.innerHTML = '<div class="community-empty">Could not load sessions: ' + esc(authErrorText(result.error)) + '</div>'; return; }
   var rows = result.data || [];
   if (!rows.length) { root.innerHTML = '<div class="community-empty">No booked sessions yet. Choose a verified mentor to request a time.</div>'; return; }
@@ -1452,7 +1869,7 @@ async function loadPeerSessionHistory() {
   var root = document.getElementById("sessionHistory");
   if (!root) return;
   if (!user) { root.innerHTML = '<div class="community-empty">Sign in to view your session history.</div><a class="btn ghost" href="#me">My page</a>'; return; }
-  var result = await supabaseClient.from("peer_sessions").select("id,connection_id,session_type_id,learner_id,mentor_id,starts_at,ends_at,timezone,status,learner_note,mentor_note,learner:profiles!peer_sessions_learner_id_fkey(display_name),mentor:profiles!peer_sessions_mentor_id_fkey(display_name)").order("starts_at", { ascending: false }).limit(100);
+  var result = await supabaseClient.from("peer_sessions").select("id,connection_id,session_type_id,learner_id,mentor_id,starts_at,ends_at,timezone,status,learner_note,mentor_note,payment_status,learner:profiles!peer_sessions_learner_id_fkey(display_name),mentor:profiles!peer_sessions_mentor_id_fkey(display_name)").order("starts_at", { ascending: false }).limit(100);
   if (result.error) { root.innerHTML = '<div class="community-empty">Could not load session history: ' + esc(authErrorText(result.error)) + '</div>'; return; }
   var now = Date.now();
   var historyRows = (result.data || []).filter(function (row) {
@@ -1468,7 +1885,8 @@ async function loadPeerSettingsPage() {
   if (!account) return;
   account.innerHTML = '<div class="local-loading">Loading your account settings…</div>';
   if (!user) { account.innerHTML = '<p class="muted">Sign in to manage your account settings.</p><button class="btn" type="button" data-settings-signin>Sign in</button>'; if (mentor) mentor.hidden = true; await loadPeerSessionHistory(); return; }
-  account.innerHTML = '<p><b>' + esc(user.n) + '</b><br>' + esc(user.e) + '<br>' + esc(accountTypeLabel(user.role)) + ' · Class ' + esc(String(user.grade || "—")) + '</p><p class="muted">' + esc((user.location && [user.location.school,user.location.city,user.location.state,user.location.country].filter(Boolean).join(" · ")) || "Add your school and location") + '</p><div class="row"><button class="btn ghost" type="button" data-settings-edit-profile>Edit account details</button><label class="btn ghost">Profile photo<input type="file" accept="image/jpeg,image/png,image/webp" data-settings-image="avatar" hidden></label><label class="btn ghost">Banner<input type="file" accept="image/jpeg,image/png,image/webp" data-settings-image="banner" hidden></label></div>';
+  var safetyNotice = user.safety && meridianAge(user.safety.date_of_birth) < 18 && !user.safety.guardian_consent_verified_at ? '<p class="muted">Parent or guardian confirmation is still needed before bookings unlock. Your date of birth and guardian details are private.</p>' : '';
+  account.innerHTML = '<p><b>' + esc(user.n) + '</b><br>' + esc(user.e) + '<br>' + esc(accountTypeLabel(user.role)) + ' · Class ' + esc(String(user.grade || "—")) + '</p><p class="muted">' + esc((user.location && [user.location.school,user.location.city,user.location.state,user.location.country].filter(Boolean).join(" · ")) || "Add your school and location") + '</p>' + safetyNotice + '<div class="row"><button class="btn ghost" type="button" data-settings-edit-profile>Edit account details</button><label class="btn ghost">Profile photo<input type="file" accept="image/jpeg,image/png,image/webp" data-settings-image="avatar" hidden></label><label class="btn ghost">Banner<input type="file" accept="image/jpeg,image/png,image/webp" data-settings-image="banner" hidden></label></div>';
   if (mentor) mentor.hidden = !canMentor(user);
   if (canMentor(user) && mentorBody) {
     mentorBody.innerHTML = '<div class="local-loading">Loading mentor settings…</div>';
@@ -1493,12 +1911,41 @@ async function loadPeerSessionsPage() {
   await loadPeerSessionList();
 }
 document.getElementById("refreshSessions").addEventListener("click", loadPeerSessionsPage);
+document.getElementById("sessionHistory").addEventListener("click", async function(event){
+  var button=event.target.closest("[data-session-feedback]"); if(!button)return;
+  var stars=window.prompt("Rate the guidance from 1 to 5 stars:"); if(stars===null)return;
+  if(!/^[1-5]$/.test(stars.trim())){window.alert("Enter a rating from 1 to 5.");return;}
+  var outcome=window.prompt("Was the guidance helpful? Enter 1 for yes, 2 for somewhat, or 3 for no."); if(outcome===null)return;
+  var resultValue=({"1":"helpful","2":"somewhat","3":"not_helpful"})[outcome.trim()]; if(!resultValue){window.alert("Choose 1, 2, or 3.");return;}
+  var nextStep=window.prompt("What will you try next? (5–500 characters)"); if(nextStep===null)return;
+  button.disabled=true;
+  var feedback=await supabaseClient.rpc("meridian_submit_session_feedback",{p_session_id:button.dataset.sessionFeedback,p_stars:Number(stars),p_result:resultValue,p_next_step:nextStep.trim()});
+  if(feedback.error){window.alert(/duplicate key/i.test(feedback.error.message)?"You already rated this Bearings call.":authErrorText(feedback.error));button.disabled=false;return;}
+  button.textContent="Feedback sent";
+});
 document.getElementById("sessionList").addEventListener("click", async function(event){
   if (event.target.closest("[data-schedule-signin]")) { openSign(); return; }
+  var videoButton=event.target.closest("[data-video-session]"); if(videoButton){videoButton.disabled=true;await openMeridianVideo(videoButton.dataset.videoSession,videoButton.dataset.videoPeer);videoButton.disabled=false;return;}
   var chatButton=event.target.closest("[data-session-chat]"); if(chatButton){openSessionChat(chatButton.dataset.sessionChat);return;}
-  var button=event.target.closest("[data-session-action]"); if(!button)return; button.disabled=true;
-  var result=await supabaseClient.from("peer_sessions").update({status:button.dataset.sessionAction}).eq("id",button.dataset.sessionId);
-  if(result.error)window.alert(authErrorText(result.error)); await loadPeerSessionList();
+  var feedbackButton=event.target.closest("[data-session-feedback]");
+  if(feedbackButton){
+    var stars=window.prompt("Rate the guidance from 1 to 5 stars:"); if(stars===null)return;
+    if(!/^[1-5]$/.test(stars.trim())){window.alert("Enter a rating from 1 to 5.");return;}
+    var outcome=window.prompt("Was the guidance helpful? Enter 1 for yes, 2 for somewhat, or 3 for no."); if(outcome===null)return;
+    var resultValue=({"1":"helpful","2":"somewhat","3":"not_helpful"})[outcome.trim()]; if(!resultValue){window.alert("Choose 1, 2, or 3.");return;}
+    var nextStep=window.prompt("What will you try next? (5–500 characters)"); if(nextStep===null)return;
+    feedbackButton.disabled=true;
+    var feedback=await supabaseClient.rpc("meridian_submit_session_feedback",{p_session_id:feedbackButton.dataset.sessionFeedback,p_stars:Number(stars),p_result:resultValue,p_next_step:nextStep.trim()});
+    if(feedback.error){window.alert(/duplicate key/i.test(feedback.error.message)?"You already rated this Bearings call.":authErrorText(feedback.error));feedbackButton.disabled=false;return;}
+    feedbackButton.textContent="Feedback sent";
+    return;
+  }
+  var button=event.target.closest("[data-session-action]"); if(!button)return;
+  var action=button.dataset.sessionAction, declineReason=null;
+  if(action === "declined") { declineReason=askMeridianDeclineReason(); if(declineReason===null)return; if(!declineReason){window.alert("Choose 1, 2, 3, or 4.");return;} }
+  button.disabled=true;
+  var result=await supabaseClient.functions.invoke("meridian-session-action",{body:{sessionId:button.dataset.sessionId,action:action,declineReason:declineReason}});
+  if(result.error || result.data && result.data.error)window.alert(authErrorText(result.error || {message:result.data.error})); await loadPeerSessionList();
 });
 document.getElementById("settings").addEventListener("click", function (event) {
   var chatButton = event.target.closest("[data-session-chat]");
@@ -1547,7 +1994,7 @@ function updateSessionChatComposer() {
   if (text) text.disabled = !writable || sessionChatBusy;
   if (file) file.disabled = !writable || sessionChatBusy;
   if (send) send.disabled = !writable || sessionChatBusy;
-  if (cancel) { cancel.hidden = !["pending", "confirmed"].includes(activeChatSession.status) || now >= end; cancel.disabled = sessionChatBusy; }
+  if (cancel) { cancel.hidden = !["pending", "confirmed"].includes(activeChatSession.status) || now >= start; cancel.disabled = sessionChatBusy; }
   var close = document.getElementById("sessionChatClose"); if (close) close.disabled = sessionChatBusy;
 }
 function sessionChatTime(value) {
@@ -1621,8 +2068,8 @@ document.getElementById("sessionChatCancel").addEventListener("click", async fun
   var button = this, sessionId = activeChatSession.id;
   sessionChatBusy = true;
   updateSessionChatComposer();
-  var result = await supabaseClient.from("peer_sessions").update({ status: "cancelled" }).eq("id", sessionId).or("learner_id.eq." + user.id + ",mentor_id.eq." + user.id);
-  if (result.error) { document.getElementById("sessionChatStatus").textContent = authErrorText(result.error); sessionChatBusy = false; updateSessionChatComposer(); return; }
+  var result = await supabaseClient.functions.invoke("meridian-session-action", { body: { sessionId: sessionId, action: "cancelled" } });
+  if (result.error || result.data && result.data.error) { document.getElementById("sessionChatStatus").textContent = authErrorText(result.error || {message:result.data.error}); sessionChatBusy = false; updateSessionChatComposer(); return; }
   activeChatSession.status = "cancelled";
   document.getElementById("sessionChatStatus").textContent = "Session cancelled. The chat is now read-only.";
   sessionChatBusy = false;
@@ -1635,6 +2082,7 @@ document.getElementById("sessionChatForm").addEventListener("submit", async func
   var sendingSession = activeChatSession, text = document.getElementById("sessionChatText"), picker = document.getElementById("sessionChatFile"), status = document.getElementById("sessionChatStatus"), body = text.value.trim(), file = picker.files && picker.files[0];
   if (!body && !file) { status.textContent = "Write a message or choose a file first."; return; }
   if (body.length > 2000) { status.textContent = "Messages can be up to 2,000 characters."; return; }
+  if (meridianContactWarning(body)) { status.textContent = "For safety, remove phone numbers, emails, links, and social handles from chat."; text.focus(); return; }
   var allowed = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
   if (file && (!allowed.includes(file.type) || file.size > 10 * 1024 * 1024)) { status.textContent = "Choose a JPG, PNG, WebP, or PDF up to 10 MB."; return; }
   sessionChatBusy = true; updateSessionChatComposer(); status.textContent = "Sending…";
@@ -1656,7 +2104,7 @@ document.getElementById("sessionChatForm").addEventListener("submit", async func
   } finally { sessionChatBusy = false; updateSessionChatComposer(); }
 });
 function scheduleManagerMarkup() {
-  return '<div class="schedule-manage"><div class="social-feed-title"><div><span class="community-kicker">MENTOR TOOLS</span><h2>Unavailable times</h2></div></div><p class="muted">Peer Connect sets 30-minute booking slots every day from 8:00 AM to 8:00 PM IST. Add a blocked period for times you cannot meet.</p><form class="schedule-form" data-schedule-form="block"><label>Block from (IST)<input name="starts_at" type="datetime-local" required></label><label>Until (IST)<input name="ends_at" type="datetime-local" required></label><button class="btn" type="submit">Block time</button></form><div id="blockedTimeList" class="schedule-manage-list"></div><div id="scheduleManageMessage" class="social-message" role="status"></div></div>';
+  return '<div class="schedule-manage"><div class="social-feed-title"><div><span class="community-kicker">SENIOR TOOLS</span><h2>Unavailable times</h2></div></div><p class="muted">Meridian sets 30-minute Bearings call slots every day from 8:00 AM to 8:00 PM IST. Block any time you cannot meet.</p><form class="schedule-form" data-schedule-form="block"><label>Block from (IST)<input name="starts_at" type="datetime-local" required></label><label>Until (IST)<input name="ends_at" type="datetime-local" required></label><button class="btn" type="submit">Block time</button></form><div id="blockedTimeList" class="schedule-manage-list"></div><div id="scheduleManageMessage" class="social-message" role="status"></div></div>';
 }
 async function loadMentorScheduleControls() {
   var root=document.getElementById("blockedTimeList"); if(!root||!user)return;
@@ -1674,13 +2122,17 @@ document.getElementById("dashboard").addEventListener("click",async function(eve
 function tutorVerificationPanel(status) {
   if (Number(user && user.grade) < 9 || Number(user && user.grade) > 12) return '<section class="box verify-status"><b>Finish your class details</b><p class="muted">Set your class before submitting mentor verification.</p></section>';
   if (status && status.status === "verified") {
-    var noticeKey = "peerConnectVerifiedNoticeSeen:" + user.id;
+    var noticeKey = "meridianVerifiedNoticeSeen:" + user.id;
     try {
-      if (window.localStorage.getItem(noticeKey) === "1") return "";
+      if (window.localStorage.getItem(noticeKey) === "1" || window.localStorage.getItem("peerConnectVerifiedNoticeSeen:" + user.id) === "1") {
+        window.localStorage.setItem(noticeKey, "1");
+        window.localStorage.removeItem("peerConnectVerifiedNoticeSeen:" + user.id);
+        return "";
+      }
       window.localStorage.setItem(noticeKey, "1");
     } catch (_localNoticeError) {
       try {
-        if (window.sessionStorage.getItem(noticeKey) === "1") return "";
+        if (window.sessionStorage.getItem(noticeKey) === "1" || window.sessionStorage.getItem("peerConnectVerifiedNoticeSeen:" + user.id) === "1") return "";
         window.sessionStorage.setItem(noticeKey, "1");
       } catch (_sessionNoticeError) {}
     }
@@ -1689,6 +2141,18 @@ function tutorVerificationPanel(status) {
   if (status && status.status === "pending") return '<section class="box verify-status"><b>Verification pending</b><p class="muted">Your school ID and fee receipt are private. A reviewer will check them before your mentor profile becomes visible.</p></section>';
   if (status && status.status === "rejected") return '<section class="box verify-status"><b>Verification needs another review</b><p class="muted">Resubmit both documents if a reviewer declined them, or if your verified name, class, or school changed. Editing your bio or guidance areas does not restart verification.</p><button class="btn" data-start-verification>Submit documents again</button></section>';
   return '<section class="box verify-status"><b>Verify your mentor profile</b><p class="muted">Mentors from every class submit a school ID and fee receipt. A trusted reviewer checks your identity, class, and school before approving your profile. Files stay private and are removed after review.</p><button class="btn" data-start-verification>Submit for review</button></section>';
+}
+async function loadMeridianFinancialLedger(target, adminView) {
+  if (!target || !user) return;
+  var result = await supabaseClient.rpc("meridian_financial_ledger", { p_mentor_id: adminView ? null : user.id });
+  if (result.error) { target.innerHTML = '<p class="muted">Settlement ledger needs the latest Meridian database migration.</p>'; return; }
+  var rows = result.data || [];
+  if (!rows.length) { target.innerHTML = '<p class="muted">No paid bookings are in the ledger yet.</p>'; return; }
+  var totals = rows.reduce(function (sum, row) { sum.gross += Number(row.gross_inr || 0); sum.fee += Number(row.platform_fee_inr || 0); sum.mentor += Number(row.mentor_amount_inr || 0); return sum; }, { gross: 0, fee: 0, mentor: 0 });
+  var statusNames = { awaiting_capture: "Awaiting payment", captured: "Payment captured · call not completed", waiting_for_completion: "Awaiting call completion", payout_pending: "Ready for manual settlement", paid: "Marked paid", refund_pending: "Refund in progress", refunded: "Refunded", payout_setup_required: "Payout setup needed" };
+  target.innerHTML = '<div class="dash-stats"><div class="dash-stat"><b>₹' + totals.gross.toFixed(2) + '</b><span>Session revenue</span></div><div class="dash-stat"><b>₹' + totals.fee.toFixed(2) + '</b><span>Meridian fee</span></div><div class="dash-stat"><b>₹' + totals.mentor.toFixed(2) + '</b><span>Senior share</span></div></div><div class="session-history-list">' + rows.slice(0, 20).map(function (row) {
+    return '<article class="session-row"><b>' + (adminView ? esc(row.mentor_name || "Meridian Senior") + ' · ' : '') + '₹' + Number(row.gross_inr).toFixed(2) + ' session</b><p>' + esc(sessionTime(row.starts_at, "Asia/Kolkata")) + ' · Meridian ₹' + Number(row.platform_fee_inr).toFixed(2) + ' · Senior ₹' + Number(row.mentor_amount_inr).toFixed(2) + '</p><span class="muted">' + esc(statusNames[row.payout_status] || row.payout_status) + '</span></article>';
+  }).join("") + '</div><p class="muted">Earnings are recorded for manual settlement. Meridian does not send automatic mentor payouts.</p>';
 }
 async function drawTutorDashboard() {
   var body = document.getElementById("tutorDashboardBody");
@@ -1719,15 +2183,18 @@ async function drawTutorDashboard() {
     ? '<section class="box dashboard-unavailable">' + scheduleManagerMarkup() + '</section>'
     : '<section class="box dashboard-unavailable"><h2>Unavailable times</h2><p class="muted">Blocking booking times will be available after your mentor profile is verified.</p><a class="btn ghost" href="#settings">Mentor settings</a></section>';
   body.innerHTML = '<div class="dash-stats"><div class="dash-stat"><b>' + pendingSessions.length + '</b><span>Bookings to review</span></div><div class="dash-stat"><b>' + upcomingSessions.length + '</b><span>Upcoming sessions</span></div><div class="dash-stat"><b>' + (profile && profile.is_available ? "Available" : "Paused") + '</b><span>Profile visibility</span></div></div>' +
-    unavailablePanel + '<section class="box request-box"><div class="dash-heading"><div><b>Booking requests</b><p class="muted">Accept or decline requests for a scheduled learning session.</p></div></div>' + bookingRows + '</section>';
+    unavailablePanel + '<section class="box request-box"><div class="dash-heading"><div><b>Booking requests</b><p class="muted">Accept or decline requests for a scheduled learning session.</p></div></div>' + bookingRows + '</section><section class="box request-box"><h2>Earnings ledger</h2><div id="mentorEarningsLedger"><div class="local-loading">Loading earnings…</div></div></section>';
+  await loadMeridianFinancialLedger(document.getElementById("mentorEarningsLedger"), false);
   if (verification && verification.status === "verified") await loadMentorScheduleControls();
 }
 document.getElementById("tutorDashboardBody").addEventListener("click", async function (e) {
   var sessionAction = e.target.closest("[data-session-action]");
   if (sessionAction) {
+    var action = sessionAction.dataset.sessionAction, declineReason = null;
+    if (action === "declined") { declineReason = askMeridianDeclineReason(); if (declineReason === null) return; if (!declineReason) { window.alert("Choose 1, 2, 3, or 4."); return; } }
     sessionAction.disabled = true;
-    var result = await supabaseClient.from("peer_sessions").update({ status: sessionAction.dataset.sessionAction }).eq("id", sessionAction.dataset.sessionId).eq("mentor_id", user.id);
-    if (result.error) window.alert(authErrorText(result.error));
+    var result = await supabaseClient.functions.invoke("meridian-session-action", { body: { sessionId: sessionAction.dataset.sessionId, action: action, declineReason: declineReason } });
+    if (result.error || result.data && result.data.error) window.alert(authErrorText(result.error || {message:result.data.error}));
     await drawTutorDashboard();
   }
 });
@@ -1792,7 +2259,7 @@ async function drawVerificationAdmin() {
   body.innerHTML = '<div class="box local-loading">Loading review queue…</div>';
   var result = await supabaseClient.from("tutor_verification_requests").select("id, user_id, submitted_at").eq("status", "pending").order("submitted_at", { ascending: true });
   if (result.error) { body.innerHTML = '<div class="box err">' + esc(authErrorText(result.error)) + '</div>'; return; }
-  if (!result.data || !result.data.length) { body.innerHTML = '<div class="box">No tutor verification requests waiting.</div>'; await drawAchievementReviewQueue(body); return; }
+  if (!result.data || !result.data.length) { body.innerHTML = '<div class="box">No mentor verification requests waiting.</div>'; await drawGuardianConsentQueue(body); await drawAchievementReviewQueue(body); await drawMeridianReportQueue(body); await drawMeridianFinancialQueue(body); return; }
   var ids = result.data.map(function (r) { return r.user_id; }), reqIds = result.data.map(function (r) { return r.id; });
   var extra = await Promise.all([
     supabaseClient.from("profiles").select("id, display_name, grade").in("id", ids),
@@ -1818,7 +2285,52 @@ async function drawVerificationAdmin() {
     cards.push('<article class="box"><h3>' + esc(p.display_name || "Learner") + ' · Class ' + esc(String(p.grade || "—")) + '</h3><p class="muted">' + esc([l.school,l.city,l.state,l.country].filter(Boolean).join(" · ") || "Location not set") + '<br>Guidance areas: ' + esc((tp.subjects || []).join(", ") || "Not set") + '<br>Guidance note: ' + esc(tp.headline || "Not set") + '<br>Submitted ' + esc(new Date(row.submitted_at).toLocaleString()) + '</p>' + (links.join("") || '<p class="err">No documents attached.</p>') + '<label>Reviewer note (optional)<input data-review-note="' + esc(row.id) + '" maxlength="500" placeholder="Private note; not shown on the mentor profile"></label><div class="row"><button class="btn" data-review="verified" data-review-id="' + esc(row.id) + '" data-user-id="' + esc(row.user_id) + '" ' + (!(hasId && hasReceipt && Number(p.grade) >= 9 && Number(p.grade) <= 12 && allDocsAvailable) ? 'disabled title="Both documents must be available and class must be 9–12"' : '') + '>Approve and verify</button><button class="btn ghost" data-review="rejected" data-review-id="' + esc(row.id) + '" data-user-id="' + esc(row.user_id) + '">Reject</button></div></article>');
   }
   body.innerHTML = cards.join("");
+  await drawGuardianConsentQueue(body);
   await drawAchievementReviewQueue(body);
+  await drawMeridianReportQueue(body);
+  await drawMeridianFinancialQueue(body);
+}
+async function drawMeridianFinancialQueue(body) {
+  body.querySelectorAll(".meridian-financial-queue").forEach(function (section) { section.remove(); });
+  var section = document.createElement("section"); section.className = "box meridian-financial-queue";
+  section.innerHTML = '<h2>Session settlement ledger</h2><p class="muted">Review session price, Meridian fee, Senior share, and payment/refund state. Settlements are manual; no transfer is sent from this page.</p><div data-ledger-content><div class="local-loading">Loading settlement ledger…</div></div>';
+  body.appendChild(section);
+  await loadMeridianFinancialLedger(section.querySelector("[data-ledger-content]"), true);
+}
+async function drawGuardianConsentQueue(body) {
+  body.querySelectorAll(".guardian-consent-queue").forEach(function (section) { section.remove(); });
+  var section = document.createElement("section"); section.className = "guardian-consent-queue";
+  section.innerHTML = '<h2>Guardian consent checks</h2><p class="muted">Confirm consent privately with the parent or guardian before unlocking bookings for a learner under 18. Do not approve from their self-reported form alone.</p>';
+  var result = await supabaseClient.from("meridian_account_safety").select("user_id,date_of_birth,guardian_name,guardian_contact,guardian_contact_type,guardian_consent_verified_at").is("guardian_consent_verified_at", null).not("guardian_contact", "is", null).order("created_at", { ascending: true }).limit(100);
+  if (result.error) section.insertAdjacentHTML("beforeend", '<div class="box">Guardian checks could not load: ' + esc(authErrorText(result.error)) + '</div>');
+  else {
+    var candidates = (result.data || []).filter(function (row) { var age = meridianAge(row.date_of_birth); return age !== null && age >= 14 && age < 18; });
+    if (!candidates.length) section.insertAdjacentHTML("beforeend", '<div class="box">No guardian consent checks waiting.</div>');
+    else {
+      var ids = candidates.map(function (row) { return row.user_id; }), names = {};
+      var profiles = await supabaseClient.from("profiles").select("id,display_name,grade").in("id", ids);
+      (profiles.data || []).forEach(function (profile) { names[profile.id] = profile; });
+      candidates.forEach(function (row) { var profile = names[row.user_id] || {}; section.insertAdjacentHTML("beforeend", '<article class="box"><b>' + esc(profile.display_name || "Learner") + ' · Class ' + esc(String(profile.grade || "—")) + '</b><p class="muted">Guardian: ' + esc(row.guardian_name || "Not provided") + ' · ' + esc(row.guardian_contact || "Not provided") + '</p><button type="button" class="btn" data-guardian-consent="' + esc(row.user_id) + '">Mark verified after confirming with guardian</button></article>'); });
+    }
+  }
+  body.appendChild(section);
+}
+async function drawMeridianReportQueue(body) {
+  body.querySelectorAll(".meridian-report-queue").forEach(function (section) { section.remove(); });
+  var result = await supabaseClient.from("reports").select("id,reporter_id,reported_user_id,post_id,doubt_id,reason,details,status,severity,is_auto_flagged,created_at").eq("status", "new").order("created_at", { ascending: true }).limit(100);
+  var section = document.createElement("section"); section.className = "meridian-report-queue";
+  section.innerHTML = '<h2>Community safety reports</h2><p class="muted">Review reports and apply a proportionate action. Suspensions expire after 24 hours by default.</p>';
+  if (result.error) section.insertAdjacentHTML("beforeend", '<div class="box">Reports could not load: ' + esc(authErrorText(result.error)) + '</div>');
+  else if (!result.data || !result.data.length) section.insertAdjacentHTML("beforeend", '<div class="box">No new reports.</div>');
+  else {
+    var ids = Array.from(new Set(result.data.map(function (row) { return row.reported_user_id; }).filter(Boolean))), names = {};
+    if (ids.length) { var profiles = await supabaseClient.from("profiles").select("id,display_name").in("id", ids); (profiles.data || []).forEach(function (profile) { names[profile.id] = profile.display_name; }); }
+    result.data.forEach(function (row) {
+      var target = row.reported_user_id ? (names[row.reported_user_id] || "Meridian account") : "Content report";
+      section.insertAdjacentHTML("beforeend", '<article class="box"><b>' + esc(row.reason.replace(/_/g," ")) + (row.is_auto_flagged ? ' · Safety filter' : '') + '</b><p>' + esc(target) + ' · ' + esc(new Date(row.created_at).toLocaleString()) + '</p>' + (row.details ? '<p class="muted">' + esc(row.details) + '</p>' : '') + '<div class="row"><button class="btn ghost" data-meridian-review="warn" data-report-id="' + esc(row.id) + '">Warn</button><button class="btn ghost" data-meridian-review="suspend" data-report-id="' + esc(row.id) + '">Suspend 24h</button><button class="btn ghost" data-meridian-review="ban" data-report-id="' + esc(row.id) + '">Ban</button><button class="btn" data-meridian-review="resolve" data-report-id="' + esc(row.id) + '">Resolve</button></div></article>');
+    });
+  }
+  body.appendChild(section);
 }
 async function drawAchievementReviewQueue(body) {
   body.querySelectorAll(".achievement-review-queue").forEach(function (oldSection) { oldSection.remove(); });
@@ -1826,7 +2338,7 @@ async function drawAchievementReviewQueue(body) {
     .select("id,user_id,category,title,issuer,achievement_year,public_summary,evidence_path,public_evidence_path,created_at")
     .eq("status", "pending").order("created_at", { ascending: true });
   var section = document.createElement("section"); section.className = "achievement-review-queue";
-  if (result.error) { section.innerHTML = '<h2>Achievement review</h2><p class="muted">Run the mentor guidance and achievements SQL migration to enable this review queue.</p>'; body.appendChild(section); return; }
+  if (result.error) { section.innerHTML = '<h2>Achievement review</h2><p class="muted">Run the latest Meridian database migration to enable this review queue.</p>'; body.appendChild(section); return; }
   section.innerHTML = '<h2>Achievement review</h2><p class="muted">Review the private evidence. Only approve an optional public file if it has no sensitive details.</p>';
   if (!result.data || !result.data.length) { section.insertAdjacentHTML("beforeend", '<div class="box">No achievement submissions waiting.</div>'); body.appendChild(section); return; }
   var ids = result.data.map(function (row) { return row.user_id; });
@@ -1841,6 +2353,27 @@ async function drawAchievementReviewQueue(body) {
   body.appendChild(section);
 }
 document.getElementById("verificationAdminBody").addEventListener("click", async function (event) {
+  var guardianButton = event.target.closest("[data-guardian-consent]");
+  if (guardianButton) {
+    if (!isVerificationAdmin) return;
+    if (!window.confirm("Have you personally confirmed consent with this learner’s parent or guardian? This unlocks bookings for the minor.")) return;
+    guardianButton.disabled = true;
+    var consent = await supabaseClient.from("meridian_account_safety").update({ guardian_consent_verified_at: new Date().toISOString() }).eq("user_id", guardianButton.dataset.guardianConsent).is("guardian_consent_verified_at", null);
+    if (consent.error) { window.alert(authErrorText(consent.error)); guardianButton.disabled = false; return; }
+    await drawVerificationAdmin(); return;
+  }
+  var moderationButton = event.target.closest("[data-meridian-review]");
+  if (moderationButton) {
+    if (!isVerificationAdmin) return;
+    var note = window.prompt("Optional private reviewer note:", "");
+    if (note === null) return;
+    moderationButton.disabled = true;
+    var action = moderationButton.dataset.meridianReview;
+    var moderation = await supabaseClient.rpc("meridian_review_report", { p_report_id: moderationButton.dataset.reportId, p_action: action, p_note: note, p_suspend_until: action === "suspend" ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() : null });
+    if (moderation.error) { window.alert(authErrorText(moderation.error)); moderationButton.disabled = false; return; }
+    await drawVerificationAdmin();
+    return;
+  }
   var achievementButton = event.target.closest("[data-achievement-review]");
   if (achievementButton) {
     if (!isVerificationAdmin) return;
@@ -1906,7 +2439,7 @@ function who() {
     return t.me;
   })[0];
   if (me) return { n: me.n, g: me.g };
-  return { n: user ? user.n : "You", g: "Student" };
+  return { n: user ? user.n : "You", g: "Learner" };
 }
 function hasBlue(n) {
   return tutors.some(function (t) {
@@ -1930,17 +2463,17 @@ function relativeTime(value) {
 function socialAvatar(profile, name) {
   return profile && profile.avatar_url
     ? '<img src="' + esc(profile.avatar_url) + '" alt="">'
-    : esc(ini(name || "Peer Connect").slice(0, 2).toUpperCase());
+    : esc(ini(name || "Meridian").slice(0, 2).toUpperCase());
 }
 function socialPostHtml(row, myId) {
-  var profile = relationRow(row.profiles), name = profile.display_name || "Peer Connect member";
+  var profile = relationRow(row.profiles), name = profile.display_name || "Meridian member";
   var reactions = Array.isArray(row.post_reactions) ? row.post_reactions : [];
   var comments = Array.isArray(row.post_comments) ? row.post_comments : [];
   var liked = reactions.some(function (reaction) { return reaction.user_id === myId; });
   var media = row.media_url ? (row.media_signed_url ? (row.media_type === "video"
     ? '<div class="social-post-media"><video controls preload="metadata" playsinline src="' + esc(row.media_signed_url) + '"></video></div>'
     : '<div class="social-post-media"><img loading="lazy" src="' + esc(row.media_signed_url) + '" alt="Photo shared by ' + esc(name) + '"></div>') : '<p class="muted">Media is temporarily unavailable. Refresh the feed to reload it.</p>') : "";
-  return '<article class="social-post" data-social-post="' + esc(row.id) + '"><div class="social-post-head"><div class="social-avatar">' + socialAvatar(profile, name) + '</div><div><div class="social-post-author">' + esc(name) + (profile.grade ? ' · Class ' + esc(String(profile.grade)) : '') + '</div><div class="social-post-time">' + esc(relativeTime(row.created_at)) + '</div></div>' + (row.author_id === myId ? '<button class="act delete-action" data-social-delete="' + esc(row.id) + '" style="margin-left:auto">Delete</button>' : '') + '</div><div class="social-post-copy">' + esc(row.content) + '</div>' + media + '<div class="social-post-actions"><button type="button" data-social-like="' + esc(row.id) + '" aria-pressed="' + liked + '">♥ ' + reactions.length + ' Like</button><button type="button" data-social-comments="' + esc(row.id) + '">◯ ' + comments.length + ' Comments</button><button type="button" data-social-focus="comment-' + esc(row.id) + '">Reply</button></div><div class="social-comments">' + comments.slice(-3).map(function (comment) { var author = relationRow(comment.profiles); return '<div class="social-comment"><b>' + esc(author.display_name || "Learner") + '</b>' + esc(comment.content) + '</div>'; }).join("") + '<form class="social-comment-form" data-social-comment-form="' + esc(row.id) + '"><input id="comment-' + esc(row.id) + '" maxlength="2000" placeholder="Write a comment…" aria-label="Write a comment"><button class="btn ghost" type="submit">Comment</button></form></div></article>';
+  return '<article class="social-post" data-social-post="' + esc(row.id) + '"><div class="social-post-head"><div class="social-avatar">' + socialAvatar(profile, name) + '</div><div><div class="social-post-author">' + esc(name) + (profile.grade ? ' · Class ' + esc(String(profile.grade)) : '') + '</div><div class="social-post-time">' + esc(relativeTime(row.created_at)) + '</div></div>' + (row.author_id === myId ? '<button class="act delete-action" data-social-delete="' + esc(row.id) + '" style="margin-left:auto">Delete</button>' : '<button class="act" data-social-report="' + esc(row.id) + '" data-report-user="' + esc(row.author_id) + '" style="margin-left:auto">Report</button>') + '</div><div class="social-post-copy">' + esc(row.content) + '</div>' + media + '<div class="social-post-actions"><button type="button" data-social-like="' + esc(row.id) + '" aria-pressed="' + liked + '">♥ ' + reactions.length + ' Like</button><button type="button" data-social-comments="' + esc(row.id) + '">◯ ' + comments.length + ' Comments</button><button type="button" data-social-focus="comment-' + esc(row.id) + '">Reply</button></div><div class="social-comments">' + comments.slice(-3).map(function (comment) { var author = relationRow(comment.profiles); return '<div class="social-comment"><b>' + esc(author.display_name || "Learner") + '</b>' + esc(comment.content) + (comment.author_id === myId ? '' : ' <button class="act" data-social-report="' + esc(row.id) + '" data-report-user="' + esc(comment.author_id) + '">Report</button>') + '</div>'; }).join("") + '<form class="social-comment-form" data-social-comment-form="' + esc(row.id) + '"><input id="comment-' + esc(row.id) + '" maxlength="2000" placeholder="Write a comment…" aria-label="Write a comment"><button class="btn ghost" type="submit">Comment</button></form></div></article>';
 }
 async function loadSocialFeed() {
   var list = document.getElementById("socialPostList");
@@ -1950,7 +2483,7 @@ async function loadSocialFeed() {
   list.innerHTML = '<div class="local-loading">Loading your learning feed…</div>';
   var result = await supabaseClient.from("posts").select("id, author_id, content, post_type, media_url, media_type, created_at, profiles!posts_author_id_fkey(display_name, grade, avatar_url), post_reactions(user_id, reaction), post_comments(id, author_id, content, created_at, profiles!post_comments_author_id_fkey(display_name))").order("created_at", { ascending: false }).limit(50);
   if (!user || user.id !== loadingUserId || curRoute !== "feed") return;
-  if (result.error) { list.innerHTML = '<div class="community-empty">Could not load posts: ' + esc(authErrorText(result.error)) + '. Run the v2.0.0 Supabase setup SQL.</div>'; return; }
+  if (result.error) { list.innerHTML = '<div class="community-empty">Could not load posts: ' + esc(authErrorText(result.error)) + '. Check the Meridian database setup guide.</div>'; return; }
   var rows = result.data || [];
   await Promise.all(rows.map(async function(row){
     if(!row.media_url || /^https:\/\//i.test(row.media_url)) { row.media_signed_url = row.media_url || ""; return; }
@@ -1978,6 +2511,7 @@ document.getElementById("publishSocialPost").addEventListener("click", async fun
   if (!user) { openSign(); return; }
   if (!content) { message.textContent = "Add a message before posting."; return; }
   if (content.length > 5000) { message.textContent = "Posts can be up to 5,000 characters."; return; }
+  if (meridianContactWarning(content)) { message.textContent = "Meridian keeps personal contact details private. Remove phone numbers, emails, links, and social handles before posting."; return; }
   var type = socialMediaFile && socialMediaFile.type.indexOf("video/") === 0 ? "video" : socialMediaFile ? "image" : null;
   var allowed = ["image/jpeg", "image/png", "image/webp", "image/gif", "video/mp4", "video/webm", "video/quicktime"];
   if (socialMediaFile && (allowed.indexOf(socialMediaFile.type) < 0 || socialMediaFile.size > 50 * 1024 * 1024)) { message.textContent = "Choose JPG, PNG, WebP, GIF, MP4, WebM, or MOV media under 50 MB."; return; }
@@ -1997,7 +2531,8 @@ document.getElementById("publishSocialPost").addEventListener("click", async fun
 });
 document.getElementById("refreshSocialFeed").addEventListener("click", loadSocialFeed);
 document.getElementById("socialPostList").addEventListener("click", async function (event) {
-  var like = event.target.closest("[data-social-like]"), del = event.target.closest("[data-social-delete]"), focus = event.target.closest("[data-social-focus]");
+  var like = event.target.closest("[data-social-like]"), del = event.target.closest("[data-social-delete]"), focus = event.target.closest("[data-social-focus]"), report = event.target.closest("[data-social-report]");
+  if (report) { await submitMeridianReport({ postId: report.dataset.socialReport, userId: report.dataset.reportUser }); return; }
   if (focus) { var input = document.getElementById(focus.dataset.socialFocus); if (input) input.focus(); return; }
   if (!user) { openSign(); return; }
   if (like) { like.disabled = true; var existing = like.getAttribute("aria-pressed") === "true"; var result = existing ? await supabaseClient.from("post_reactions").delete().eq("post_id", like.dataset.socialLike).eq("user_id", user.id) : await supabaseClient.from("post_reactions").insert({ post_id: like.dataset.socialLike, user_id: user.id, reaction: "like" }); if (result.error) window.alert(authErrorText(result.error)); await loadSocialFeed(); }
@@ -2007,6 +2542,7 @@ document.getElementById("socialPostList").addEventListener("submit", async funct
   var form = event.target.closest("[data-social-comment-form]"); if (!form) return; event.preventDefault();
   if (!user) { openSign(); return; }
   var input = form.querySelector("input"), value = input.value.trim(); if (!value) return;
+  if (meridianContactWarning(value)) { window.alert("For safety, remove phone numbers, emails, links, and social handles from comments."); return; }
   var button = form.querySelector("button"); button.disabled = true;
   var result = await supabaseClient.from("post_comments").insert({ post_id: form.dataset.socialCommentForm, author_id: user.id, content: value });
   if (result.error) window.alert(authErrorText(result.error)); else await loadSocialFeed();
@@ -2043,8 +2579,8 @@ async function loadDoubtsFromSupabase() {
     return {
       id: row.id,
       authorId: row.author_id,
-      n: author.display_name || "Peer Connect member",
-      g: authorGrade ? "Class " + authorGrade : "Student",
+      n: author.display_name || "Meridian member",
+      g: authorGrade ? "Class " + authorGrade : "Learner",
       sub: row.subject || "General",
       t: row.body || row.title,
       created_at: row.created_at,
@@ -2056,7 +2592,7 @@ async function loadDoubtsFromSupabase() {
         return {
           id: answer.id,
           authorId: answer.author_id,
-          n: answerAuthor.display_name || "Peer Connect member",
+          n: answerAuthor.display_name || "Meridian member",
           t: answer.content,
           isAccepted: answer.is_accepted,
         };
@@ -2080,7 +2616,11 @@ flist.addEventListener("click", async function (e) {
     })[0],
     a = b.dataset.act;
   if (!p) return;
-  if (a === "like") {
+  if (a === "report-doubt") {
+    await submitMeridianReport({ doubtId: p.id, userId: p.authorId });
+  } else if (a === "report-answer") {
+    await submitMeridianReport({ doubtId: p.id, userId: b.dataset.authorId });
+  } else if (a === "like") {
     p.liked = !p.liked;
     p.likes += p.liked ? 1 : -1;
     drawFeed();
@@ -2137,6 +2677,7 @@ flist.addEventListener("click", async function (e) {
       inp.focus();
       return;
     }
+    if (meridianContactWarning(v)) { document.getElementById("ferr").textContent = "For safety, remove phone numbers, emails, links, and social handles from your answer."; inp.focus(); return; }
     if (!user) {
       openSign();
       return;
@@ -2173,6 +2714,7 @@ document.getElementById("fPost").addEventListener("click", async function () {
     er.textContent = "Write your doubt first.";
     return;
   }
+  if (meridianContactWarning(v)) { er.textContent = "For safety, remove phone numbers, emails, links, and social handles from your doubt."; return; }
   er.textContent = "";
   var button = this;
   button.disabled = true;
@@ -2194,7 +2736,7 @@ document.getElementById("fPost").addEventListener("click", async function () {
     id: created.data.id,
     authorId: user.id,
     n: user.n,
-    g: user.grade ? "Class " + user.grade : "Student",
+    g: user.grade ? "Class " + user.grade : "Learner",
     sub: created.data.subject || "General",
     t: created.data.body,
     created_at: created.data.created_at,
@@ -2247,7 +2789,7 @@ function postHtml(p) {
           (hasBlue(r.n) ? BT : "") +
           (user && r.authorId === user.id
             ? '<button class="act delete-action" data-act="delete-answer" data-id="' + p.id + '" data-aid="' + esc(String(r.id)) + '">Delete answer</button>'
-            : "") +
+            : '<button class="act" data-act="report-answer" data-id="' + p.id + '" data-author-id="' + esc(r.authorId || "") + '">Report answer</button>') +
           '</div>' +
           "<div>" +
           esc(r.t) +
@@ -2264,7 +2806,7 @@ function postHtml(p) {
     "</button>" +
     (user && p.authorId === user.id
       ? '<button class="act delete-action" data-act="delete-doubt" data-id="' + p.id + '">Delete doubt</button>'
-      : "") +
+      : '<button class="act" data-act="report-doubt" data-id="' + p.id + '">Report doubt</button>') +
     "</div>" +
     (open
       ? '<div class="rrow"><input id="ri' +
@@ -2336,7 +2878,7 @@ document.getElementById("ftabs").addEventListener("click", function (e) {
 function drawMe() {
   var h = "";
   if (!user) {
-    h = '<div class="box me-signin-card"><div><span class="community-kicker">YOUR PEER CONNECT PROFILE</span><h3>Sign in to see your page</h3><p class="muted">Your profile and community details live here.</p></div><button class="btn" data-go="signin">Sign in</button></div>';
+    h = '<div class="box me-signin-card"><div><span class="community-kicker">YOUR MERIDIAN PROFILE</span><h3>Sign in to see your page</h3><p class="muted">Your profile and community details live here.</p></div><button class="btn" data-go="signin">Sign in</button></div>';
   } else {
     var location = user.location || {};
     var locationText = [location.city, location.state, location.country].filter(Boolean).join(", ") || "Add your location";
@@ -2422,7 +2964,7 @@ function route() {
     if (a.dataset.nav === (h === "profile" ? "home" : h)) a.setAttribute("aria-current", "page");
     else a.removeAttribute("aria-current");
   });
-  document.title = names[h] + " | Peer Connect";
+  document.title = names[h] + " | Meridian";
   if (h === "doubts") {
     if (user) loadDoubtsFromSupabase();
     else drawFeed();

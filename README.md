@@ -1,219 +1,57 @@
-# Peer Connect: project handoff
+# Meridian
 
-Peer Connect is a peer guidance community for learners. They can connect with mentors for support with school subjects, exams, Olympiads, debate, art, theater, sports, and other interests. This folder is the working front-end prototype.
+Meridian helps learners find their bearings with practical guidance from someone who has been there. The frontend is a static HTML, CSS, and JavaScript app for GitHub Pages; Supabase provides authentication, database, and private storage.
 
-The page styling is embedded in `index.html`; the app behavior is in `app.js`.
+## Run and deploy
 
-## Automatic semantic releases
+Open the project with a local static web server while developing. Google sign-in does not work from `file://` URLs. Publish the repository through its existing GitHub Pages workflow; no framework or build step is required.
 
-Peer Connect uses GitHub Actions and Conventional Commits. Use `fix:` for a
-patch, `feat:` for a minor release, and `!` or a `BREAKING CHANGE:` footer for
-a major release. The workflow opens a release pull request that updates
-`version.json`; merging it creates the matching `vX.Y.Z` GitHub Release and
-tag. See [CONTRIBUTING.md](CONTRIBUTING.md) for examples and setup details.
+`supabase-config.js` contains only the public Supabase URL and publishable key. Never place service-role, payment, mail-provider, or video-provider secrets in browser files.
 
-## 1. What exists today
+## Supabase setup
 
-A front-end prototype connected to Supabase Auth. People can create an account with email and password or use Google, then choose Learner, Mentor, or Both and add their class (9–12), school, city, state, and country. Mentors submit a school ID and fee receipt for private review. Only approved mentors appear in search with a green Verified badge. Mentor profiles show guidance areas and reviewed achievement highlights.
+The deployed Meridian database already has the app’s profiles, bookings, social feed, reports, verification, and private storage tables. For a new or updating project, run **`supabase_meridian_safety_moderation.sql` once** in **Supabase → SQL Editor**. It now includes the learner-goals tables so there is one Meridian product migration to run.
 
-| Page | Route | What it does |
-|---|---|---|
-| Home | `#home` | Signed-in community feed with text, photo/video posts, likes, and comments |
-| Tutors | `#tutors` | Search verified tutors, filter by subject/state/city, open profile cards, Connect |
-| Doubts | `#doubts` | Ask a doubt, upvote, sort Hot/New/Top, filter by subject, answer |
-| Pricing | `#pricing` | Student and tutor accounts are free; optional tutor Blue Tick is planned as a one-time purchase with price TBD |
-| My page | `#me` | Account details and location editing |
-| Tutor dashboard | `#dashboard` | Verification submission/status, location-filtered requests, availability, and profile editing |
-| Study sessions | `#sessions` | Book times with accepted mentors and view upcoming/past sessions |
-| Verification review | `#verification` | Private review queue for allowlisted reviewers only |
+That migration adds private age and guardian-consent fields, contact-detail filtering, reporting review tools, block records, fixed 30-minute booking safeguards, a 12-hour response window, a database-level one-person-per-time lock, private booking notifications and call reminders, mentor journey/results, fixed-weight matching, mentor achievement review with private proof and redacted public files, and the settlement ledger. The starting commission is 25%; change it in `meridian_platform_config.commission_percent` before new bookings if needed. Booking slots are 8:00 AM–8:00 PM India time. Seniors can block unavailable times; slots and duration remain company-set.
 
-On phones a bottom tab bar replaces the top links.
+Booking requests, decisions, cancellations, and 10-minute call reminders appear in the signed-in notification center. The migration schedules reminders through `pg_cron` when available. If it reports that `pg_cron` is unavailable, schedule `public.meridian_notify_upcoming_calls()` to run every five minutes in Supabase Scheduled Functions.
 
-## 2. Files
+These SQL files use `auth.uid()` to tie rows to signed-in profiles; they do not need an email address written into SQL. The Meridian migration is designed to be rerun after updates; back up the project before applying database changes and use the latest complete file.
 
-- `index.html`: page structure. Each page is a block with a `data-v="..."` attribute. The router shows or hides blocks by that value.
-- Styling is embedded in `index.html` so the UI does not rely on a separate CSS file.
-- `app.js`: page behavior plus Supabase Auth. A map of its functions is in the comment at the top of the file.
+## Current product rules
 
-No framework or build step. Serve this folder through a local web server to run
-it; the Supabase client is loaded from jsDelivr, and OAuth does not work from a
-`file://` URL.
+- The public brand is **Meridian**. Existing Supabase table and RPC names remain internal compatibility interfaces; Meridian-prefixed browser settings automatically migrate previous saved preferences.
+- People choose Learner, Senior, or Both. A Senior is still a learner.
+- Learners book a verified Senior directly and explain what they want guidance on. A booking holds its time while pending or confirmed.
+- A scheduled 30-minute Bearings call opens private in-site chat at the booked time. Only the two participants can read or send messages during that window.
+- Do not share personal contact details or home addresses. The app checks content in the browser and the database applies a second filter.
+- Achievement evidence and school verification files remain private. Only reviewer-approved, redacted achievement summaries and optional reviewed copies appear on public Senior profiles.
+- The Meridian live call is a private two-person 100ms room, opens five minutes before its scheduled 30-minute slot, and is configured without recording. Participants start with camera and microphone off.
+- Payments are authorized during checkout and captured only when the Senior accepts. A cancellation after capture requests a refund; completed calls are recorded in the configured commission and Senior share ledger. Payouts are manual and shown in the Senior dashboard and reviewer ledger.
+- The current release metadata is in `version.json`; release automation uses Conventional Commits and release-please. Do not hand-edit the version during ordinary feature work.
 
-## v2.0.0 database setup
+## External launch requirements
 
-Before deploying the frontend, open the Peer Connect project in Supabase and
-go to **SQL Editor → New query**. If the scheduling tables are not in the
-database yet, run `peer_connect_v2_social_scheduling.sql` first. Then run
-`peer_connect_company_fixed_sessions.sql`. The second migration changes booking
-to company-set 30-minute slots every day from 08:00 to 20:00 in `Asia/Kolkata`.
-Mentors can block unavailable periods; they cannot set weekly hours or name
-session types. Actual session instants remain `timestamptz`.
+GitHub Pages serves only the static frontend. Never put payment, email, or video secrets in browser files. Deploy the Supabase Edge Functions before enabling live sessions:
 
-The scheduling flow is **accepted connection → choose a day → pick a fixed
-30-minute slot → mentor confirms**. Pending and confirmed sessions both hold the
-slot. Learners can cancel; mentors can confirm, decline, cancel, complete, or
-mark no-show. Only verified mentors can receive bookings. The database checks
-accepted connections, company hours, mentor blocks, and overlapping sessions.
-
-Photo/video uploads use the private `post-media` bucket; the app creates
-short-lived signed links for signed-in feed viewers. Users can upload or delete
-files only in their own folder. Media should not contain private school or
-account information. A static GitHub Pages site must use only the Supabase publishable
-key in `supabase-config.js`; never put a service-role key in frontend files.
-
-The company fixed-session migration also replaces the earlier slot function,
-including the timezone qualification that prevents the prior ambiguous-column
-error. Use that migration for the current schedule.
-
-## Profile setup save fix
-
-If account setup keeps appearing after reload, or the role cards / Continue
-button do not work, deploy the frontend changes and run
-`peer_connect_profile_setup_fix.sql` in **Supabase → SQL Editor → New query**.
-The migration adds a small authenticated database function that saves the
-signed-in user's profile and location together. It checks the caller with
-`auth.uid()` and does not use or expose a service-role key. The app also shows
-database read/save errors instead of silently treating a failed read as a new
-profile.
-
-## 3. Current business rules
-
-- Student and tutor accounts are free. Students can send unlimited connection requests.
-- Optional tutor **Blue Tick** is planned as a one-time payment. The price is undecided and payments are not implemented.
-- The green **Verified** badge is free. A trusted reviewer checks a school ID and fee receipt; the client cannot grant the badge.
-- Verification files live in a private bucket and the review page removes them after approval or rejection. They are never displayed on tutor profiles.
-- Student locations stay in a row-level protected table. They are shown to the tutor receiving that student’s connection request. Verified tutor school/location details are shown in tutor search and profiles.
-- Changing a verified mentor’s name, class, or school clears approval and requires another review. Updating a bio or guidance areas does not.
-- Tutor verification remains separate from the optional Blue Tick.
-
-## 4. Data shapes
-
-```js
-tutor = { n: "name", g: "Class 12", s: ["Maths"], h: "one-line headline",
-          r: 4.8 /* rating or "New" */, x: 12 /* sessions */, m: 0 /* mutual connections */,
-  c: "#2B4EFF" /* cover color */, school: "school", city: "city", state: "state",
-  country: "country", verified: true /* set by the protected reviewer workflow */ }
-
-post  = { id: 1, n: "asker name", g: "Class 11", sub: "Maths", t: "question text",
-          ago: "now", likes: 0, liked: false, rep: [{ n: "answerer", t: "answer text" }] }
+```text
+supabase functions deploy meridian-create-order
+supabase functions deploy meridian-verify-payment
+supabase functions deploy meridian-session-action
+supabase functions deploy meridian-create-room
+supabase functions deploy meridian-video-token
+supabase functions deploy meridian-razorpay-webhook --no-verify-jwt
 ```
 
-Main state variables in `app.js`: `tutors`, `posts`, `sent`, `user` (signed-in person), `mine` (has a tutor profile), `fSub`, `fSort`, `openR`.
+In **Supabase → Edge Functions → Secrets**, set `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`, `MERIDIAN_100MS_ACCESS_KEY`, `MERIDIAN_100MS_APP_SECRET`, `MERIDIAN_100MS_TEMPLATE_ID`, and `MERIDIAN_100MS_ROLE` (the role must exist in that 100ms template). `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` are supplied by Supabase to deployed functions; never copy the service-role key into the site. In Razorpay, use an approved account with manual capture. Register the deployed `meridian-razorpay-webhook` URL for `payment.authorized`, `payment.captured`, and `refund.processed`. Test checkout, capture, decline, cancellation, refund, and settlement with test-mode keys first. The Senior and reviewer dashboards show the split and payment state; no automatic mentor transfer is initiated. External payout activation remains a separate step requiring explicit approval and payment-provider setup.
 
-## 5. What is fake and must be replaced
+Guardian consent currently requires the Meridian safety team to contact the guardian privately and mark the check in the reviewer area. No guardian email is sent by the app. Do not send minors’ personal data to an email or payment provider until Meridian has selected and approved that provider. Live payments/video require provider accounts, deployment secrets, and end-to-end checks; they are not usable until those are configured.
 
-| Fake today | Real version |
-|---|---|
-| Doubt upvotes are still local | Save upvotes in a database table |
-| Optional Blue Tick payment | Payment provider and price are undecided; no payment is active |
-| Data in `tutors` and `posts` arrays | Database tables, loaded through an API |
-| Tutor verification | `supabase-tutor-verification.sql` adds private location storage, private ID/receipt storage, reviewer access, and protected verification status |
+## Main files
 
-## 6. Supabase Auth setup
-
-The app keeps its CSS in index.html, loads a pinned Supabase JavaScript client
-from jsDelivr and reads its project URL and publishable key from
-supabase-config.js. The key is intended
-for browser use; never put a service-role or secret key in frontend files.
-
-Google sign-in uses Supabase Auth. The selected account type is saved to the
-profiles table. Tutor setup saves the student's grade and tutor subjects to
-the connected project. The My page reads the signed-in user's profile.
-
-## 7. Tutor verification setup
-
-Before publishing the updated site, open Supabase SQL Editor for the connected
-project and run `supabase-tutor-verification.sql` once. It adds the private
-location table, review queue, access rules, and private storage bucket. The
-script also moves existing profile school/city values into the private table.
-Students and tutors will be prompted to confirm school, city, state, and
-country after their next sign-in.
-
-Then add the trusted reviewer account from the bottom of that SQL file:
-
-1. Replace `YOUR_ADMIN_EMAIL` with your own signed-in email.
-2. Run the `insert into public.verification_admins ...` statement in SQL Editor.
-3. Sign out and back in. The **Verify tutors** link appears for that account.
-4. Review the school ID and fee receipt from the private queue. Approval adds
-   the green badge; approval or rejection removes the uploaded files from
-   storage. Only the reviewer can open those files.
-
-### Mentor guidance areas and achievement highlights
-
-After `supabase-tutor-verification.sql`, run `peer_connect_mentor_guidance_achievements.sql` in Supabase SQL Editor. Mentors can select up to eight guidance areas, add their own, and submit exam results, certificates, medals, or other milestones.
-
-Original supporting proof is stored privately for review, then deleted after the decision. Learners see only summaries that a reviewer approves. Mentors may optionally submit a separate redacted copy; it stays private until a reviewer approves it. Hide school ID and roll numbers, addresses, dates of birth, QR codes, signatures, and contact details before submitting a copy. Never publish identity documents or fee receipts.
-
-Do not manually set a verification status or add a reviewer from browser code.
-The browser uses only the Supabase publishable key; never add a service-role
-key to `supabase-config.js`.
-
-### Meridian learner guidance goals
-
-Before deploying the learner-goals onboarding update, run
-`supabase_meridian_learner_goals.sql` in **Supabase → SQL Editor → New query**.
-This creates a private, owner-only table for a learner's guidance goal, board,
-optional exam, focus subjects, preferred languages, and optional city tier.
-The SQL does not need an email address; rows are linked to the signed-in
-account through its profile ID. Do not make this table public until a secure
-matching endpoint is in place.
-
-Location details are not selected from the public `profiles` table. Tutor
-directory results expose locations only for approved tutors. A student's
-location is returned only to the tutor receiving their connection request.
-
-To enable Google sign-in:
-
-1. Add a Google OAuth web client in Google Cloud and set its callback URL to
-   https://dximxjxlzmfnqaaryphv.supabase.co/auth/v1/callback.
-2. In Supabase Dashboard, open Authentication → Sign In / Providers → Google
-   and enter the Google client ID and client secret.
-3. In Authentication → URL Configuration, add the deployed Peer Connect URL
-   (for example, https://example.com/**) and the local development URL
-   (for example, http://localhost:8000/**) to the allowed redirect URLs.
-4. Serve this folder through a local web server or deploy it to a static host.
-   Opening index.html as a file:// URL is not suitable for OAuth callbacks.
-
-## 8. Suggested stack for the live site
-
-Keep it simple for a student team:
-
-- **Supabase** (Postgres + Google login + row-level security) or **Firebase**.
-- Front end: keep plain HTML/JS at first, or move to **React with Vite** or **Next.js** when the pages grow. Next.js gives real URLs like `/tutors/aarav` instead of `#tutors`.
-- Hosting: Vercel or Netlify (free tiers).
-- Payments: consider a one-time checkout only if the Blue Tick price is approved later.
-
-Suggested tables: `profiles`, `tutor_profiles`, `connections` (requester, tutor, status), `doubts`, `answers`, `votes`, `subscriptions`, `reports`.
-
-## 9. Safety and legal points for a live site (important)
-
-Most users will be under 18, so plan for this before launch:
-
-- Sessions in school or in a supervised space only. No private contact details shown on profiles.
-- Add a **Report** button on profiles, doubts and answers, and a way for an adult admin to remove content.
-- Verify users with a school email or a teacher approval.
-- India's Digital Personal Data Protection Act, 2023 requires verifiable parental consent before processing a child's data. Add a consent step and a privacy policy.
-- Do not take payments from minors directly. Any future one-time purchase should be handled with a parent or guardian.
-
-## 10. Style rules
-
-- Plain English in all text. No buzzwords.
-- Keep the design: blue brand color, gold accent, Bricolage Grotesque for headings, Figtree for body.
-- Keep dark mode working (colors are variables in `:root`).
-- Keep it usable on phones.
-- Use the typographic apostrophe in visible text.
-
-## 11. Good next tasks to ask ChatGPT
-
-1. "Persist doubt upvotes in Supabase."
-2. "Add a separate profile page for each tutor, with their reviews and a request button."
-3. "Make connection requests real: the tutor sees a list and can accept or decline."
-4. "Add a one-time checkout for the tutor Blue Tick after its price is decided."
-5. "Add a Report button and a simple admin page to remove content."
-6. "Add a Follow button on tutors and a trending subjects box on the Doubts page."
-
-## 11. How to ask for changes
-
-- Name the page and the function, for example "in `drawMe()` in `app.js`".
-- Ask for the full changed function, not a summary, so you can paste it in.
-- After each change, verify email and Google sign-in, role setup, tutor request handling, and doubt posting/upvoting/answers.
+- `index.html`: Meridian pages, styles, navigation, and dialogs.
+- `app.js`: frontend behavior and Supabase calls.
+- `supabase-config.js`: browser-safe Supabase configuration only.
+- `version.json`, `.release-please-manifest.json`, `.github/workflows/`: release metadata and automation.
+- `supabase_meridian_safety_moderation.sql`: single additive database migration for Meridian safety, guidance, matching, and booking.
+- `supabase/functions/`: server-only payment and 100ms video handlers. These run on Supabase, never GitHub Pages.

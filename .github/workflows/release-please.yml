@@ -1,4 +1,4 @@
-name: Semantic release
+name: Meridian semantic release
 
 on:
   push:
