@@ -1659,6 +1659,216 @@ dialog::backdrop, .session-chat-dialog::backdrop, .session-booking-dialog::backd
   .social-home { padding-top: 20px; }
   footer { padding-bottom: 8px; }
 }
+
+/* Step 2 — discovery, profile, booking, and calls presentation. */
+[data-v="home"] > h1 {
+  max-width: 16ch;
+  margin: 26px 0 12px;
+  font-size: clamp(38px, 6vw, 68px);
+  line-height: 1.02;
+}
+[data-v="home"] > p {
+  max-width: 68ch;
+  margin: 0 0 24px;
+  color: var(--muted);
+  font-size: 18px;
+}
+.meridian-matches {
+  width: 100%;
+  margin: 22px 0;
+  padding: clamp(18px, 3vw, 30px);
+  border: 1.5px solid var(--ink);
+  background: var(--surface);
+}
+.meridian-match-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+.meridian-match-card {
+  min-width: 0;
+  padding: 18px;
+  border: 1.5px solid var(--ink);
+  background: var(--bg);
+}
+.meridian-match-person {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.meridian-match-person img,
+.meridian-match-person > span {
+  width: 56px;
+  height: 56px;
+  flex: 0 0 56px;
+  border: 1.5px solid var(--ink);
+  object-fit: cover;
+}
+.meridian-match-person h3 { margin: 0; font-size: 20px; }
+.meridian-match-person p { margin: 4px 0 0; font-size: 14px; }
+.meridian-match-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.meridian-match-actions .btn { flex: 1 1 150px; }
+.search { margin: 22px 0 12px; }
+.search input { width: 100%; }
+.location-filters { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0; }
+.location-filters select { min-width: 180px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+.chip {
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1.5px solid var(--academic);
+  background: var(--surface);
+  color: #8FA5FF;
+  font: 700 13px/1.2 "DotGothic16", "Space Mono", monospace;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.chip[aria-pressed="true"], .chip.active { background: var(--academic); color: #fff; }
+.quota { display: flex; justify-content: space-between; gap: 14px; margin: 16px 0; color: var(--muted); }
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 18px;
+  align-items: stretch;
+  width: 100%;
+  margin: 20px 0 60px;
+}
+.grid > .empty, .grid > .local-loading { grid-column: 1 / -1; }
+.card {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+  border: 1.5px solid var(--ink);
+  background: var(--surface);
+  cursor: pointer;
+}
+.card:focus-visible { outline: 3px solid var(--academic); outline-offset: 4px; }
+.card .cover {
+  position: relative;
+  min-height: 164px;
+  height: 164px;
+  overflow: hidden;
+  border-bottom: 1.5px solid var(--ink);
+  background: #202020;
+}
+.card .mentor-banner-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.mentor-card-kicker {
+  position: absolute;
+  z-index: 1;
+  top: 12px;
+  left: 12px;
+}
+.card .body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 18px;
+}
+.card .av {
+  width: 64px;
+  height: 64px;
+  flex: 0 0 64px;
+  margin-top: -48px;
+  border: 1.5px solid var(--ink);
+  background: var(--brand);
+  color: var(--ink);
+  font: 700 20px "Space Grotesk", sans-serif;
+  z-index: 2;
+}
+.card .av img { width: 100%; height: 100%; object-fit: cover; }
+.card h3 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 23px; line-height: 1.15; }
+.card .sub { color: var(--muted); font-size: 15px; line-height: 1.5; }
+.card .tags { display: flex; flex-wrap: wrap; gap: 7px; margin: 0; }
+.card .mentor-match-reason { margin: 0; padding-left: 10px; border-left: 3px solid var(--brand); }
+.card .mentor-booking-cta { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 10px; margin-top: auto; padding-top: 12px; }
+.card .mentor-booking-cta > span { white-space: nowrap; }
+.card .mentor-booking-cta .btn { min-width: 0; width: auto; align-self: auto; margin: 0; }
+.verify-badge { display: inline-flex; align-items: center; padding: 4px 7px; border: 1.5px solid var(--green); color: #57D68A; font: 700 11px "DotGothic16", "Space Mono", monospace; text-transform: uppercase; }
+.tutor-online { margin-left: auto; }
+.profile-page { width: 100%; padding: 28px clamp(14px, 3vw, 42px) 56px; }
+.profile-page-inner { width: min(100%, 1280px); margin-inline: auto; }
+.profile-page .profile-back { margin-bottom: 18px; }
+.profile-page .profile-cover {
+  height: clamp(180px, 26vw, 320px);
+  overflow: hidden;
+  border: 1.5px solid var(--ink);
+  background-color: #202020;
+}
+.profile-page .profile-head { padding: 0 clamp(16px, 4vw, 48px) 28px; }
+.profile-page .profile-head .av {
+  width: 104px;
+  height: 104px;
+  margin-top: -52px;
+  border: 1.5px solid var(--ink);
+  background: var(--brand);
+  z-index: 2;
+}
+.profile-page .profile-head h2 { margin: 14px 0 8px; font-size: clamp(30px, 4vw, 48px); }
+.profile-page .profile-meta { color: var(--muted); font-size: 15px; }
+.profile-page .profile-head > p { max-width: 72ch; font-size: 17px; }
+.profile-page .profile-social { display: flex; flex-wrap: wrap; gap: 18px; margin: 16px 0; }
+.profile-page .profile-head > #profileBook { margin-top: 8px; }
+.profile-page .profile-appearance { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.profile-tabs { display: flex; gap: 8px; padding: 14px clamp(16px, 4vw, 48px); border-block: 1.5px solid var(--ink); }
+.profile-tabs .btn { min-height: 44px; }
+.profile-content { padding: 22px clamp(16px, 4vw, 48px); }
+.profile-content > h3, .mentor-guidance-details h3, .mentor-journey h3, .mentor-results h3 { margin: 0 0 12px; font-size: 25px; }
+.mentor-guidance-details, .mentor-journey, .mentor-results { margin: 18px 0; padding: clamp(18px, 3vw, 28px); border: 1.5px solid var(--ink); background: var(--surface); }
+.mentor-journey ol { padding-left: 28px; }
+.mentor-journey ol::before { left: 7px; width: 2px; background: var(--brand); }
+.mentor-journey li { grid-template-columns: 80px minmax(0, 1fr); gap: 14px; padding-bottom: 24px; }
+.mentor-journey li::before { left: -25px; width: 12px; height: 12px; border: 2px solid var(--ink); background: var(--brand); }
+.journey-year { color: var(--muted); }
+.mentor-results-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.mentor-result-card { min-width: 0; padding: 16px; border: 1.5px solid var(--ink); background: var(--bg); }
+.session-booking-dialog { width: min(680px, calc(100% - 24px)); max-width: 680px; max-height: min(90dvh, 860px); overflow: auto; }
+.booking-dialog-head { align-items: center; padding: 20px 22px; }
+.booking-dialog-head h2 { font-size: clamp(26px, 4vw, 36px); }
+.booking-dialog-content { padding: 18px 22px 24px; }
+.schedule-form { gap: 16px; margin-top: 0; }
+.schedule-form label { gap: 8px; font-size: 15px; }
+.session-policy-note { padding: 12px; border-left: 4px solid var(--brand); background: var(--soft); }
+.session-date-strip { gap: 8px; margin: 4px 0 10px; }
+.session-date { min-height: 64px; flex: 1 0 64px; padding: 9px 6px; }
+.session-date span { font: 700 11px "DotGothic16", "Space Mono", monospace; text-transform: uppercase; }
+.session-date b { font: 700 20px "Space Grotesk", sans-serif; }
+.schedule-slots { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; margin: 12px 0 18px; }
+.schedule-slot { min-height: 44px; border: 1.5px solid var(--ink); background: var(--surface); color: var(--ink); font-weight: 600; }
+.schedule-slot.selected { background: var(--brand); color: var(--ink); }
+.session-booking-footer { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 18px; padding-top: 16px; border-top: 1.5px solid var(--ink); }
+.session-price-note { font: 700 14px "DotGothic16", "Space Mono", monospace; }
+.session-list-panel { width: 100%; margin-top: 20px; }
+.session-list { display: grid; gap: 0; }
+.session-row { padding: 18px 0; border-top: 1.5px solid var(--ink); }
+.session-row > b, .session-row h3 { font: 700 18px "Space Grotesk", sans-serif; }
+.session-row p { margin: 6px 0; color: var(--muted); }
+.session-actions { gap: 8px; margin-top: 12px; }
+.session-actions .btn { min-height: 44px; }
+.session-chat-dialog { width: min(960px, calc(100% - 24px)); max-width: 960px; }
+@media (max-width: 700px) {
+  [data-v="home"] > h1 { margin-top: 18px; }
+  [data-v="home"] > p { font-size: 16px; }
+  .quota { flex-direction: column; gap: 4px; }
+  .card .mentor-booking-cta { align-items: stretch; flex-direction: column; }
+  .card .mentor-booking-cta .btn { width: 100%; }
+  .profile-page { padding-inline: 0; }
+  .profile-page .profile-cover { height: 180px; }
+  .profile-page .profile-head .av { width: 82px; height: 82px; margin-top: -42px; }
+  .mentor-journey li { grid-template-columns: 1fr; gap: 5px; }
+  .session-date-strip { overflow-x: auto; }
+  .session-date { flex: 0 0 64px; }
+  .session-booking-footer { align-items: stretch; flex-direction: column; }
+}
 </style>
   </head>
   <body>
