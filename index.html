@@ -2015,24 +2015,241 @@ header nav #gsign { order: 7; }
   header nav { gap: 6px; }
   header nav #gsign { min-height: 40px; }
 }
+
+/* Step 1c — readable yellow actions, text-only navigation, and one account menu. */
+:root { --on-accent: #000000; --brand-ink: var(--on-accent); }
+
+/* Yellow surfaces always use black text and icons, including nested content. */
+.btn:not(.ghost):not(.danger), .btn.primary, .profile-close,
+.schedule-slot.selected, .session-date.selected,
+.role-option.selected, .role-option[aria-pressed="true"],
+.logo i, .startup-brand > i, .cover, .profile-cover, .me-cover {
+  color: var(--on-accent) !important;
+}
+.btn:not(.ghost):not(.danger) *, .btn.primary *, .profile-close *,
+.schedule-slot.selected *, .session-date.selected *,
+.role-option.selected *, .role-option[aria-pressed="true"] *,
+.logo i *, .startup-brand > i *, .cover *, .profile-cover *, .me-cover * {
+  color: var(--on-accent) !important;
+}
+.btn:not(.ghost):not(.danger), .btn.primary,
+.schedule-slot.selected, .session-date.selected,
+.role-option.selected, .role-option[aria-pressed="true"], .profile-close,
+.logo i, .startup-brand > i {
+  background-color: #FFE94A !important;
+}
+.btn:not(.ghost):disabled, .btn.primary:disabled, #gsign:disabled {
+  color: rgb(0 0 0 / 60%) !important;
+  opacity: 1;
+}
+.btn:not(.ghost):disabled *, .btn.primary:disabled *, #gsign:disabled * { color: rgb(0 0 0 / 60%) !important; }
+.btn:not(.ghost):not(.danger):hover:not(:disabled), .btn.primary:hover:not(:disabled),
+.btn:not(.ghost):not(.danger):focus-visible, .btn.primary:focus-visible {
+  background-color: #FFE94A !important;
+  color: var(--on-accent) !important;
+}
+.btn:not(.ghost):not(.danger):hover:not(:disabled) *, .btn.primary:hover:not(:disabled) *,
+.btn:not(.ghost):not(.danger):focus-visible *, .btn.primary:focus-visible * { color: var(--on-accent) !important; }
+::selection { background: #FFE94A; color: var(--on-accent); }
+h1 mark, h2 mark, .hero h1 mark, .highlight-word { color: var(--on-accent) !important; background: linear-gradient(transparent 58%, #FFE94A 58%) !important; }
+.logo i::after, .startup-brand > i::after { border-color: var(--on-accent) !important; }
+.steps li::before, .ini2, #meridianNotificationCount { color: var(--on-accent) !important; }
+
+/* Keep only the five primary destinations in both navigation bars. */
+header .wrap { position: relative; }
+header nav {
+  position: static;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 28px;
+  overflow: visible;
+}
+header nav > a.h { display: none !important; }
+header nav > a.h[data-nav="feed"],
+header nav > a.h[data-nav="home"],
+header nav > a.h[data-nav="sessions"],
+header nav > a.h[data-nav="doubts"],
+header nav > a.h[data-nav="me"] {
+  display: inline-flex !important;
+  position: relative;
+  min-height: 44px;
+  align-items: center;
+  padding: 8px 0;
+  border: 0;
+  background: transparent !important;
+  color: #A8A8A8;
+  font: 600 16px/1.2 Inter, Arial, sans-serif;
+  text-decoration: none;
+}
+header nav > a.h[data-nav="feed"]::after,
+header nav > a.h[data-nav="home"]::after,
+header nav > a.h[data-nav="sessions"]::after,
+header nav > a.h[data-nav="doubts"]::after,
+header nav > a.h[data-nav="me"]::after {
+  position: absolute;
+  right: 0;
+  bottom: -4px;
+  left: 0;
+  height: 3px;
+  background: #FFE94A;
+  content: "";
+  opacity: 0;
+}
+header nav > a.h[data-nav="feed"]:hover,
+header nav > a.h[data-nav="home"]:hover,
+header nav > a.h[data-nav="sessions"]:hover,
+header nav > a.h[data-nav="doubts"]:hover,
+header nav > a.h[data-nav="me"]:hover { color: #FFFFFF; }
+header nav > a.h[data-nav="feed"][aria-current="page"],
+header nav > a.h[data-nav="home"][aria-current="page"],
+header nav > a.h[data-nav="sessions"][aria-current="page"],
+header nav > a.h[data-nav="doubts"][aria-current="page"],
+header nav > a.h[data-nav="me"][aria-current="page"] { color: #FFFFFF; }
+header nav > a.h[data-nav="feed"][aria-current="page"]::after,
+header nav > a.h[data-nav="home"][aria-current="page"]::after,
+header nav > a.h[data-nav="sessions"][aria-current="page"]::after,
+header nav > a.h[data-nav="doubts"][aria-current="page"]::after,
+header nav > a.h[data-nav="me"][aria-current="page"]::after { opacity: 1; }
+header nav > a.h:focus-visible, .tabbar a:focus-visible,
+.account-menu-toggle:focus-visible, .account-menu :focus-visible {
+  outline: 2px solid #FFE94A;
+  outline-offset: 4px;
+}
+.account-menu-toggle {
+  display: inline-grid;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  place-items: center;
+  padding: 0;
+  border: 1.5px solid #FFFFFF;
+  background: #FFE94A;
+  color: var(--on-accent);
+  font: 700 18px/1 "Space Grotesk", sans-serif;
+  cursor: pointer;
+}
+.account-menu-toggle * { color: var(--on-accent); }
+.account-menu[hidden] { display: none !important; }
+.account-menu {
+  position: absolute;
+  z-index: 50;
+  top: calc(100% - 2px);
+  right: clamp(16px, 3vw, 48px);
+  display: grid;
+  width: min(260px, calc(100vw - 32px));
+  padding: 6px;
+  border: 1.5px solid #FFFFFF;
+  background: #000000;
+  color: #FFFFFF;
+}
+.account-menu > a, .account-menu > button {
+  display: flex;
+  width: 100%;
+  min-height: 44px;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 0;
+  background: #000000 !important;
+  color: #FFFFFF !important;
+  font: 600 16px/1.25 Inter, Arial, sans-serif;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.account-menu > a:hover, .account-menu > button:hover { background: #1A1A1A !important; color: #FFFFFF !important; }
+.account-menu .account-menu-separator { display: block; height: 1px; margin: 5px 2px; background: #FFFFFF; }
+.account-menu #meridianNotificationBell { justify-content: space-between; }
+.account-menu #meridianNotificationBell #meridianNotificationCount:not(:empty) {
+  position: static;
+  display: inline-grid;
+  min-width: 22px;
+  height: 22px;
+  place-items: center;
+  margin-left: auto;
+  padding: 0 5px;
+  background: #FFE94A;
+  color: var(--on-accent);
+  font-size: 12px;
+  line-height: 1;
+}
+.account-menu #gsign { min-height: 44px; padding: 10px 12px; border: 0; background: #000000 !important; color: #FFFFFF !important; font-size: 16px; }
+.account-menu #gsign.ghost { font-size: 0; }
+.account-menu #gsign.ghost .ini2 { display: none; }
+.account-menu #gsign.ghost::after { content: "Sign out"; font-size: 16px; }
+.account-menu #gsign.gbtn { font-size: 16px; }
+.me-quick-links { gap: 10px; }
+.tabbar { gap: 28px; }
+.tabbar a {
+  position: relative;
+  min-height: 48px;
+  padding: 8px 0;
+  border: 0 !important;
+  background: transparent !important;
+  color: #A8A8A8 !important;
+  font: 600 16px/1.2 Inter, Arial, sans-serif;
+  text-decoration: none;
+}
+.tabbar a[data-nav="feed"], .tabbar a[data-nav="home"], .tabbar a[data-nav="sessions"],
+.tabbar a[data-nav="doubts"], .tabbar a[data-nav="me"] { display: inline-flex !important; }
+.tabbar a:hover { color: #FFFFFF !important; }
+.tabbar a[aria-current="page"] { color: #FFFFFF !important; }
+.tabbar a[aria-current="page"]::after {
+  position: absolute;
+  right: 0;
+  bottom: -4px;
+  left: 0;
+  height: 3px;
+  background: #FFE94A;
+  content: "";
+}
+@media (max-width: 900px) {
+  header nav { width: auto; justify-content: flex-end; }
+}
+@media (max-width: 640px) {
+  header .wrap { flex-direction: row; align-items: center; }
+  header nav { width: auto; flex: 0 0 auto; gap: 0; }
+  header nav > a.h { display: none !important; }
+  .account-menu { position: fixed; top: 62px; right: 12px; }
+  .tabbar {
+    justify-content: space-around;
+    gap: 8px;
+    padding-inline: 10px;
+    border-top: 1.5px solid #FFFFFF;
+  }
+  .tabbar a { flex: 1 1 20%; font-size: 16px; }
+  .tabbar [data-nav="pricing"], .tabbar [data-nav="settings"],
+  .tabbar [data-nav="verification"], .tabbar [data-nav="dashboard"] { display: none !important; }
+}
 </style>
   </head>
   <body>
     <header>
       <div class="wrap">
         <a class="logo" href="#home" aria-label="Meridian home"><i></i>Meridian <span class="app-version" id="appVersion">v2.4.0</span></a>
-        <nav>
-          <a class="h" data-nav="home" data-workspace-nav="learner" href="#home">Find</a
+        <nav aria-label="Main navigation">
+          <a class="h" data-nav="feed" href="#feed">Home</a
+          ><a class="h" data-nav="home" data-workspace-nav="learner" href="#home">Find</a
           ><a class="h tutor-only" data-role-nav="tutor" data-workspace-nav="mentor" data-nav="dashboard" href="#dashboard" hidden>Dashboard</a
           ><a class="h" data-nav="sessions" href="#sessions">Calls</a
-          ><a class="h" data-nav="feed" href="#feed">Home</a
           ><a class="h admin-only" data-nav="verification" href="#verification" hidden>Meridian Admin</a
           ><a class="h" data-nav="doubts" href="#doubts">Doubts</a
           ><a class="h" data-nav="me" href="#me">Me</a
           ><a class="h" data-nav="pricing" href="#pricing">Pricing</a
           ><button class="btn ghost h" data-workspace-switch type="button" hidden>Switch to Senior</button
           ><button class="btn ghost h" id="btnTutor">Become a Senior</button
-          ><button class="btn gbtn" id="gsign">Sign up / Sign in</button>
+          ><button class="account-menu-toggle" id="accountMenuToggle" type="button" aria-label="Open account menu" aria-haspopup="true" aria-controls="accountMenu" aria-expanded="false"><span aria-hidden="true">M</span></button>
+          ><div class="account-menu" id="accountMenu" role="menu" aria-label="Account menu" hidden>
+            <a role="menuitem" data-nav="settings" href="#settings">Settings</a>
+            <a role="menuitem" data-nav="pricing" href="#pricing">Pricing</a>
+            <button role="menuitem" class="account-menu-switch" data-workspace-switch type="button" hidden>Switch to Senior</button>
+            <button role="menuitem" class="meridian-notification-trigger" id="meridianNotificationBell" type="button" aria-label="Alerts"><span>Alerts</span><span id="meridianNotificationCount" aria-live="polite"></span></button>
+            <a role="menuitem" class="admin-only" data-nav="verification" href="#verification" hidden>Meridian Admin</a>
+            <span class="account-menu-separator" role="separator"></span>
+            <button class="account-menu-signout" id="gsign" type="button">Sign up / Sign in</button>
+          </div>
         </nav>
       </div>
     </header>
@@ -2247,12 +2464,7 @@ header nav #gsign { order: 7; }
           <h1>Me</h1>
           <div id="meBody" style="margin-top: 16px"></div>
           <nav class="me-quick-links" aria-label="Me settings">
-            <a class="btn ghost" data-nav="pricing" href="#pricing">Pricing</a>
-            <a class="btn ghost" data-nav="settings" href="#settings">Settings</a>
-            <button class="btn ghost" data-workspace-switch type="button" hidden>Switch to mentor</button>
             <a class="btn ghost tutor-only" data-role-nav="tutor" data-nav="dashboard" href="#dashboard" hidden>Mentor dashboard</a>
-            <a class="btn ghost admin-only" data-nav="verification" href="#verification" hidden>Meridian Admin</a>
-            <button class="btn ghost meridian-notification-trigger" id="meridianNotificationBell" type="button" aria-label="Notifications" hidden><span id="meridianNotificationCount" aria-live="polite"></span></button>
           </nav>
         </div>
       </section>
@@ -2270,10 +2482,10 @@ header nav #gsign { order: 7; }
     </div>
 
     <nav class="tabbar" aria-label="Main">
-      <a data-workspace-nav="learner" data-nav="home" href="#home">Find</a
+      <a data-nav="feed" href="#feed">Home</a
+      ><a data-workspace-nav="learner" data-nav="home" href="#home">Find</a
       ><a class="tutor-only" data-role-nav="tutor" data-workspace-nav="mentor" data-nav="dashboard" href="#dashboard" hidden>Dashboard</a
       ><a data-nav="sessions" href="#sessions">Calls</a
-      ><a data-nav="feed" href="#feed">Home</a
       ><a class="admin-only" data-nav="verification" href="#verification" hidden>Admin</a
       ><a data-nav="doubts" href="#doubts">Doubts</a
       ><a data-nav="me" href="#me">Me</a

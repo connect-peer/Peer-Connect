@@ -3025,3 +3025,41 @@ fetch("version.json", { cache: "no-store" }).then(function (response) {
   var versionLabel = document.getElementById("appVersion");
   if (versionLabel && versionInfo.version) versionLabel.textContent = "v" + versionInfo.version;
 }).catch(function () {});
+
+/* Step 1c account-menu open/close behavior. Existing menu item actions remain untouched. */
+(function () {
+  var menu = document.getElementById("accountMenu");
+  var toggle = document.getElementById("accountMenuToggle");
+  var mobileMe = document.querySelector('.tabbar [data-nav="me"]');
+  if (!menu || !toggle) return;
+
+  function setMenuOpen(open) {
+    menu.hidden = !open;
+    toggle.setAttribute("aria-expanded", open ? "true" : "false");
+    var mobileToggle = document.querySelector('.tabbar [aria-controls="accountMenu"]');
+    if (mobileToggle) mobileToggle.setAttribute("aria-expanded", open ? "true" : "false");
+  }
+
+  toggle.addEventListener("click", function () {
+    setMenuOpen(menu.hidden);
+  });
+
+  if (mobileMe) mobileMe.addEventListener("click", function () {
+    if (window.matchMedia("(max-width: 640px)").matches) setMenuOpen(true);
+  });
+
+  menu.addEventListener("click", function (event) {
+    if (event.target.closest("a, button")) setMenuOpen(false);
+  });
+
+  document.addEventListener("click", function (event) {
+    if (menu.hidden || menu.contains(event.target) || toggle.contains(event.target) || (mobileMe && mobileMe.contains(event.target))) return;
+    setMenuOpen(false);
+  });
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key !== "Escape" || menu.hidden) return;
+    setMenuOpen(false);
+    toggle.focus();
+  });
+})();
