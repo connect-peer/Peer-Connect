@@ -2271,6 +2271,17 @@ body.safety-reviewer-portal .tabbar [data-nav="sessions"] { display: none !impor
 .guardian-consent-confirm-dialog .box { margin: 0; border: 0; }
 .guardian-consent-confirm-dialog h2 { margin: 8px 0; font-size: clamp(24px, 4vw, 32px); }
 .guardian-consent-confirm-dialog .row { justify-content: flex-end; margin-top: 24px; }
+.account-delete-dialog { width: min(560px, calc(100vw - 28px)); max-width: 560px; padding: 24px; border: 1.5px solid var(--skill); border-radius: 0; background: #050505; color: var(--ink); }
+.account-delete-dialog::backdrop { background: rgba(0,0,0,.84); backdrop-filter: none; }
+.account-delete-dialog h2 { margin: 8px 0; font: 700 clamp(24px, 4vw, 34px)/1.1 "Space Grotesk", sans-serif; }
+.account-delete-dialog p { line-height: 1.55; }
+.account-delete-warning { padding: 12px 14px; border-left: 4px solid var(--skill); background: #171113; }
+.account-delete-dialog label { display: grid; gap: 8px; margin: 18px 0; font-weight: 700; }
+.account-delete-dialog input { width: 100%; min-height: 48px; border: 1.5px solid var(--ink); border-radius: 0; background: #111; color: var(--ink); padding: 10px 12px; font: inherit; }
+.account-delete-dialog .row { justify-content: flex-end; margin-top: 20px; }
+.account-delete-status { min-height: 22px; color: var(--skill); }
+.account-delete-zone { margin-top: 22px; padding-top: 18px; border-top: 1.5px solid var(--skill); }
+.account-delete-zone h3 { margin: 0 0 8px; color: var(--skill); }
 
 /* Fullscreen onboarding stepper, styled like the split sign-in page. */
 dialog.setup-dialog { position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh; max-width: none; max-height: none; margin: 0; padding: 0; overflow: hidden; border: 0; border-radius: 0; background: #050505; color: #f7f7f7; }
@@ -2755,6 +2766,17 @@ header nav #meridianNotificationBell:hover { background: #1A1A1A !important; }
     </dialog>
     <dialog id="guardianConsentConfirmDialog" class="guardian-consent-confirm-dialog" aria-labelledby="guardianConsentConfirmTitle">
       <section class="box"><span class="community-kicker">PRIVATE SAFETY CHECK</span><h2 id="guardianConsentConfirmTitle">Confirm guardian consent</h2><p>Only continue if you personally confirmed consent with this learner’s parent or guardian. This unlocks bookings for the learner.</p><form method="dialog" class="row"><button class="btn ghost" value="cancel">Go back</button><button class="btn" value="confirmed">I confirmed consent</button></form></section>
+    </dialog>
+    <dialog id="deleteAccountDialog" class="account-delete-dialog" aria-labelledby="deleteAccountTitle" aria-describedby="deleteAccountWarning">
+      <span class="community-kicker">PERMANENT ACCOUNT ACTION</span>
+      <h2 id="deleteAccountTitle">Delete your account?</h2>
+      <p id="deleteAccountWarning" class="account-delete-warning">This permanently removes your Meridian profile, mentor verification and evidence, profile images, posts, doubts, bookings, chats, and other account data. This cannot be undone. External payment-provider records may be retained by that provider.</p>
+      <p>Active calls and unresolved refunds or mentor payouts must be completed before deletion.</p>
+      <label for="deleteAccountPhrase">Type <strong>DELETE MY ACCOUNT</strong> to continue
+        <input id="deleteAccountPhrase" type="text" autocomplete="off" spellcheck="false" aria-label="Type DELETE MY ACCOUNT to confirm">
+      </label>
+      <p class="account-delete-status" id="deleteAccountStatus" role="alert" aria-live="polite"></p>
+      <div class="row"><button class="btn ghost" id="cancelDeleteAccount" type="button">Keep my account</button><button class="btn danger" id="confirmDeleteAccount" type="button" disabled>Delete permanently</button></div>
     </dialog>
     <dialog id="dlg" aria-labelledby="dt"><div id="dbody"></div></dialog>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.2"></script>

@@ -56,6 +56,7 @@ supabase functions deploy meridian-verify-payment
 supabase functions deploy meridian-session-action
 supabase functions deploy meridian-create-room
 supabase functions deploy meridian-video-token
+supabase functions deploy meridian-delete-account
 supabase functions deploy meridian-razorpay-webhook --no-verify-jwt
 ```
 
@@ -65,6 +66,8 @@ Guardian consent currently requires the Meridian safety team to contact the guar
 
 Guardian email matching is enforced by `meridian_guardian_account_policy.sql`, which should be run after `supabase_meridian_safety_moderation.sql`. A guardian email linked to a normal Meridian learner or mentor cannot be approved for consent or used to unlock a new booking. Authorized staff can be allowlisted in the private `meridian_staff_accounts` table; existing `verification_admins` accounts are automatically treated as admins/reviewers for this check, regardless of their learner/mentor profile role. Changing guardian details clears the old consent approval and returns the learner to the review queue.
 
+Permanent account deletion uses `meridian_account_deletion.sql` plus the authenticated `meridian-delete-account` Edge Function. Run the SQL in Supabase SQL Editor and deploy the function before showing the delete button. It removes account-owned Meridian records and files before hard-deleting the Supabase Auth user. It refuses deletion while calls or payments/refunds/payouts are unresolved. External payment-provider records follow that provider's retention rules.
+
 ## Main files
 
 - `index.html`: Meridian pages, styles, navigation, and dialogs.
@@ -72,4 +75,5 @@ Guardian email matching is enforced by `meridian_guardian_account_policy.sql`, w
 - `supabase-config.js`: browser-safe Supabase configuration only.
 - `version.json`, `.release-please-manifest.json`, `.github/workflows/`: release metadata and automation.
 - `supabase_meridian_safety_moderation.sql`: single additive database migration for Meridian safety, guidance, matching, and booking.
-- `supabase/functions/`: server-only payment and 100ms video handlers. These run on Supabase, never GitHub Pages.
+- `meridian_account_deletion.sql`: secure, self-only database cleanup used before permanent Auth deletion.
+- `supabase/functions/`: server-only payment, video, and account-deletion handlers. These run on Supabase, never GitHub Pages.

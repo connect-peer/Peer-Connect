@@ -2066,7 +2066,7 @@ async function loadPeerSettingsPage() {
   account.innerHTML = '<div class="local-loading">Loading your account settings…</div>';
   if (!user) { account.innerHTML = '<p class="muted">Sign in to manage your account settings.</p><button class="btn" type="button" data-settings-signin>Sign in</button>'; if (mentor) mentor.hidden = true; await loadPeerSessionHistory(); return; }
   var safetyNotice = user.safety && meridianAge(user.safety.date_of_birth) < 18 && !user.safety.guardian_consent_verified_at ? '<p class="muted">Parent or guardian confirmation is still needed before bookings unlock. Your date of birth and guardian details are private.</p>' : '';
-  account.innerHTML = '<p><b>' + esc(user.n) + '</b><br>' + esc(user.e) + '<br>' + esc(accountTypeLabel(user.role)) + ' · Class ' + esc(String(user.grade || "—")) + '</p><p class="muted">' + esc((user.location && [user.location.school,user.location.city,user.location.state,user.location.country].filter(Boolean).join(" · ")) || "Add your school and location") + '</p>' + safetyNotice + '<div class="row"><button class="btn ghost" type="button" data-settings-edit-profile>Edit account details</button><label class="btn ghost">Profile photo<input type="file" accept="image/jpeg,image/png,image/webp" data-settings-image="avatar" hidden></label><label class="btn ghost">Banner<input type="file" accept="image/jpeg,image/png,image/webp" data-settings-image="banner" hidden></label></div>';
+  account.innerHTML = '<p><b>' + esc(user.n) + '</b><br>' + esc(user.e) + '<br>' + esc(accountTypeLabel(user.role)) + ' · Class ' + esc(String(user.grade || "—")) + '</p><p class="muted">' + esc((user.location && [user.location.school,user.location.city,user.location.state,user.location.country].filter(Boolean).join(" · ")) || "Add your school and location") + '</p>' + safetyNotice + '<div class="row"><button class="btn ghost" type="button" data-settings-edit-profile>Edit account details</button><label class="btn ghost">Profile photo<input type="file" accept="image/jpeg,image/png,image/webp" data-settings-image="avatar" hidden></label><label class="btn ghost">Banner<input type="file" accept="image/jpeg,image/png,image/webp" data-settings-image="banner" hidden></label></div><section class="account-delete-zone"><h3>Delete account permanently</h3><p class="muted">Remove your Meridian account, verification files, and account data.</p><button class="btn danger" type="button" data-delete-account>Delete my account</button></section>';
   if (mentor) mentor.hidden = !canMentor(user);
   if (canMentor(user) && mentorBody) {
     mentorBody.innerHTML = '<div class="local-loading">Loading mentor settings…</div>';
@@ -2128,6 +2128,15 @@ document.getElementById("sessionList").addEventListener("click", async function(
   if(result.error || result.data && result.data.error)window.alert(authErrorText(result.error || {message:result.data.error})); await loadPeerSessionList();
 });
 document.getElementById("settings").addEventListener("click", function (event) {
+  if (event.target.closest("[data-delete-account]")) {
+    var deleteDialog = document.getElementById("deleteAccountDialog");
+    document.getElementById("deleteAccountPhrase").value = "";
+    document.getElementById("deleteAccountStatus").textContent = "";
+    document.getElementById("confirmDeleteAccount").disabled = true;
+    if (deleteDialog && !deleteDialog.open) deleteDialog.showModal();
+    document.getElementById("deleteAccountPhrase").focus();
+    return;
+  }
   var chatButton = event.target.closest("[data-session-chat]");
   if (chatButton) openSessionChat(chatButton.dataset.sessionChat);
   if (event.target.closest("[data-settings-signin]")) { openSign(); return; }
@@ -2139,6 +2148,45 @@ document.getElementById("settings").addEventListener("click", function (event) {
 document.getElementById("settings").addEventListener("change", async function (event) {
   var imageInput = event.target.closest("[data-settings-image]");
   if (imageInput && imageInput.files && imageInput.files[0]) { await uploadProfileImage(imageInput.files[0], imageInput.dataset.settingsImage); imageInput.value = ""; return; }
+});
+document.getElementById("cancelDeleteAccount").addEventListener("click", function () {
+  document.getElementById("deleteAccountDialog").close();
+});
+document.getElementById("deleteAccountDialog").addEventListener("click", function (event) {
+  if (event.target === this) this.close();
+});
+document.getElementById("deleteAccountDialog").addEventListener("close", function () {
+  document.getElementById("deleteAccountPhrase").value = "";
+  document.getElementById("deleteAccountStatus").textContent = "";
+  document.getElementById("confirmDeleteAccount").disabled = true;
+});
+document.getElementById("deleteAccountPhrase").addEventListener("input", function () {
+  document.getElementById("confirmDeleteAccount").disabled = this.value.trim() !== "DELETE MY ACCOUNT";
+});
+document.getElementById("confirmDeleteAccount").addEventListener("click", async function () {
+  if (!user || this.disabled || document.getElementById("deleteAccountPhrase").value.trim() !== "DELETE MY ACCOUNT") return;
+  var button = this, status = document.getElementById("deleteAccountStatus");
+  button.disabled = true;
+  button.textContent = "Deleting account…";
+  status.textContent = "Removing your Meridian data and uploaded files…";
+  try {
+    var result = await supabaseClient.functions.invoke("meridian-delete-account", { body: { confirmation: "DELETE MY ACCOUNT" } });
+    var deleteError = result.data && result.data.error ? result.data.error : "";
+    if (result.error) {
+      deleteError = result.error.message || "Account deletion failed.";
+      if (result.error.context && typeof result.error.context.clone === "function") {
+        try { var responseBody = await result.error.context.clone().json(); if (responseBody && responseBody.error) deleteError = responseBody.error; } catch (_) {}
+      }
+    }
+    if (deleteError) throw new Error(deleteError);
+    await supabaseClient.auth.signOut({ scope: "local" });
+    window.location.hash = "#home";
+    window.location.reload();
+  } catch (error) {
+    status.textContent = error && error.message ? error.message : "Could not delete the account. Try again or contact Meridian support.";
+    button.disabled = document.getElementById("deleteAccountPhrase").value.trim() !== "DELETE MY ACCOUNT";
+    button.textContent = "Delete permanently";
+  }
 });
 document.querySelectorAll("[data-workspace-switch]").forEach(function (button) { button.addEventListener("click", switchWorkspace); });
 document.getElementById("closeBooking").addEventListener("click", function () { document.getElementById("bookingDialog").close(); });
