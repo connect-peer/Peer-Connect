@@ -58,7 +58,8 @@ function publicName(name) {
   return parts[0] + " " + parts[parts.length - 1].charAt(0).toUpperCase() + ".";
 }
 function esc(s) {
-  return s.replace(/[&<>"]/g, function (c) {
+  var text = typeof s === "string" || typeof s === "number" || typeof s === "boolean" ? String(s) : "";
+  return text.replace(/[&<>"]/g, function (c) {
     return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
   });
 }
