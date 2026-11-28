@@ -97,19 +97,23 @@ async function submitMeridianReport(target) {
   if (result.error) window.alert(authErrorText(result.error)); else window.alert("Thanks. Your report was sent privately to the Meridian review team.");
 }
 function drawChips() {
-  chips.innerHTML = subjects
-    .map(function (s) {
-      return (
-        '<button class="chip" aria-pressed="' +
-        (s === active) +
-        '" data-s="' +
-        s +
-        '">' +
-        s +
-        "</button>"
-      );
-    })
-    .join("");
+  var academicAreas = ["Maths", "Physics", "Chemistry", "Biology", "JEE", "NEET", "Computer Science", "English", "History", "Accountancy", "Economics", "Other exams"];
+  var activityAreas = ["Debate", "MUN", "Public speaking", "Robotics", "Coding", "Olympiads", "Music", "Art", "Theater", "Sports", "Startups", "Chess", "Writing", "Study skills", "Time management", "College and career guidance"];
+  var availableAreas = subjects.filter(function (subject) { return subject !== "All"; });
+  var academics = academicAreas.slice();
+  var activities = activityAreas.slice();
+  availableAreas.forEach(function (subject) {
+    if (academics.indexOf(subject) < 0 && activities.indexOf(subject) < 0) activities.push(subject);
+  });
+  var button = function (subject) {
+    return '<button type="button" class="chip" aria-pressed="' + (subject === active) + '" data-s="' + esc(subject) + '">' + esc(subject) + '</button>';
+  };
+  var row = function (label, className, values) {
+    return '<section class="chip-group ' + className + '" aria-label="' + label + '"><h2 class="chip-group-label">' + label + '</h2><div class="chip-row">' + values.map(button).join("") + '</div></section>';
+  };
+  chips.innerHTML = '<div class="chip-group chip-group-all"><span class="chip-group-label">Browse</span><div class="chip-row">' + button("All") + '</div></div>' +
+    row("Academics", "chip-group-academics", academics) +
+    row("Skills & activities", "chip-group-activities", activities);
 }
 function draw() {
   var list = tutors.filter(function (t) {
@@ -151,10 +155,8 @@ function draw() {
     .map(function (t) {
       var i = tutors.indexOf(t);
       return (
-        '<article class="card" data-profile-index="' + i + '" tabindex="0" aria-label="View ' + esc(t.me ? t.n : publicName(t.n)) + ' Journey map"><div class="cover mentor-card-cover" style="--c:' +
-        t.c +
-        '">' + (t.bannerUrl ? '<img class="mentor-banner-img" src="' + esc(t.bannerUrl) + '" alt="" loading="lazy">' : '') + '<span class="mentor-card-kicker">Journey map</span></div><div class="body">' +
-        '<div class="av">' +
+        '<article class="card" data-profile-index="' + i + '" tabindex="0" aria-label="View ' + esc(t.me ? t.n : publicName(t.n)) + ' Journey map"><div class="body">' +
+        '<div class="av" aria-hidden="true">' +
         (t.avatarUrl ? '<img src="' + esc(t.avatarUrl) + '" alt="">' : ini(t.n)) +
         "</div>" +
         '<h3><span class="tutor-name">' +
@@ -162,20 +164,20 @@ function draw() {
         (t.blue ? BT : "") +
         (t.verified ? ' <span class="verify-badge">Verified</span>' : t.me ? ' <span class="verify-review-state">' + esc(t.verificationStatus || "Not verified") + '</span>' : '') +
         '</span>' + (t.verified && t.available ? '<span class="tutor-online" title="Available"></span>' : '') + '</h3>' +
-        '<div class="sub">' +
-        esc(t.g) + " · " + esc(t.h) + '<br>' + esc([t.city, t.state].filter(Boolean).join(" · ")) +
-        "</div>" +
+        '<div class="sub"><span class="mentor-card-grade">' + esc(t.g) + '</span><span class="mentor-card-headline">' + esc(t.h) + '</span>' + ((t.state || t.city) ? '<span class="mentor-card-city">' + esc(t.state || t.city) + '</span>' : '') + '</div>' +
         (guidance && !t.me && list.indexOf(t) < 3 ? '<p class="muted mentor-match-reason">Suggested for you · ' + esc(t.matchReason) + '</p>' : '') +
         '<div class="tags">' +
-        t.s
+        t.s.slice(0, 2)
           .map(function (s) {
-            return '<span class="tag">' + s + "</span>";
+            var tagKind = ["Maths", "Physics", "Chemistry", "Biology", "JEE", "NEET", "Computer Science", "English", "History", "Accountancy", "Economics", "Other exams"].indexOf(s) >= 0 ? "tag-academic" : "tag-skill";
+            return '<span class="tag ' + tagKind + '">' + esc(s) + "</span>";
           })
           .join("") +
+        (t.s.length > 2 ? '<span class="tag tag-more">+' + (t.s.length - 2) + ' more</span>' : '') +
         "</div>" +
         (t.me
-          ? '<button class="btn ghost" data-edit-tutor-card>Edit profile</button>'
-          : '<div class="mentor-booking-cta"><span>30 min · ₹' + esc(t.sessionPrice || 199) + '</span><button class="btn" data-book-mentor="' + esc(t.user_id) + '">Book a Bearings call</button></div>') +
+          ? '<div class="mentor-booking-cta"><button class="btn ghost" data-edit-tutor-card>Edit profile</button></div>'
+          : '<div class="mentor-booking-cta"><button type="button" class="btn ghost mentor-journey-button">View Journey map</button><span>30 min · ₹' + esc(t.sessionPrice || 199) + '</span><button class="btn" data-book-mentor="' + esc(t.user_id) + '">Book a Bearings call</button></div>') +
         "</div></article>"
       );
     })
