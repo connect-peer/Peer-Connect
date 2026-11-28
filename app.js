@@ -3208,7 +3208,7 @@ fetch("version.json", { cache: "no-store" }).then(function (response) {
   });
 
   if (mobileMe) mobileMe.addEventListener("click", function () {
-    if (window.matchMedia("(max-width: 640px)").matches) setMenuOpen(true);
+    if (window.matchMedia("(max-width: 760px)").matches) setMenuOpen(true);
   });
 
   menu.addEventListener("click", function (event) {
