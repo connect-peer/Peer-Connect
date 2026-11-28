@@ -1082,14 +1082,111 @@ var learnerGoalDecisionChoices = [
   ["other", "Other"],
 ];
 var learnerBoardChoices = ["CBSE", "ICSE", "State board", "Other"];
-var learnerHelpSubjects = ["Maths", "Physics", "Chemistry", "Biology", "English", "Computer Science", "History", "Accountancy", "Economics", "Other"];
+var learnerHelpSubjects = ["Maths", "Physics", "Chemistry", "Biology", "English", "Computer Science", "History", "Accountancy", "Economics", "JEE", "NEET", "Other exams", "Other", "Debate", "MUN", "Public speaking", "Robotics", "Coding", "Olympiads", "Music", "Art", "Theater", "Sports", "Startups", "Chess", "Writing", "Study skills", "Time management", "College and career guidance"];
 var learnerLanguageChoices = ["English", "Hindi", "Bengali", "Tamil", "Telugu", "Marathi", "Kannada", "Malayalam", "Gujarati", "Punjabi", "Urdu", "Other"];
 function learnerGoalCheckboxGroup(name, title, options, selected, limit) {
   selected = selected || [];
+  function optionLabels(items) {
+    return items.map(function (option) {
+      var checked = selected.indexOf(option) >= 0;
+      return '<label><input type="checkbox" name="' + esc(name) + '" value="' + esc(option) + '"' + (checked ? ' checked' : '') + '><span>' + esc(option) + '</span></label>';
+    }).join("");
+  }
+  if (name === "learnerHelpSubjects") {
+    var skillOptions = ["Debate", "MUN", "Public speaking", "Robotics", "Coding", "Olympiads", "Music", "Art", "Theater", "Sports", "Startups", "Chess", "Writing", "Study skills", "Time management", "College and career guidance"];
+    var academicOptions = options.filter(function (option) { return skillOptions.indexOf(option) < 0; });
+    var activityOptions = options.filter(function (option) { return skillOptions.indexOf(option) >= 0; });
+    return '<fieldset class="profile-goal-group goal-help-subjects" data-goal-limit="' + limit + '"><legend>' + esc(title) + '</legend><div class="profile-subject-academics"><p class="profile-chip-category">Academics</p><div class="goal-checkbox-grid">' + optionLabels(academicOptions) + '</div></div><details class="profile-more-areas"><summary>Skills &amp; activities · More +</summary><div class="profile-subject-skills"><div class="goal-checkbox-grid">' + optionLabels(activityOptions) + '</div></div></details><small class="muted">Choose up to ' + limit + ' across both groups.</small></fieldset>';
+  }
   return '<fieldset class="profile-goal-group' + (limit ? ' goal-help-subjects' : '') + '"' + (limit ? ' data-goal-limit="' + limit + '"' : '') + '><legend>' + esc(title) + '</legend><div class="goal-checkbox-grid">' + options.map(function (option) {
     var checked = selected.indexOf(option) >= 0;
     return '<label><input type="checkbox" name="' + esc(name) + '" value="' + esc(option) + '"' + (checked ? ' checked' : '') + '><span>' + esc(option) + '</span></label>';
   }).join("") + '</div>' + (limit ? '<small class="muted">Choose up to ' + limit + '.</small>' : '') + '</fieldset>';
+}
+function createMeridianStepper(options) {
+  var root = options.root, steps = options.steps, activeIndex = 0, activePanel = null;
+  var counter = root.querySelector("[data-step-counter]"), segments = root.querySelector("[data-step-segments]"), progress = root.querySelector("[data-step-progress]"), back = root.querySelector("[data-step-back]"), next = root.querySelector("[data-step-next]"), complete = root.querySelector("[data-step-complete]");
+  function enabledIndexes() { return steps.map(function (step, index) { return step.enabled ? (step.enabled() ? index : -1) : index; }).filter(function (index) { return index >= 0; }); }
+  function render(direction) {
+    var indexes = enabledIndexes(), position = indexes.indexOf(activeIndex), step = activeIndex === -1 ? null : steps[activeIndex];
+    if (activeIndex !== -1 && position < 0) { activeIndex = indexes[0]; position = 0; step = steps[activeIndex]; }
+    root.querySelectorAll("[data-step-panel]").forEach(function (panel) { panel.hidden = true; panel.classList.remove("step-enter-forward", "step-enter-backward"); });
+    complete.hidden = true;
+    if (!step) {
+      complete.hidden = false;
+      complete.classList.remove("step-enter-forward", "step-enter-backward");
+      complete.classList.add(direction === "back" ? "step-enter-backward" : "step-enter-forward");
+      root.querySelector("[data-step-controls]").hidden = true;
+      if (counter) counter.textContent = "PROFILE PREVIEW";
+      if (segments) segments.replaceChildren();
+      if (progress) { progress.setAttribute("aria-valuemax", "100"); progress.setAttribute("aria-valuenow", "100"); }
+      if (options.preview) options.preview();
+      var completeHeading = complete.querySelector("h1");
+      if (completeHeading) completeHeading.focus({ preventScroll: true });
+      return;
+    }
+    root.querySelector("[data-step-controls]").hidden = false;
+    var panel = root.querySelector('[data-step-panel="' + step.panel + '"]');
+    if (!panel) return;
+    panel.hidden = false;
+    panel.classList.add(direction === "back" ? "step-enter-backward" : "step-enter-forward");
+    activePanel = panel;
+    if (counter) counter.textContent = "STEP " + (position + 1) + " OF " + indexes.length;
+    if (segments) {
+      segments.replaceChildren();
+      segments.style.gridTemplateColumns = "repeat(" + indexes.length + ", minmax(0, 1fr))";
+      indexes.forEach(function (_, segmentIndex) {
+        var segment = document.createElement("span");
+        segment.className = "profile-step-segment" + (segmentIndex <= position ? " is-done" : "");
+        segment.setAttribute("aria-hidden", "true");
+        segments.appendChild(segment);
+      });
+    }
+    if (progress) { progress.setAttribute("aria-valuemax", String(indexes.length)); progress.setAttribute("aria-valuenow", String(position + 1)); }
+    if (back) back.disabled = position === 0;
+    if (next) next.textContent = position === indexes.length - 1 ? "Review profile" : "Continue";
+    var brandLine = root.querySelector("[data-step-brand-line]");
+    if (brandLine) brandLine.textContent = step.brandLine || "Your Meridian profile, one step at a time.";
+    if (options.preview) options.preview();
+    var heading = panel.querySelector("h1");
+    if (heading) heading.focus({ preventScroll: true });
+  }
+  function validateCurrent() {
+    var step = steps[activeIndex], message = step && step.validate ? step.validate() : "";
+    var error = root.querySelector("#profileErr");
+    if (error) error.textContent = message || "";
+    if (message) {
+      var field = activePanel && activePanel.querySelector("input:not([type=checkbox]), select, textarea");
+      if (field) field.focus({ preventScroll: true });
+      return false;
+    }
+    return true;
+  }
+  function move(direction) {
+    var indexes = enabledIndexes(), position = indexes.indexOf(activeIndex);
+    if (direction === "next") {
+      if (!validateCurrent()) return;
+      if (position >= indexes.length - 1) { activeIndex = -1; render("next"); return; }
+      activeIndex = indexes[position + 1]; render("next"); return;
+    }
+    if (activeIndex === -1) { activeIndex = indexes[indexes.length - 1]; render("back"); return; }
+    if (position > 0) { activeIndex = indexes[position - 1]; render("back"); }
+  }
+  root.addEventListener("click", function (event) {
+    if (event.target.closest("[data-step-next]")) { event.preventDefault(); move("next"); }
+    else if (event.target.closest("[data-step-back]")) { event.preventDefault(); move("back"); }
+    else if (event.target.closest("[data-step-finish]")) { event.preventDefault(); if (options.onFinish) options.onFinish(); }
+  });
+  root.addEventListener("keydown", function (event) {
+    if (event.key !== "Enter" || event.shiftKey || event.target.closest("textarea,button,[role=option]")) return;
+    event.preventDefault();
+    if (activeIndex === -1) { if (options.onFinish) options.onFinish(); }
+    else move("next");
+  });
+  root.addEventListener("input", function () { if (options.preview) options.preview(); });
+  root.addEventListener("change", function () { if (options.preview) options.preview(); });
+  render("next");
+  return { render: render };
 }
 function openOnboarding(changeRole) {
   if (!user || !supabaseClient || onboardingOpen) return;
@@ -1103,27 +1200,23 @@ function openOnboarding(changeRole) {
   var savedGuidance = user.guidance || {};
   var savedSafety = user.safety || {};
   var rolePicker = '<fieldset class="role-options"><legend>How do you want to use Meridian?</legend><button type="button" class="role-option' + (selectedRole === "learner" || selectedRole === "student" ? " selected" : "") + '" data-role="learner" aria-pressed="' + (selectedRole === "learner" || selectedRole === "student") + '"><strong>Learner</strong><span>Find a Meridian Mentor, ask questions, and get guidance.</span></button><button type="button" class="role-option' + (selectedRole === "mentor" || selectedRole === "tutor" ? " selected" : "") + '" data-role="mentor" aria-pressed="' + (selectedRole === "mentor" || selectedRole === "tutor") + '"><strong>Meridian Mentor</strong><span>Share what you know and guide learners in lower classes.</span></button><button type="button" class="role-option' + (selectedRole === "both" ? " selected" : "") + '" data-role="both" aria-pressed="' + (selectedRole === "both") + '"><strong>Both</strong><span>Get guidance from mentors and guide learners in lower classes.</span></button></fieldset>';
-  dbody.innerHTML =
-    '<h3 id="dt">Set up your profile</h3><p style="color:var(--muted);margin:6px 0 14px">Add your school, location, and guidance goals so Meridian can help you find the right people.</p>' +
-    '<label for="profileName">Name</label><input id="profileName" autocomplete="name" value="' + esc(user.n) + '">' +
-    '<label for="profileGrade">Class</label><select id="profileGrade" required aria-label="Choose your class"><option value="">Choose your class</option>' +
-    [9, 10, 11, 12].map(function (grade) {
-      return '<option value="' + grade + '"' + (Number(user.grade) === grade ? " selected" : "") + '>Class ' + grade + '</option>';
-    }).join("") +
-    '</select><label for="profileSchool">School</label><input id="profileSchool" maxlength="180" autocomplete="organization" value="' + esc(savedLocation.school || "") + '" placeholder="Your school name">' +
-    '<label for="profileCity">City</label><input id="profileCity" maxlength="100" autocomplete="address-level2" value="' + esc(savedLocation.city || "") + '">' +
-    '<label for="profileState">State</label><input id="profileState" maxlength="100" autocomplete="address-level1" value="' + esc(savedLocation.state || "") + '">' +
-    '<label for="profileCountry">Country</label><input id="profileCountry" maxlength="100" autocomplete="country-name" value="' + esc(savedLocation.country || "") + '">' +
-    (user.safetySchemaAvailable ? '<label for="profileDob">Date of birth</label><input id="profileDob" type="date" max="' + new Date().toISOString().slice(0,10) + '" required value="' + esc(savedSafety.date_of_birth || "") + '"><div id="guardianFields"' + ((savedSafety.guardian_contact && !savedSafety.guardian_consent_verified_at) ? '' : ' hidden') + '><p class="muted">Learners under 18 need a parent or guardian to confirm consent before bookings unlock.</p><label for="guardianName">Parent or guardian name</label><input id="guardianName" maxlength="120" value="' + esc(savedSafety.guardian_name || '') + '"><label for="guardianEmail">Parent or guardian email</label><input id="guardianEmail" type="email" autocomplete="email" maxlength="254" value="' + esc(savedSafety.guardian_contact_type === 'email' ? savedSafety.guardian_contact : '') + '"></div>' : '') +
-    rolePicker + '<div id="learnerGoalFields" class="learner-goal-fields"><h4>Your guidance goals</h4><p class="muted">Tell us what you’re working toward. You can update this any time.</p>' +
-    '<label for="learnerGoalDecision">What would you like guidance with?</label><select id="learnerGoalDecision" required><option value="">Choose a goal</option>' + learnerGoalDecisionChoices.map(function (item) { return '<option value="' + item[0] + '"' + (savedGuidance.goal_decision === item[0] ? ' selected' : '') + '>' + esc(item[1]) + '</option>'; }).join("") + '</select>' +
-    '<label for="learnerBoard">Your board</label><select id="learnerBoard" required><option value="">Choose your board</option>' + learnerBoardChoices.map(function (item) { return '<option' + (savedGuidance.board === item ? ' selected' : '') + '>' + esc(item) + '</option>'; }).join("") + '</select>' +
-    '<label for="learnerTargetExam">Target exam <span class="muted">(optional)</span></label><input id="learnerTargetExam" maxlength="80" value="' + esc(savedGuidance.target_exam || '') + '" placeholder="For example, JEE Main or NEET">' +
-    learnerGoalCheckboxGroup("learnerHelpSubjects", "Subjects you want help with", learnerHelpSubjects, savedGuidance.help_subjects, 3) +
-    learnerGoalCheckboxGroup("learnerLanguages", "Languages you prefer", learnerLanguageChoices, savedGuidance.preferred_languages) +
-    '<label for="learnerCityTier">City type <span class="muted">(optional)</span></label><select id="learnerCityTier"><option value="">Prefer not to say</option><option value="tier_1"' + (savedGuidance.city_tier === "tier_1" ? ' selected' : '') + '>Tier 1</option><option value="tier_2"' + (savedGuidance.city_tier === "tier_2" ? ' selected' : '') + '>Tier 2</option><option value="tier_3"' + (savedGuidance.city_tier === "tier_3" ? ' selected' : '') + '>Tier 3</option><option value="other"' + (savedGuidance.city_tier === "other" ? ' selected' : '') + '>Other / not sure</option></select></div>' +
-    '<div class="err" id="profileErr" role="alert"></div>' +
-    '<div class="row"><button class="btn ghost" id="cancelProfile"' + (setupRequired ? ' hidden' : '') + '>Cancel</button><button class="btn" id="saveProfile">Continue</button></div>';
+  var gradeOptions = [9, 10, 11, 12].map(function (grade) { return '<option value="' + grade + '"' + (Number(user.grade) === grade ? " selected" : "") + '>Class ' + grade + '</option>'; }).join("");
+  var goalOptions = learnerGoalDecisionChoices.map(function (item) { return '<option value="' + item[0] + '"' + (savedGuidance.goal_decision === item[0] ? ' selected' : '') + '>' + esc(item[1]) + '</option>'; }).join("");
+  var boardOptions = learnerBoardChoices.map(function (item) { return '<option value="' + esc(item) + '"' + (savedGuidance.board === item ? ' selected' : '') + '>' + esc(item) + '</option>'; }).join("");
+  var safetyPanel = user.safetySchemaAvailable ? '<section class="profile-step-panel" data-step-panel="safety"><h1 tabindex="-1">A quick safety check</h1><p class="profile-step-hint">Your date of birth and guardian details stay private.</p><label for="profileDob">Date of birth</label><input id="profileDob" type="date" max="' + new Date().toISOString().slice(0,10) + '" required value="' + esc(savedSafety.date_of_birth || "") + '"><div id="guardianFields"' + ((savedSafety.guardian_contact && !savedSafety.guardian_consent_verified_at) ? '' : ' hidden') + '><p class="profile-step-hint">Learners under 18 need a parent or guardian to confirm consent before bookings unlock.</p><label for="guardianName">Parent or guardian name</label><input id="guardianName" maxlength="120" value="' + esc(savedSafety.guardian_name || '') + '"><label for="guardianEmail">Parent or guardian email</label><input id="guardianEmail" type="email" autocomplete="email" maxlength="254" value="' + esc(savedSafety.guardian_contact_type === 'email' ? savedSafety.guardian_contact : '') + '"></div></section>' : '';
+  dbody.innerHTML = '<div class="profile-stepper" id="profileStepper">' +
+    '<button class="profile-step-close" id="cancelProfile" type="button" aria-label="Close profile setup"' + (setupRequired ? ' hidden' : '') + '>×</button>' +
+    '<div class="profile-step-main"><div class="profile-step-top"><span class="profile-step-counter" data-step-counter></span><div class="profile-step-segments" data-step-segments role="progressbar" aria-label="Profile setup progress" aria-valuemin="1" aria-valuemax="6" aria-valuenow="1" data-step-progress></div></div>' +
+    '<div class="profile-step-panels">' +
+    '<section class="profile-step-panel" data-step-panel="name"><h1 id="dt" tabindex="-1">What should we call you?</h1><p class="profile-step-hint">Use the name you want people to see on your profile.</p><label for="profileName">Name</label><input id="profileName" autocomplete="name" value="' + esc(user.n) + '"></section>' +
+    '<section class="profile-step-panel" data-step-panel="class" hidden><h1 tabindex="-1">Which class are you in?</h1><p class="profile-step-hint">Choose your current class, then choose how you want to use Meridian.</p><label for="profileGrade">Class</label><select id="profileGrade" class="profile-class-options" size="5" required aria-label="Choose your class"><option value="">Choose your class</option>' + gradeOptions + '</select>' + rolePicker + '</section>' +
+    '<div id="learnerGoalFields" class="learner-goal-fields"><section class="profile-step-panel" data-step-panel="goal" hidden><h1 tabindex="-1">What do you want help with?</h1><p class="profile-step-hint">Choose the main thing you want guidance on. You can change it later.</p><label for="learnerGoalDecision">Your guidance goal</label><select id="learnerGoalDecision" class="profile-class-options" size="7" required><option value="">Choose a goal</option>' + goalOptions + '</select><label for="learnerTargetExam">Target exam <span class="muted">(optional)</span></label><input id="learnerTargetExam" maxlength="80" value="' + esc(savedGuidance.target_exam || '') + '" placeholder="For example, JEE Main or NEET"></section>' +
+    '<section class="profile-step-panel" data-step-panel="subjects" hidden><h1 tabindex="-1">Pick up to 3 subjects or skills</h1><p class="profile-step-hint">Choose up to three areas where you would like guidance.</p>' + learnerGoalCheckboxGroup("learnerHelpSubjects", "Subjects you want help with", learnerHelpSubjects, savedGuidance.help_subjects, 3) + '</section>' +
+    '<section class="profile-step-panel" data-step-panel="board" hidden><h1 tabindex="-1">Language and board</h1><p class="profile-step-hint">This helps us find someone who explains things in a way that works for you.</p><label for="learnerBoard">Your board</label><select id="learnerBoard" class="profile-class-options" size="5" required><option value="">Choose your board</option>' + boardOptions + '</select>' + learnerGoalCheckboxGroup("learnerLanguages", "Languages you prefer", learnerLanguageChoices, savedGuidance.preferred_languages) + '</section></div>' +
+    '<section class="profile-step-panel" data-step-panel="location" hidden><h1 tabindex="-1">Where are you?</h1><p class="profile-step-hint">City, state, school, and country are required by the current profile setup.</p><label for="profileCity">City</label><input id="profileCity" maxlength="100" autocomplete="address-level2" value="' + esc(savedLocation.city || "") + '"><label for="profileState">State</label><input id="profileState" maxlength="100" autocomplete="address-level1" value="' + esc(savedLocation.state || "") + '"><label for="profileSchool">School (required)</label><input id="profileSchool" maxlength="180" autocomplete="organization" value="' + esc(savedLocation.school || "") + '" placeholder="Your school name"><small class="profile-step-hint">Used for matching. Your school may appear on mentor profiles.</small><label for="profileCountry">Country</label><input id="profileCountry" maxlength="100" autocomplete="country-name" value="' + esc(savedLocation.country || "") + '"><label for="learnerCityTier">City type <span class="muted">(optional)</span></label><select id="learnerCityTier"><option value="">Prefer not to say</option><option value="tier_1"' + (savedGuidance.city_tier === "tier_1" ? ' selected' : '') + '>Tier 1</option><option value="tier_2"' + (savedGuidance.city_tier === "tier_2" ? ' selected' : '') + '>Tier 2</option><option value="tier_3"' + (savedGuidance.city_tier === "tier_3" ? ' selected' : '') + '>Tier 3</option><option value="other"' + (savedGuidance.city_tier === "other" ? ' selected' : '') + '>Other / not sure</option></select></section>' + safetyPanel +
+    '<section class="profile-step-panel profile-step-complete" data-step-complete hidden><span class="profile-step-counter">PROFILE PREVIEW</span><h1 tabindex="-1">You’re all set</h1><p class="profile-step-hint">Take a quick look. You can edit these details any time.</p><div class="profile-preview-card profile-preview-card-final"><div class="profile-preview-avatar" data-preview-initials>?</div><div><b data-preview-name>Your name</b><span data-preview-class>Class not selected</span></div><p data-preview-goal>Your guidance goal will appear here.</p><div class="profile-preview-subjects" data-preview-subjects></div></div><div class="profile-step-complete-actions"><button class="profile-step-back" type="button" data-step-back>Back</button><button class="btn profile-step-finish" type="button" data-step-finish>Find my Mentors</button></div></section>' +
+    '</div><div class="err profile-step-error" id="profileErr" role="alert" aria-live="polite"></div><div class="profile-step-controls" data-step-controls><button class="profile-step-back" type="button" data-step-back>Back</button><button class="btn" type="button" data-step-next>Continue</button></div><button class="sr-only" id="saveProfile" type="button">Continue</button></div>' +
+    '<aside class="profile-step-brand"><div class="auth-brand-top"><span class="auth-brand-mark">M</span>Meridian</div><p class="profile-brand-line" data-step-brand-line>Good guidance starts peer to peer.</p><div class="profile-brand-preview"><span class="profile-brand-preview-kicker">LIVE PREVIEW</span><div class="profile-preview-card"><div class="profile-preview-avatar" data-preview-initials>?</div><div><b data-preview-name>Your name</b><span data-preview-class>Class not selected</span></div><p data-preview-goal>Your guidance goal will appear here.</p><div class="profile-preview-subjects" data-preview-subjects></div></div></div><p class="profile-brand-foot">Find someone who has been where you are.</p></aside></div>';
   dlg.dataset.setupRequired = String(setupRequired);
   if (!dlg.open) dlg.showModal();
   var goalFields = document.getElementById("learnerGoalFields");
@@ -1134,9 +1227,46 @@ function openOnboarding(changeRole) {
     var age = today.getFullYear() - birth.getFullYear() - (today < new Date(today.getFullYear(), birth.getMonth(), birth.getDate()) ? 1 : 0);
     guardianFields.hidden = !birthInput.value || age >= 18;
   }
-  if (birthInput) birthInput.addEventListener("change", updateGuardianVisibility);
+  if (birthInput) { birthInput.addEventListener("change", updateGuardianVisibility); updateGuardianVisibility(); }
   function updateGoalVisibility() { goalFields.hidden = !canLearn({ role: selectedRole }); }
   updateGoalVisibility();
+  var profileStepperRoot = document.getElementById("profileStepper");
+  function profileStepPreview() {
+    var previewName = document.getElementById("profileName").value.trim() || "Your name";
+    var gradeValue = document.getElementById("profileGrade").value;
+    var goalSelect = document.getElementById("learnerGoalDecision"), goalValue = goalSelect.value ? goalSelect.options[goalSelect.selectedIndex].text : "Your guidance goal will appear here.";
+    var selectedSubjects = Array.from(dbody.querySelectorAll('input[name="learnerHelpSubjects"]:checked')).map(function (input) { return input.value; });
+    profileStepperRoot.querySelectorAll("[data-preview-name]").forEach(function (element) { element.textContent = previewName; });
+    profileStepperRoot.querySelectorAll("[data-preview-class]").forEach(function (element) { element.textContent = gradeValue ? "Class " + gradeValue : "Class not selected"; });
+    profileStepperRoot.querySelectorAll("[data-preview-goal]").forEach(function (element) { element.textContent = goalValue; });
+    profileStepperRoot.querySelectorAll("[data-preview-initials]").forEach(function (element) { element.textContent = ini(previewName); });
+    profileStepperRoot.querySelectorAll("[data-preview-subjects]").forEach(function (element) { element.textContent = selectedSubjects.length ? selectedSubjects.join(" · ") : "Subjects and skills will appear here."; });
+  }
+  function profileAge(dateValue) {
+    if (!dateValue) return null;
+    var birth = new Date(dateValue + "T00:00:00"), today = new Date();
+    return today.getFullYear() - birth.getFullYear() - (today < new Date(today.getFullYear(), birth.getMonth(), birth.getDate()) ? 1 : 0);
+  }
+  var profileStepper = createMeridianStepper({
+    root: profileStepperRoot,
+    steps: [
+      { panel: "name", brandLine: "Start with the name you want your community to see.", validate: function () { return document.getElementById("profileName").value.trim() ? "" : "Add your name to continue."; } },
+      { panel: "class", brandLine: "Your class helps us find guidance that fits your stage.", validate: function () { var grade = Number(document.getElementById("profileGrade").value); return !grade || !selectedRole ? "Choose your class and account type to continue." : grade < 9 || grade > 12 ? "Choose a class from 9 to 12." : ""; } },
+      { panel: "goal", enabled: function () { return canLearn({ role: selectedRole }); }, brandLine: "Tell us what you are working toward.", validate: function () { return document.getElementById("learnerGoalDecision").value ? "" : "Choose a guidance goal to continue."; } },
+      { panel: "subjects", enabled: function () { return canLearn({ role: selectedRole }); }, brandLine: "Choose the topics where another learner’s experience could help.", validate: function () { return dbody.querySelectorAll('input[name="learnerHelpSubjects"]:checked').length <= 3 ? "" : "Choose no more than three subjects."; } },
+      { panel: "board", enabled: function () { return canLearn({ role: selectedRole }); }, brandLine: "We use your board and languages to make better matches.", validate: function () { return document.getElementById("learnerBoard").value && dbody.querySelectorAll('input[name="learnerLanguages"]:checked').length ? "" : "Choose your board and at least one preferred language."; } },
+      { panel: "location", brandLine: "Your city and school help us find a closer match.", validate: function () { return ["profileSchool", "profileCity", "profileState", "profileCountry"].every(function (id) { return document.getElementById(id).value.trim(); }) ? "" : "Add your school, city, state, and country to continue."; } },
+      { panel: "safety", enabled: function () { return !!user.safetySchemaAvailable; }, brandLine: "Your date of birth and guardian details stay private.", validate: function () { var date = birthInput.value, age = profileAge(date); if (!date) return "Add your date of birth to continue."; if (age < 14) return "Meridian is available to learners aged 14 and over. Please check back when you are 14."; if (age < 18 && (!document.getElementById("guardianName").value.trim() || !document.getElementById("guardianEmail").value.trim())) return "A parent or guardian name and email are required for learners under 18."; return ""; } },
+    ],
+    preview: profileStepPreview,
+    onFinish: function () {
+      var saveButton = document.getElementById("saveProfile"), finishButton = profileStepperRoot.querySelector("[data-step-finish]");
+      if (finishButton && finishButton.disabled) return;
+      if (finishButton) finishButton.disabled = true;
+      var saveResult = saveButton.onclick.call(saveButton);
+      Promise.resolve(saveResult).finally(function () { if (dlg.open && finishButton) finishButton.disabled = false; });
+    },
+  });
   document.getElementById("cancelProfile").onclick = function () { dlg.close(); };
   dbody.querySelectorAll("[data-role]").forEach(function (button) {
     button.onclick = function () {
@@ -1147,6 +1277,7 @@ function openOnboarding(changeRole) {
         option.setAttribute("aria-pressed", String(selected));
       });
       updateGoalVisibility();
+      if (profileStepper) profileStepper.render("next");
     };
   });
   dbody.querySelectorAll("[data-goal-limit] input[type=checkbox]").forEach(function (input) {
