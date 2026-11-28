@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.7.0](https://github.com/connect-peer/Meridian/compare/v2.6.0...v2.7.0) (2026-11-28)
+
+
+### Features
+
+* added delete account button ([aadb37b](https://github.com/connect-peer/Meridian/commit/aadb37b19226e6ed6421a2a5a529993f2e215011))
+
+
+### Bug Fixes
+
+* delete button ([504e813](https://github.com/connect-peer/Meridian/commit/504e813d3ad4a996628a41a5b3016a698a16b68d))
+* ui ([81f069d](https://github.com/connect-peer/Meridian/commit/81f069d12908f7045a323cecbcf4078158bcce97))
+* ui ([d48aba4](https://github.com/connect-peer/Meridian/commit/d48aba4bea8425f22773e32f15b92e4fd43223f7))
+* ui ([f8bcacc](https://github.com/connect-peer/Meridian/commit/f8bcaccc0d902a7b2f2811165a5ff4f953a37d6f))
+* ui ([25f76b0](https://github.com/connect-peer/Meridian/commit/25f76b092fc7dead47e9a4ced16410867277fe85))
+* verify ([7cd27af](https://github.com/connect-peer/Meridian/commit/7cd27af536d1644344d806a9cc7b59daa85791ff))
+
 ## [2.6.0](https://github.com/connect-peer/Meridian/compare/v2.5.0...v2.6.0) (2026-11-28)
 
 
